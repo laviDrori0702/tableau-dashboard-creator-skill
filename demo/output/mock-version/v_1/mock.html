@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Performance Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+/* === RESET & BASE — from design-tokens.md === */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Open Sans', sans-serif;
+    background-color: #F4F6F7; /* design-tokens: Dashboard background */
+    font-size: 12px; /* design-tokens: Worksheet default font size */
+    min-width: 1100px;
+    min-height: 800px;
+    color: #1C2833; /* design-tokens: Text > Dark */
+}
+
+/* === LAYOUT — Tableau zone model === */
+.dashboard-root {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+}
+.content-wrapper {
+    width: 97.5%; /* ~1.25% margin from edges */
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* === TOP BANNER === */
+.top-banner {
+    height: 65px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #F4F6F7; /* design-tokens: Top banner area */
+    padding: 7px 12px;
+}
+.logo-area {
+    width: 195px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    color: #5D6D7E;
+    font-size: 11px;
+    font-style: italic;
+}
+.right-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.update-time {
+    font-size: 11px;
+    color: #5D6D7E; /* design-tokens: Text > Medium */
+}
+.info-icon {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    color: #5D6D7E;
+}
+
+/* === DASHBOARD TITLE === */
+.dashboard-title {
+    height: 70px;
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    padding-bottom: 0;
+    margin-bottom: 1px;
+    background-color: #F4F6F7; /* design-tokens: Top banner area */
+    font-size: 36px; /* design-tokens: Dashboard title size */
+    font-weight: bold;
+    color: #1C2833; /* design-tokens: Text > Dark */
+}
+
+/* === FILTER BAR === */
+.filter-bar {
+    height: 53px;
+    display: flex;
+    align-items: center;
+    margin-top: 11px;
+    margin-bottom: 11px;
+    gap: 12px;
+    padding: 0 4px;
+}
+.filter-label {
+    width: 185px;
+    font-size: 12px; /* design-tokens: Filter labels size */
+    font-weight: bold;
+    color: #5D6D7E; /* design-tokens: Text > Medium */
+    margin: 4px;
+}
+.filter-control {
+    padding: 6px 10px;
+    border: 1px solid #E5E8E8;
+    border-radius: 0; /* CRITICAL: no rounded corners */
+    font-family: 'Open Sans', sans-serif;
+    font-size: 12px;
+    background: #FFFFFF;
+    color: #1C2833;
+    cursor: pointer;
+    min-width: 140px;
+}
+.expand-btn {
+    width: 38px;
+    height: 38px;
+    margin: 4px;
+    border: 1px solid #E5E8E8;
+    border-radius: 0; /* CRITICAL */
+    background: #FFFFFF;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #5D6D7E;
+}
+
+/* === MAIN CONTENT === */
+.main-content {
+    flex: 1;
+    display: flex;
+    gap: 0;
+    overflow: hidden;
+}
+.charts-area {
+    flex: 0 0 86%;
+    display: flex;
+    flex-direction: column;
+}
+.hidden-filters-panel {
+    flex: 0 0 14%;
+    background: #FFFFFF;
+    padding: 12px;
+    border: none; /* design-tokens: border-style none */
+    border-radius: 0; /* CRITICAL */
+    display: none; /* collapsed by default */
+    flex-direction: column;
+    gap: 16px;
+}
+.hidden-filters-panel.visible {
+    display: flex;
+}
+.hidden-filters-panel h4 {
+    font-size: 12px;
+    font-weight: bold;
+    color: #5D6D7E;
+    margin-bottom: 4px;
+}
+
+/* === KPI ROW === */
+.kpi-row {
+    height: 94px;
+    display: flex;
+    gap: 16px; /* design-tokens: KPI cards margin-right */
+}
+.kpi-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF; /* design-tokens: Chart card background */
+    border: none;
+    border-radius: 0; /* CRITICAL */
+}
+.kpi-accent-bar {
+    height: 3px; /* design-tokens: accent bar height */
+    margin: 0;
+}
+.kpi-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8px 16px;
+}
+.kpi-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1C2833;
+}
+.kpi-label {
+    font-size: 11px;
+    color: #5D6D7E;
+    margin-top: 2px;
+}
+.kpi-comparison {
+    font-size: 11px;
+    margin-top: 4px;
+}
+.kpi-comparison.positive { color: #27AE60; }
+.kpi-comparison.negative { color: #E74C3C; }
+
+/* === CHART ROWS === */
+.chart-row {
+    display: flex;
+    gap: 16px;
+    margin-top: 11px; /* design-tokens: Chart card outer margin-top */
+    flex: 1;
+    min-height: 0;
+}
+.chart-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF; /* design-tokens: Chart card background */
+    padding: 8px; /* design-tokens: Chart card inner padding */
+    border: none;
+    border-radius: 0; /* CRITICAL */
+}
+.chart-title-bar {
+    height: 46px; /* design-tokens: Title bar fixed-size */
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.chart-icon {
+    width: 47px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: #5D6D7E;
+}
+.chart-title {
+    font-size: 15px; /* design-tokens: Chart title size */
+    color: #1C2833; /* design-tokens: Text > Dark */
+    margin: 4px;
+    margin-left: 10px;
+    flex: 1;
+}
+.chart-info-icon {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 4px;
+    font-size: 14px;
+    color: #5D6D7E;
+    cursor: pointer;
+}
+.separator-line {
+    height: 3px; /* design-tokens: separator height */
+    background-color: #E5E8E8; /* design-tokens: Separator line */
+    margin: 0 10px; /* design-tokens: separator margin-lr */
+}
+.chart-area {
+    flex: 1;
+    padding: 8px;
+    min-height: 0;
+    position: relative;
+}
+
+/* === TABLE (Chart 4) === */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.data-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-weight: 600;
+    color: #5D6D7E;
+    border-bottom: 2px solid #E5E8E8;
+    cursor: pointer;
+    user-select: none;
+}
+.data-table th:hover {
+    color: #1B4F72;
+}
+.data-table th .sort-arrow {
+    font-size: 10px;
+    margin-left: 4px;
+}
+.data-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #E5E8E8;
+    color: #1C2833;
+}
+.data-table tr:hover {
+    background-color: #F4F6F7;
+}
+
+/* === BELOW TARGET HIGHLIGHT === */
+.below-target {
+    color: #E74C3C;
+    font-weight: 600;
+}
+</style>
+</head>
+<body>
+
+<div class="dashboard-root">
+  <div class="content-wrapper">
+
+    <!-- TOP BANNER -->
+    <div class="top-banner">
+      <div class="logo-area">[Logo placeholder]</div>
+      <div class="right-section">
+        <span class="update-time">Last updated: Feb 2026</span>
+        <div class="info-icon" title="Dashboard info">&#9432;</div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD TITLE -->
+    <div class="dashboard-title">Sales Performance</div>
+
+    <!-- FILTER BAR -->
+    <div class="filter-bar">
+      <span class="filter-label">Filters</span>
+      <select class="filter-control" id="filter-date" onchange="applyFilters()">
+        <option value="all">All Months</option>
+        <option value="2025-01">January 2025</option>
+        <option value="2025-02">February 2025</option>
+        <option value="2025-03">March 2025</option>
+        <option value="2025-04">April 2025</option>
+      </select>
+      <select class="filter-control" id="filter-region" onchange="applyFilters()">
+        <option value="all">All Regions</option>
+        <option value="North America">North America</option>
+        <option value="Europe">Europe</option>
+        <option value="Asia Pacific">Asia Pacific</option>
+      </select>
+      <select class="filter-control" id="filter-category" onchange="applyFilters()">
+        <option value="all">All Categories</option>
+        <option value="Electronics">Electronics</option>
+        <option value="Software">Software</option>
+        <option value="Furniture">Furniture</option>
+      </select>
+      <button class="expand-btn" id="expand-btn" onclick="toggleHiddenFilters()" title="More filters">&#9776;</button>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+      <div class="charts-area">
+
+        <!-- KPI ROW -->
+        <div class="kpi-row">
+          <div class="kpi-card">
+            <div class="kpi-accent-bar" style="background-color: #1B4F72;"></div>
+            <div class="kpi-content">
+              <div class="kpi-value" id="kpi-revenue">$85,030</div>
+              <div class="kpi-label">Total Revenue</div>
+              <div class="kpi-comparison positive" id="kpi-revenue-comp"></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-accent-bar" style="background-color: #2E86C1;"></div>
+            <div class="kpi-content">
+              <div class="kpi-value" id="kpi-profit">$41,177</div>
+              <div class="kpi-label">Total Profit</div>
+              <div class="kpi-comparison positive" id="kpi-profit-comp"></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-accent-bar" style="background-color: #48C9B0;"></div>
+            <div class="kpi-content">
+              <div class="kpi-value" id="kpi-orders">40</div>
+              <div class="kpi-label">Total Orders</div>
+              <div class="kpi-comparison positive" id="kpi-orders-comp"></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-accent-bar" style="background-color: #F39C12;"></div>
+            <div class="kpi-content">
+              <div class="kpi-value" id="kpi-aov">$2,126</div>
+              <div class="kpi-label">Avg Order Value</div>
+              <div class="kpi-comparison" id="kpi-aov-comp" style="color: #5D6D7E;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CHART ROW 1 -->
+        <div class="chart-row">
+          <!-- Chart 1: Revenue Trend -->
+          <div class="chart-card">
+            <div class="chart-title-bar">
+              <div class="chart-icon">&#128200;</div>
+              <div class="chart-title">Revenue Trend</div>
+              <div class="chart-info-icon">&#9432;</div>
+            </div>
+            <div class="separator-line"></div>
+            <div class="chart-area">
+              <canvas id="revenueTrendChart"></canvas>
+            </div>
+          </div>
+          <!-- Chart 2: Revenue vs Target by Region -->
+          <div class="chart-card">
+            <div class="chart-title-bar">
+              <div class="chart-icon">&#128202;</div>
+              <div class="chart-title">Revenue vs Target by Region</div>
+              <div class="chart-info-icon">&#9432;</div>
+            </div>
+            <div class="separator-line"></div>
+            <div class="chart-area">
+              <canvas id="revenueVsTargetChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- CHART ROW 2 -->
+        <div class="chart-row">
+          <!-- Chart 3: Profit by Product Category -->
+          <div class="chart-card">
+            <div class="chart-title-bar">
+              <div class="chart-icon">&#128230;</div>
+              <div class="chart-title">Profit by Product Category</div>
+              <div class="chart-info-icon">&#9432;</div>
+            </div>
+            <div class="separator-line"></div>
+            <div class="chart-area">
+              <canvas id="profitByCategoryChart"></canvas>
+            </div>
+          </div>
+          <!-- Chart 4: Top Customers -->
+          <div class="chart-card">
+            <div class="chart-title-bar">
+              <div class="chart-icon">&#128101;</div>
+              <div class="chart-title">Top Customers</div>
+              <div class="chart-info-icon">&#9432;</div>
+            </div>
+            <div class="separator-line"></div>
+            <div class="chart-area" style="overflow-y: auto;">
+              <table class="data-table" id="customerTable">
+                <thead>
+                  <tr>
+                    <th onclick="sortTable(0)">Customer <span class="sort-arrow"></span></th>
+                    <th onclick="sortTable(1)">Segment <span class="sort-arrow"></span></th>
+                    <th onclick="sortTable(2)">Revenue <span class="sort-arrow">&#9660;</span></th>
+                    <th onclick="sortTable(3)">NPS <span class="sort-arrow"></span></th>
+                  </tr>
+                </thead>
+                <tbody id="customerTableBody">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- HIDDEN FILTERS PANEL -->
+      <div class="hidden-filters-panel" id="hidden-filters-panel">
+        <h4>Additional Filters</h4>
+        <div>
+          <label style="font-size:11px; color:#5D6D7E; font-weight:600;">Customer Segment</label>
+          <select class="filter-control" id="filter-segment" onchange="applyFilters()" style="width:100%; margin-top:4px;">
+            <option value="all">All Segments</option>
+            <option value="Enterprise">Enterprise</option>
+            <option value="Mid-Market">Mid-Market</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px; color:#5D6D7E; font-weight:600;">Country</label>
+          <select class="filter-control" id="filter-country" onchange="applyFilters()" style="width:100%; margin-top:4px;">
+            <option value="all">All Countries</option>
+            <option value="United States">United States</option>
+            <option value="Germany">Germany</option>
+            <option value="Japan">Japan</option>
+            <option value="Sweden">Sweden</option>
+            <option value="Canada">Canada</option>
+            <option value="Australia">Australia</option>
+            <option value="United Kingdom">United Kingdom</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// === SAMPLE DATA (from sample-data/ CSVs) ===
+const orders = [
+  {id:"ORD-001",date:"2025-01-03",customer:"Acme Corp",region:"North America",country:"United States",category:"Electronics",product:"Wireless Headphones",qty:12,price:89.99,discount:0.10,revenue:971.89,cost:480.00,profit:491.89},
+  {id:"ORD-002",date:"2025-01-05",customer:"GlobalTech Ltd",region:"Europe",country:"Germany",category:"Software",product:"Cloud License Annual",qty:5,price:299.99,discount:0.00,revenue:1499.95,cost:750.00,profit:749.95},
+  {id:"ORD-003",date:"2025-01-07",customer:"Sakura Inc",region:"Asia Pacific",country:"Japan",category:"Electronics",product:"USB-C Hub",qty:30,price:45.00,discount:0.15,revenue:1147.50,cost:600.00,profit:547.50},
+  {id:"ORD-004",date:"2025-01-10",customer:"Nordic Solutions",region:"Europe",country:"Sweden",category:"Furniture",product:"Standing Desk",qty:3,price:549.99,discount:0.05,revenue:1567.47,cost:1050.00,profit:517.47},
+  {id:"ORD-005",date:"2025-01-12",customer:"Maple Systems",region:"North America",country:"Canada",category:"Electronics",product:"4K Monitor",qty:8,price:399.99,discount:0.10,revenue:2879.93,cost:1760.00,profit:1119.93},
+  {id:"ORD-006",date:"2025-01-15",customer:"Acme Corp",region:"North America",country:"United States",category:"Software",product:"Security Suite",qty:15,price:149.99,discount:0.20,revenue:1799.88,cost:900.00,profit:899.88},
+  {id:"ORD-007",date:"2025-01-18",customer:"Outback Digital",region:"Asia Pacific",country:"Australia",category:"Furniture",product:"Ergonomic Chair",qty:6,price:329.99,discount:0.00,revenue:1979.94,cost:1080.00,profit:899.94},
+  {id:"ORD-008",date:"2025-01-20",customer:"Thames Analytics",region:"Europe",country:"United Kingdom",category:"Electronics",product:"Mechanical Keyboard",qty:25,price:129.99,discount:0.10,revenue:2924.78,cost:1250.00,profit:1674.78},
+  {id:"ORD-009",date:"2025-01-22",customer:"GlobalTech Ltd",region:"Europe",country:"Germany",category:"Electronics",product:"Wireless Mouse",qty:40,price:59.99,discount:0.05,revenue:2279.62,cost:800.00,profit:1479.62},
+  {id:"ORD-010",date:"2025-01-25",customer:"Sakura Inc",region:"Asia Pacific",country:"Japan",category:"Software",product:"Data Analytics Platform",qty:2,price:999.99,discount:0.00,revenue:1999.98,cost:800.00,profit:1199.98},
+  {id:"ORD-011",date:"2025-02-01",customer:"Acme Corp",region:"North America",country:"United States",category:"Furniture",product:"Conference Table",qty:1,price:1299.99,discount:0.00,revenue:1299.99,cost:780.00,profit:519.99},
+  {id:"ORD-012",date:"2025-02-03",customer:"Nordic Solutions",region:"Europe",country:"Sweden",category:"Electronics",product:"Webcam Pro",qty:10,price:179.99,discount:0.10,revenue:1619.91,cost:700.00,profit:919.91},
+  {id:"ORD-013",date:"2025-02-06",customer:"Maple Systems",region:"North America",country:"Canada",category:"Software",product:"Cloud License Annual",qty:8,price:299.99,discount:0.15,revenue:2039.93,cost:1200.00,profit:839.93},
+  {id:"ORD-014",date:"2025-02-08",customer:"Thames Analytics",region:"Europe",country:"United Kingdom",category:"Furniture",product:"Monitor Arm",qty:15,price:89.99,discount:0.00,revenue:1349.85,cost:525.00,profit:824.85},
+  {id:"ORD-015",date:"2025-02-10",customer:"Outback Digital",region:"Asia Pacific",country:"Australia",category:"Electronics",product:"Wireless Headphones",qty:20,price:89.99,discount:0.05,revenue:1709.81,cost:800.00,profit:909.81},
+  {id:"ORD-016",date:"2025-02-13",customer:"GlobalTech Ltd",region:"Europe",country:"Germany",category:"Furniture",product:"Standing Desk",qty:4,price:549.99,discount:0.10,revenue:1979.96,cost:1400.00,profit:579.96},
+  {id:"ORD-017",date:"2025-02-15",customer:"Acme Corp",region:"North America",country:"United States",category:"Electronics",product:"4K Monitor",qty:6,price:399.99,discount:0.00,revenue:2399.94,cost:1320.00,profit:1079.94},
+  {id:"ORD-018",date:"2025-02-18",customer:"Sakura Inc",region:"Asia Pacific",country:"Japan",category:"Furniture",product:"Ergonomic Chair",qty:8,price:329.99,discount:0.05,revenue:2507.92,cost:1440.00,profit:1067.92},
+  {id:"ORD-019",date:"2025-02-20",customer:"Nordic Solutions",region:"Europe",country:"Sweden",category:"Software",product:"Security Suite",qty:12,price:149.99,discount:0.10,revenue:1619.89,cost:720.00,profit:899.89},
+  {id:"ORD-020",date:"2025-02-22",customer:"Maple Systems",region:"North America",country:"Canada",category:"Electronics",product:"Mechanical Keyboard",qty:18,price:129.99,discount:0.00,revenue:2339.82,cost:900.00,profit:1439.82},
+  {id:"ORD-021",date:"2025-03-01",customer:"Thames Analytics",region:"Europe",country:"United Kingdom",category:"Software",product:"Data Analytics Platform",qty:3,price:999.99,discount:0.05,revenue:2849.97,cost:1200.00,profit:1649.97},
+  {id:"ORD-022",date:"2025-03-04",customer:"Outback Digital",region:"Asia Pacific",country:"Australia",category:"Software",product:"Cloud License Annual",qty:6,price:299.99,discount:0.10,revenue:1619.95,cost:900.00,profit:719.95},
+  {id:"ORD-023",date:"2025-03-06",customer:"Acme Corp",region:"North America",country:"United States",category:"Electronics",product:"USB-C Hub",qty:50,price:45.00,discount:0.15,revenue:1912.50,cost:1000.00,profit:912.50},
+  {id:"ORD-024",date:"2025-03-08",customer:"GlobalTech Ltd",region:"Europe",country:"Germany",category:"Electronics",product:"Webcam Pro",qty:15,price:179.99,discount:0.00,revenue:2699.85,cost:1050.00,profit:1649.85},
+  {id:"ORD-025",date:"2025-03-10",customer:"Sakura Inc",region:"Asia Pacific",country:"Japan",category:"Electronics",product:"Wireless Mouse",qty:35,price:59.99,discount:0.05,revenue:1994.67,cost:700.00,profit:1294.67},
+  {id:"ORD-026",date:"2025-03-13",customer:"Nordic Solutions",region:"Europe",country:"Sweden",category:"Furniture",product:"Conference Table",qty:2,price:1299.99,discount:0.00,revenue:2599.98,cost:1560.00,profit:1039.98},
+  {id:"ORD-027",date:"2025-03-15",customer:"Maple Systems",region:"North America",country:"Canada",category:"Furniture",product:"Monitor Arm",qty:20,price:89.99,discount:0.10,revenue:1619.82,cost:700.00,profit:919.82},
+  {id:"ORD-028",date:"2025-03-18",customer:"Thames Analytics",region:"Europe",country:"United Kingdom",category:"Electronics",product:"4K Monitor",qty:10,price:399.99,discount:0.05,revenue:3799.91,cost:2200.00,profit:1599.91},
+  {id:"ORD-029",date:"2025-03-20",customer:"Outback Digital",region:"Asia Pacific",country:"Australia",category:"Furniture",product:"Standing Desk",qty:5,price:549.99,discount:0.00,revenue:2749.95,cost:1750.00,profit:999.95},
+  {id:"ORD-030",date:"2025-03-22",customer:"Acme Corp",region:"North America",country:"United States",category:"Software",product:"Data Analytics Platform",qty:4,price:999.99,discount:0.10,revenue:3599.96,cost:1600.00,profit:1999.96},
+  {id:"ORD-031",date:"2025-04-01",customer:"GlobalTech Ltd",region:"Europe",country:"Germany",category:"Electronics",product:"Wireless Headphones",qty:22,price:89.99,discount:0.05,revenue:1880.79,cost:880.00,profit:1000.79},
+  {id:"ORD-032",date:"2025-04-03",customer:"Sakura Inc",region:"Asia Pacific",country:"Japan",category:"Software",product:"Security Suite",qty:10,price:149.99,discount:0.00,revenue:1499.90,cost:600.00,profit:899.90},
+  {id:"ORD-033",date:"2025-04-06",customer:"Nordic Solutions",region:"Europe",country:"Sweden",category:"Electronics",product:"Mechanical Keyboard",qty:14,price:129.99,discount:0.10,revenue:1637.87,cost:700.00,profit:937.87},
+  {id:"ORD-034",date:"2025-04-08",customer:"Maple Systems",region:"North America",country:"Canada",category:"Furniture",product:"Ergonomic Chair",qty:7,price:329.99,discount:0.00,revenue:2309.93,cost:1260.00,profit:1049.93},
+  {id:"ORD-035",date:"2025-04-10",customer:"Thames Analytics",region:"Europe",country:"United Kingdom",category:"Software",product:"Cloud License Annual",qty:9,price:299.99,discount:0.15,revenue:2294.92,cost:1350.00,profit:944.92},
+  {id:"ORD-036",date:"2025-04-13",customer:"Outback Digital",region:"Asia Pacific",country:"Australia",category:"Electronics",product:"USB-C Hub",qty:45,price:45.00,discount:0.10,revenue:1822.50,cost:900.00,profit:922.50},
+  {id:"ORD-037",date:"2025-04-15",customer:"Acme Corp",region:"North America",country:"United States",category:"Furniture",product:"Standing Desk",qty:3,price:549.99,discount:0.00,revenue:1649.97,cost:1050.00,profit:599.97},
+  {id:"ORD-038",date:"2025-04-18",customer:"GlobalTech Ltd",region:"Europe",country:"Germany",category:"Software",product:"Data Analytics Platform",qty:2,price:999.99,discount:0.05,revenue:1899.98,cost:800.00,profit:1099.98},
+  {id:"ORD-039",date:"2025-04-20",customer:"Sakura Inc",region:"Asia Pacific",country:"Japan",category:"Electronics",product:"4K Monitor",qty:9,price:399.99,discount:0.10,revenue:3239.92,cost:1980.00,profit:1259.92},
+  {id:"ORD-040",date:"2025-04-22",customer:"Nordic Solutions",region:"Europe",country:"Sweden",category:"Furniture",product:"Monitor Arm",qty:18,price:89.99,discount:0.00,revenue:1619.82,cost:630.00,profit:989.82}
+];
+
+const customers = [
+  {name:"Acme Corp",segment:"Enterprise",nps:72},
+  {name:"GlobalTech Ltd",segment:"Enterprise",nps:65},
+  {name:"Sakura Inc",segment:"Mid-Market",nps:81},
+  {name:"Nordic Solutions",segment:"Mid-Market",nps:78},
+  {name:"Maple Systems",segment:"Enterprise",nps:69},
+  {name:"Outback Digital",segment:"Mid-Market",nps:85},
+  {name:"Thames Analytics",segment:"Enterprise",nps:74}
+];
+
+const targets = [
+  {month:"2025-01",region:"North America",revenue_target:8000,orders_target:10},
+  {month:"2025-01",region:"Europe",revenue_target:9000,orders_target:12},
+  {month:"2025-01",region:"Asia Pacific",revenue_target:7000,orders_target:8},
+  {month:"2025-02",region:"North America",revenue_target:8500,orders_target:11},
+  {month:"2025-02",region:"Europe",revenue_target:9500,orders_target:13},
+  {month:"2025-02",region:"Asia Pacific",revenue_target:7500,orders_target:9},
+  {month:"2025-03",region:"North America",revenue_target:9000,orders_target:12},
+  {month:"2025-03",region:"Europe",revenue_target:10000,orders_target:14},
+  {month:"2025-03",region:"Asia Pacific",revenue_target:8000,orders_target:10},
+  {month:"2025-04",region:"North America",revenue_target:9500,orders_target:13},
+  {month:"2025-04",region:"Europe",revenue_target:10500,orders_target:15},
+  {month:"2025-04",region:"Asia Pacific",revenue_target:8500,orders_target:11}
+];
+
+// Chart series colors from design-tokens.md
+const COLORS = {
+  series: ['#1B4F72','#2E86C1','#48C9B0','#F39C12','#E74C3C','#8E44AD','#27AE60','#F1C40F','#95A5A6','#34495E'],
+  accent: ['#1B4F72','#2E86C1','#48C9B0','#F39C12'],
+  targetMuted: '#E5E8E8',
+  belowTarget: '#E74C3C'
+};
+const REGIONS = ['North America','Europe','Asia Pacific'];
+const MONTHS = ['2025-01','2025-02','2025-03','2025-04'];
+const MONTH_LABELS = ['Jan 2025','Feb 2025','Mar 2025','Apr 2025'];
+
+// === CHART INSTANCES ===
+let revenueTrendChart, revenueVsTargetChart, profitByCategoryChart;
+
+// === HELPER: get month string from date ===
+function getMonth(dateStr) { return dateStr.substring(0, 7); }
+
+// === HELPER: get customer segment ===
+function getSegment(customerName) {
+  const c = customers.find(function(cust) { return cust.name === customerName; });
+  return c ? c.segment : 'Unknown';
+}
+
+// === FILTER LOGIC ===
+function getFilteredOrders() {
+  const dateFilter = document.getElementById('filter-date').value;
+  const regionFilter = document.getElementById('filter-region').value;
+  const categoryFilter = document.getElementById('filter-category').value;
+  const segmentFilter = document.getElementById('filter-segment').value;
+  const countryFilter = document.getElementById('filter-country').value;
+
+  return orders.filter(function(o) {
+    if (dateFilter !== 'all' && getMonth(o.date) !== dateFilter) return false;
+    if (regionFilter !== 'all' && o.region !== regionFilter) return false;
+    if (categoryFilter !== 'all' && o.category !== categoryFilter) return false;
+    if (segmentFilter !== 'all' && getSegment(o.customer) !== segmentFilter) return false;
+    if (countryFilter !== 'all' && o.country !== countryFilter) return false;
+    return true;
+  });
+}
+
+function getFilteredTargets() {
+  const dateFilter = document.getElementById('filter-date').value;
+  const regionFilter = document.getElementById('filter-region').value;
+  return targets.filter(function(t) {
+    if (dateFilter !== 'all' && t.month !== dateFilter) return false;
+    if (regionFilter !== 'all' && t.region !== regionFilter) return false;
+    return true;
+  });
+}
+
+// === TOGGLE HIDDEN FILTERS ===
+function toggleHiddenFilters() {
+  const panel = document.getElementById('hidden-filters-panel');
+  panel.classList.toggle('visible');
+}
+
+// === UPDATE KPIs ===
+function updateKPIs(filtered, filteredTargets) {
+  const totalRevenue = filtered.reduce(function(s, o) { return s + o.revenue; }, 0);
+  const totalProfit = filtered.reduce(function(s, o) { return s + o.profit; }, 0);
+  const totalOrders = filtered.length;
+  const avgOV = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  const totalRevenueTarget = filteredTargets.reduce(function(s, t) { return s + t.revenue_target; }, 0);
+  const totalOrdersTarget = filteredTargets.reduce(function(s, t) { return s + t.orders_target; }, 0);
+  const margin = totalRevenue > 0 ? (totalProfit / totalRevenue * 100) : 0;
+
+  document.getElementById('kpi-revenue').textContent = '$' + Math.round(totalRevenue).toLocaleString();
+  document.getElementById('kpi-profit').textContent = '$' + Math.round(totalProfit).toLocaleString();
+  document.getElementById('kpi-orders').textContent = totalOrders.toLocaleString();
+  document.getElementById('kpi-aov').textContent = '$' + Math.round(avgOV).toLocaleString();
+
+  // Revenue vs target comparison
+  if (totalRevenueTarget > 0) {
+    const revPct = (totalRevenue / totalRevenueTarget * 100).toFixed(1);
+    const revComp = document.getElementById('kpi-revenue-comp');
+    revComp.textContent = (revPct >= 100 ? '\u25B2 ' : '\u25BC ') + revPct + '% of target';
+    revComp.className = 'kpi-comparison ' + (revPct >= 100 ? 'positive' : 'negative');
+  }
+
+  // Profit margin
+  const profitComp = document.getElementById('kpi-profit-comp');
+  profitComp.textContent = margin.toFixed(1) + '% margin';
+  profitComp.className = 'kpi-comparison ' + (margin >= 40 ? 'positive' : 'negative');
+
+  // Orders vs target
+  if (totalOrdersTarget > 0) {
+    const ordPct = (totalOrders / totalOrdersTarget * 100).toFixed(1);
+    const ordComp = document.getElementById('kpi-orders-comp');
+    ordComp.textContent = (ordPct >= 100 ? '\u25B2 ' : '\u25BC ') + ordPct + '% of target (' + totalOrdersTarget + ')';
+    ordComp.className = 'kpi-comparison ' + (ordPct >= 100 ? 'positive' : 'negative');
+  }
+
+  document.getElementById('kpi-aov-comp').textContent = 'per order';
+}
+
+// === CHART 1: REVENUE TREND (LINE) ===
+function updateRevenueTrend(filtered) {
+  const datasets = REGIONS.map(function(region, i) {
+    const data = MONTHS.map(function(m) {
+      return filtered.filter(function(o) { return o.region === region && getMonth(o.date) === m; })
+                     .reduce(function(s, o) { return s + o.revenue; }, 0);
+    });
+    return {
+      label: region,
+      data: data,
+      borderColor: COLORS.series[i],
+      backgroundColor: COLORS.series[i] + '20',
+      borderWidth: 2,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      tension: 0.3,
+      fill: false
+    };
+  });
+
+  if (revenueTrendChart) revenueTrendChart.destroy();
+  revenueTrendChart = new Chart(document.getElementById('revenueTrendChart'), {
+    type: 'line',
+    data: { labels: MONTH_LABELS, datasets: datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { family: 'Open Sans', size: 11 }, color: '#5D6D7E' } },
+        tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString(); } } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { family: 'Open Sans', size: 11 }, color: '#5D6D7E' } },
+        y: { grid: { color: '#E5E8E8' }, ticks: { font: { family: 'Open Sans', size: 11 }, color: '#5D6D7E', callback: function(v) { return '$' + (v/1000).toFixed(0) + 'k'; } } }
+      }
+    }
+  });
+}
+
+// === CHART 2: REVENUE VS TARGET BY REGION (BAR) ===
+function updateRevenueVsTarget(filtered, filteredTargets) {
+  const actualByRegion = REGIONS.map(function(r) { return filtered.filter(function(o) { return o.region === r; }).reduce(function(s, o) { return s + o.revenue; }, 0); });
+  const targetByRegion = REGIONS.map(function(r) { return filteredTargets.filter(function(t) { return t.region === r; }).reduce(function(s, t) { return s + t.revenue_target; }, 0); });
+
+  // Determine bar colors: red if below target — per PDR requirement
+  const barColors = REGIONS.map(function(_, i) { return actualByRegion[i] < targetByRegion[i] ? COLORS.belowTarget : COLORS.series[0]; });
+
+  if (revenueVsTargetChart) revenueVsTargetChart.destroy();
+  revenueVsTargetChart = new Chart(document.getElementById('revenueVsTargetChart'), {
+    type: 'bar',
+    data: {
+      labels: REGIONS,
+      datasets: [
+        { label: 'Actual Revenue', data: actualByRegion, backgroundColor: barColors, borderRadius: 0 },
+        { label: 'Target', data: targetByRegion, backgroundColor: COLORS.targetMuted, borderRadius: 0 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { family: 'Open Sans', size: 11 }, color: '#5D6D7E' } },
+        tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ': $' + Math.round(ctx.parsed.x).toLocaleString(); } } }
+      },
+      scales: {
+        x: { grid: { color: '#E5E8E8' }, ticks: { font: { family: 'Open Sans', size: 11 }, color: '#5D6D7E', callback: function(v) { return '$' + (v/1000).toFixed(0) + 'k'; } } },
+        y: { grid: { display: false }, ticks: { font: { family: 'Open Sans', size: 11 }, color: '#5D6D7E' } }
+      }
+    }
+  });
+}
+
+// === CHART 3: PROFIT BY CATEGORY (BAR) ===
+function updateProfitByCategory(filtered) {
+  const categories = ['Electronics','Software','Furniture'];
+  const profitData = categories.map(function(c) { return filtered.filter(function(o) { return o.category === c; }).reduce(function(s, o) { return s + o.profit; }, 0); });
+
+  if (profitByCategoryChart) profitByCategoryChart.destroy();
+  profitByCategoryChart = new Chart(document.getElementById('profitByCategoryChart'), {
+    type: 'bar',
+    data: {
+      labels: categories,
+      datasets: [{
+        label: 'Profit',
+        data: profitData,
+        backgroundColor: [COLORS.series[0], COLORS.series[1], COLORS.series[2]],
+        borderRadius: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: function(ctx) { return 'Profit: $' + Math.round(ctx.parsed.x).toLocaleString(); } } }
+      },
+      scales: {
+        x: { grid: { color: '#E5E8E8' }, ticks: { font: { family: 'Open Sans', size: 11 }, color: '#5D6D7E', callback: function(v) { return '$' + (v/1000).toFixed(0) + 'k'; } } },
+        y: { grid: { display: false }, ticks: { font: { family: 'Open Sans', size: 11 }, color: '#5D6D7E' } }
+      }
+    }
+  });
+}
+
+// === CHART 4: TOP CUSTOMERS TABLE ===
+let currentSortCol = 2; // default sort by revenue
+let currentSortAsc = false; // descending
+
+function updateCustomerTable(filtered) {
+  // Aggregate revenue per customer from filtered orders
+  const custMap = {};
+  filtered.forEach(function(o) {
+    if (!custMap[o.customer]) custMap[o.customer] = 0;
+    custMap[o.customer] += o.revenue;
+  });
+
+  // Build rows with segment and NPS
+  var rows = Object.keys(custMap).map(function(name) {
+    var c = customers.find(function(cust) { return cust.name === name; });
+    return { name: name, segment: c ? c.segment : '\u2014', revenue: custMap[name], nps: c ? c.nps : 0 };
+  });
+
+  // Sort
+  rows.sort(function(a, b) {
+    var valA, valB;
+    switch(currentSortCol) {
+      case 0: valA = a.name; valB = b.name; break;
+      case 1: valA = a.segment; valB = b.segment; break;
+      case 2: valA = a.revenue; valB = b.revenue; break;
+      case 3: valA = a.nps; valB = b.nps; break;
+    }
+    if (typeof valA === 'string') return currentSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    return currentSortAsc ? valA - valB : valB - valA;
+  });
+
+  // Build table rows using safe DOM methods
+  var tbody = document.getElementById('customerTableBody');
+  while (tbody.firstChild) { tbody.removeChild(tbody.firstChild); }
+
+  rows.forEach(function(r) {
+    var tr = document.createElement('tr');
+    var tdName = document.createElement('td');
+    tdName.textContent = r.name;
+    var tdSegment = document.createElement('td');
+    tdSegment.textContent = r.segment;
+    var tdRevenue = document.createElement('td');
+    tdRevenue.textContent = '$' + Math.round(r.revenue).toLocaleString();
+    var tdNps = document.createElement('td');
+    tdNps.textContent = r.nps;
+    tr.appendChild(tdName);
+    tr.appendChild(tdSegment);
+    tr.appendChild(tdRevenue);
+    tr.appendChild(tdNps);
+    tbody.appendChild(tr);
+  });
+
+  // Update sort arrows using safe DOM methods
+  var arrows = document.querySelectorAll('#customerTable th .sort-arrow');
+  for (var i = 0; i < arrows.length; i++) {
+    arrows[i].textContent = i === currentSortCol ? (currentSortAsc ? '\u25B2' : '\u25BC') : '';
+  }
+}
+
+function sortTable(colIndex) {
+  if (currentSortCol === colIndex) {
+    currentSortAsc = !currentSortAsc;
+  } else {
+    currentSortCol = colIndex;
+    currentSortAsc = colIndex <= 1; // alphabetical ascending, numbers descending
+  }
+  applyFilters();
+}
+
+// === MASTER FILTER APPLICATION ===
+function applyFilters() {
+  var filtered = getFilteredOrders();
+  var filteredTargets = getFilteredTargets();
+  updateKPIs(filtered, filteredTargets);
+  updateRevenueTrend(filtered);
+  updateRevenueVsTarget(filtered, filteredTargets);
+  updateProfitByCategory(filtered);
+  updateCustomerTable(filtered);
+}
+
+// === INIT ===
+applyFilters();
+</script>
+
+</body>
+</html>

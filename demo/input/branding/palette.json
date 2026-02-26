@@ -1,0 +1,11 @@
+{
+  "primary": "#1B4F72",
+  "secondary": "#2E86C1",
+  "accent_colors": ["#1B4F72", "#2E86C1", "#48C9B0", "#F39C12"],
+  "background": "#F4F6F7",
+  "card_background": "#FFFFFF",
+  "separator": "#E5E8E8",
+  "text_dark": "#1C2833",
+  "text_medium": "#5D6D7E",
+  "chart_series": ["#1B4F72", "#2E86C1", "#48C9B0", "#F39C12", "#E74C3C", "#8E44AD", "#27AE60", "#F1C40F", "#95A5A6", "#34495E"]
+}

@@ -1,0 +1,26 @@
+# Ignore everything by default
+*
+
+# Allow top-level files
+!.gitignore
+!README.md
+
+# Allow skill/ tree
+!skill/
+!skill/tableau-dashboard-creator/
+!skill/tableau-dashboard-creator/SKILL.md
+!skill/tableau-dashboard-creator/assets/
+!skill/tableau-dashboard-creator/assets/**
+!skill/tableau-dashboard-creator/examples/
+!skill/tableau-dashboard-creator/examples/**
+!skill/tableau-dashboard-creator/references/
+!skill/tableau-dashboard-creator/references/**
+!skill/tableau-dashboard-creator/scripts/
+!skill/tableau-dashboard-creator/scripts/**
+
+# Allow demo/ tree
+!demo/
+!demo/input/
+!demo/input/**
+!demo/output/
+!demo/output/**
