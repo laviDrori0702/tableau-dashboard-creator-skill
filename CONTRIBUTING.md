@@ -26,7 +26,7 @@ Thanks for your interest in improving the Tableau Dashboard Creator skill!
 
 ### Areas Where Help is Welcome
 
-- **Database connectors** — Adding support for new databases (MySQL, BigQuery, etc.) in `skill/tableau-dashboard-creator/scripts/`
+- **Database connectors** — Adding query scripts for new databases (Databricks, Snowflake, MySQL, BigQuery, etc.) in `skill/tableau-dashboard-creator/scripts/` — follow the `query_postgresql.py` pattern
 - **TWB generation** — Step E is experimental; improvements to XML fidelity are valuable
 - **Layout templates** — New dashboard layout patterns in the design tokens system
 - **Documentation** — Improving the README, adding tutorials, or translating

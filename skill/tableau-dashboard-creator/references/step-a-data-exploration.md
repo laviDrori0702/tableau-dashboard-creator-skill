@@ -25,21 +25,14 @@ When using local files, note in DS-ARCHITECTURE.md that the datasource is a loca
 If no `sample-data/` directory exists (or it is empty), read `QUERIES.md` and execute queries:
 
 1. **Parse QUERIES.md** — queries are grouped under headings that indicate the database type:
-   - `## Databricks` → use `scripts/query_databricks.py`
    - `## PostgreSQL` → use `scripts/query_postgresql.py`
-   - `## Snowflake` → use `scripts/query_snowflake.py`
+   - Other database types → the user must add a matching `query_<dbtype>.py` script to `scripts/` following the PostgreSQL pattern
 
 2. **Execute each query** using the matching script:
 
 ```bash
-# Databricks
-python scripts/query_databricks.py "SELECT * FROM catalog.schema.table"
-
 # PostgreSQL
 python scripts/query_postgresql.py "SELECT * FROM public.table"
-
-# Snowflake
-python scripts/query_snowflake.py "SELECT * FROM db.schema.table"
 ```
 
 All scripts enforce LIMIT 500 automatically. If the user's query already has a LIMIT, it is preserved.

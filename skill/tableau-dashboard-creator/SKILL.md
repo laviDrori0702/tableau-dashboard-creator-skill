@@ -14,7 +14,7 @@ Before starting, verify the user has provided:
 
 ```
 Checklist:
-- [ ] QUERIES.md — SQL queries grouped under database type headings (Databricks / PostgreSQL / Snowflake)
+- [ ] QUERIES.md — SQL queries grouped under database type headings (e.g., PostgreSQL)
       OR sample-data/ directory with CSV, JSON, or XLSX files
 - [ ] <DASHBOARD-NAME>-PDR.md — Human-language dashboard request
 - [ ] .env — Database credentials (skip if using sample-data/)
@@ -30,26 +30,19 @@ If any are missing, ask the user to provide them before proceeding.
 Queries must be grouped under a heading matching the database type:
 
 ```markdown
-## Databricks
-SELECT * FROM catalog.schema.table1
-
 ## PostgreSQL
 SELECT * FROM public.table2
 ```
 
 The agent selects the correct query script based on the heading.
 
-### Required Python packages (per database type)
+> **Adding other databases**: The skill ships with PostgreSQL support. To add other databases (Databricks, Snowflake, MySQL, BigQuery, etc.), create a matching `query_<dbtype>.py` script in `scripts/` following the same pattern as `query_postgresql.py`, add the corresponding heading to QUERIES.md, and update the step-a reference.
+
+### Required Python packages
 
 ```
-# Databricks
-databricks-sql-connector, python-dotenv, pandas
-
 # PostgreSQL
 psycopg2-binary, python-dotenv, pandas
-
-# Snowflake
-snowflake-connector-python, python-dotenv, pandas
 ```
 
 ## Workflow Overview
@@ -63,6 +56,8 @@ Step D: Implementation Spec ──[user approval]──> Step E: TWB Generation 
 ```
 
 **Do NOT skip steps. Wait for explicit user approval before moving to the next step.**
+
+> **Every step is iterative.** The agent will not produce a perfect result in a single pass — this is expected and by design. Encourage the user to review each artifact carefully, request changes, and iterate until satisfied. This is especially true for Step C (HTML mock) and Step E (TWB generation). For Step C, encourage the user to share the mock with stakeholders for validation before approving — a well-reviewed mock prevents costly rework downstream.
 
 ## Step 0: Brand Setup
 
@@ -85,9 +80,8 @@ Read [references/step-a-data-exploration.md](references/step-a-data-exploration.
 Summary:
 1. **Check for local data first**: If `sample-data/` directory exists with CSV/JSON/XLSX files, scan them directly — skip database queries
 2. **Otherwise**, read QUERIES.md, identify the database type from headings, and execute each query via the matching script:
-   - Databricks: `scripts/query_databricks.py`
    - PostgreSQL: `scripts/query_postgresql.py`
-   - Snowflake: `scripts/query_snowflake.py`
+   - Other databases: add a `query_<dbtype>.py` script following the PostgreSQL pattern
 3. Analyze schema and sample data
 4. Create `DS-ARCHITECTURE.md` with datasource and field descriptions
 5. Present DS-ARCHITECTURE.md to the user for approval

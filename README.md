@@ -64,9 +64,7 @@ tableau-dashboard-creator-skill/
 │       │   ├── tableau-design-tokens.md         # Design token reference
 │       │   └── twb-xml-reference.md             # TWB XML schema docs
 │       └── scripts/
-│           ├── query_databricks.py              # Databricks SQL executor
-│           ├── query_postgresql.py              # PostgreSQL SQL executor
-│           └── query_snowflake.py               # Snowflake SQL executor
+│           └── query_postgresql.py              # PostgreSQL SQL executor
 └── demo/
     ├── input/                                   ← What YOU provide (example files)
     │   ├── SalesPerformance-PDR.md              # Completed dashboard request
@@ -229,13 +227,13 @@ These are the artifacts the skill generated from the inputs above:
 
 ## Database Support
 
-The skill includes query scripts for three databases. Required packages per database:
+The skill ships with a PostgreSQL query script. Additional database connectors can be added to `skill/tableau-dashboard-creator/scripts/` to match your environment.
 
 | Database | Packages | Key `.env` Variables |
 |----------|----------|---------------------|
 | PostgreSQL | `psycopg2-binary`, `pandas`, `python-dotenv` | `PG_HOST`, `PG_PORT`, `PG_DATABASE`, `PG_USER`, `PG_PASSWORD` |
 
-> Databricks and Snowflake query scripts are included but not yet fully supported. Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+> **Need another database?** You can add your own query script (e.g., Databricks, Snowflake, MySQL, BigQuery) following the same pattern as `query_postgresql.py`. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 All query scripts enforce a **LIMIT 500** safety cap on results.
 

@@ -284,3 +284,5 @@ Present to the user with these instructions:
 - Custom shapes, map layers, and image-based marks are not generated
 - The workbook targets Tableau Desktop 2023.1+ compatibility
 - Datasource connection credentials are NOT embedded — the user must configure these after replacing datasources
+
+> **Important — this is an iterative process.** The generated `.twbx` is unlikely to be perfect on the first attempt. Tableau's XML schema is complex and strict — minor issues (wrong field references, layout quirks, formatting mismatches) are expected. Encourage the user to open the workbook in Tableau Desktop, identify what needs fixing, and report back. Each iteration improves fidelity. This step is experimental by nature — treat it as a strong starting point, not a finished product.

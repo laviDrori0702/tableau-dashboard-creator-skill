@@ -3,16 +3,9 @@
 Provide your SQL queries below. Group them under a heading that matches your database type.
 The agent will use the heading to select the correct query script.
 
-Supported database types: `Databricks`, `PostgreSQL`, `Snowflake`
+Supported out-of-the-box: `PostgreSQL`
 
----
-
-## Databricks
-
-```sql
--- Example: replace with your actual query
-SELECT * FROM catalog.schema.your_table
-```
+> **Need another database?** Add a `query_<dbtype>.py` script to `scripts/` following the same pattern as `query_postgresql.py`, then add a matching heading section here (e.g., `## Databricks`, `## Snowflake`, `## MySQL`).
 
 ---
 
@@ -25,14 +18,5 @@ SELECT * FROM public.your_table
 
 ---
 
-## Snowflake
-
-```sql
--- Example: replace with your actual query
-SELECT * FROM your_database.your_schema.your_table
-```
-
----
-
-**Note**: You only need to include sections for the database(s) you actually use. Delete the rest.
+**Note**: You only need to include sections for the database(s) you actually use.
 If you placed data files in `sample-data/`, this file is optional — the agent will scan local files first.

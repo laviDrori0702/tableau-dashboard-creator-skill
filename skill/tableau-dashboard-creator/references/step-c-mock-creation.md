@@ -145,3 +145,5 @@ Implement where applicable:
 Save to `mock-version/v_N/mock.html` where N is the current version number (start with 1).
 
 Present the mock to the user (tell them to open the HTML file in a browser) and **wait for approval** before proceeding to Step D. If the user requests changes, increment version number and create a new full mock.
+
+> **Important — this is an iterative process.** The HTML mock is unlikely to be perfect on the first attempt. Expect multiple revision cycles — this is normal and by design. Encourage the user to share the mock with stakeholders for feedback before approving. A well-validated mock saves significant rework in later steps (D and E). Take your time here — it's better to iterate on the mock than to rebuild the implementation spec or workbook.
