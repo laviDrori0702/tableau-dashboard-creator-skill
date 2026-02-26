@@ -8,7 +8,7 @@ Works with **Claude Code**, **Cursor**, and any other agentic AI coding tool tha
 
 > The skill generates an interactive HTML mock (Step C) that previews your dashboard before building it in Tableau.
 
-![Dashboard Mock Preview](assets/mock-preview.png)
+![Dashboard Mock Preview](assets/mock_screenshot.jpeg)
 
 *Open `demo/output/mock-version/v_1/mock.html` in a browser to try the interactive version.*
 
