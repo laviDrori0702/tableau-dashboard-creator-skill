@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8' ?>
 
 <!-- build 20251.25.1121.1650                               -->
-<workbook original-version='18.1' source-build='2025.1.10 (20251.25.1121.1650)' source-platform='win' version='18.1' xml:base='https://dub01.online.tableau.com' xmlns:user='http://www.tableausoftware.com/xml/user'>
+<workbook original-version='18.1' source-build='2025.1.10 (20251.25.1121.1650)' source-platform='win' version='18.1' xml:base='https://example.online.tableau.com' xmlns:user='http://www.tableausoftware.com/xml/user'>
   <document-format-change-manifest>
     <AccessibleZoneTabOrder />
     <AnimationOnByDefault />
@@ -28,7 +28,7 @@
     <ZoneFriendlyName />
     <ZoneVisibilityControl />
   </document-format-change-manifest>
-  <repository-location id='RapaportSubscriptionsWaterfall' path='/t/gstat/workbooks' revision='1.8' site='gstat' />
+  <repository-location id='ExampleWorkbook' path='/t/example-site/workbooks' revision='1.8' site='example-site' />
   <preferences>
     <preference name='ui.encoding.shelf.height' value='24' />
     <preference name='ui.shelf.height' value='26' />
@@ -54,7 +54,7 @@
       <connection class='federated'>
         <named-connections>
           <named-connection caption='subscriptionWaterfall_subscriptionsBalanceChange' name='textscan.0qdn7t01cf5s0y14jab6u0zk7672'>
-            <connection class='textscan' directory='C:/Users/lavid/Documents/rapaport' filename='subscriptionWaterfall_subscriptionsBalanceChange.csv' password='' server='' />
+            <connection class='textscan' directory='.' filename='subscriptionWaterfall_subscriptionsBalanceChange.csv' password='' server='' />
           </named-connection>
         </named-connections>
         <relation connection='textscan.0qdn7t01cf5s0y14jab6u0zk7672' name='subscriptionWaterfall_subscriptionsBalanceChange.csv' table='[subscriptionWaterfall_subscriptionsBalanceChange#csv]' type='table'>
@@ -3779,7 +3779,7 @@
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{2055C533-145A-4623-8465-E864E5203D84}&quot; zone-id=&quot;76&quot; zone-ids=[22]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavid/Documents/My Tableau Repository/Shapes/Lavi/icons8-menu-50.png</image-path>
+                    <image-path>./assets/icon.png
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -3797,7 +3797,7 @@
                   <format attr='margin' value='4' />
                 </zone-style>
               </zone>
-              <zone fixed-size='192' h='5053' id='28' is-fixed='true' is-scaled='1' param='C:/Users/lavid/PyCharmMiscProject/DataDocumentation/rapaport/Rapaport Logos/Rapaport_logo_white.svg' type-v2='bitmap' w='12886' x='6184' y='1836'>
+              <zone fixed-size='192' h='5053' id='28' is-fixed='true' is-scaled='1' param='./assets/company_logo.svg' type-v2='bitmap' w='12886' x='6184' y='1836'>
                 <zone-style>
                   <format attr='border-color' value='#000000' />
                   <format attr='border-style' value='none' />
@@ -4404,7 +4404,7 @@
           <zones>
             <zone h='100000' id='164' type-v2='layout-basic' w='100000' x='0' y='0'>
               <zone h='84000' id='163' param='vert' type-v2='layout-flow' w='84000' x='8000' y='8000'>
-                <zone fixed-size='32' h='5053' id='28' is-fixed='true' is-scaled='1' param='C:/Users/lavid/PyCharmMiscProject/DataDocumentation/rapaport/Rapaport Logos/Rapaport_logo_white.svg' type-v2='bitmap' w='12886' x='6184' y='1836'>
+                <zone fixed-size='32' h='5053' id='28' is-fixed='true' is-scaled='1' param='./assets/company_logo.svg' type-v2='bitmap' w='12886' x='6184' y='1836'>
                   <zone-style>
                     <format attr='border-color' value='#000000' />
                     <format attr='border-style' value='none' />
@@ -4913,7 +4913,7 @@
                   <format attr='margin' value='4' />
                 </zone-style>
               </zone>
-              <zone fixed-size='192' h='4910' id='13' is-fixed='true' is-scaled='1' param='C:/Users/lavid/AppData/Local/Temp/TableauTemp/0dt0z850mziimq16v60ta0x7y6my/Sheets1/Image/Rapaport_logo_white.svg' type-v2='bitmap' w='12886' x='3349' y='1786'>
+              <zone fixed-size='192' h='4910' id='13' is-fixed='true' is-scaled='1' param='./assets/company_logo.svg' type-v2='bitmap' w='12886' x='3349' y='1786'>
                 <zone-style>
                   <format attr='border-color' value='#000000' />
                   <format attr='border-style' value='none' />
@@ -5064,7 +5064,7 @@
           <zones>
             <zone h='100000' id='51' type-v2='layout-basic' w='100000' x='0' y='0'>
               <zone h='84000' id='50' param='vert' type-v2='layout-flow' w='84000' x='8000' y='8000'>
-                <zone fixed-size='32' h='4910' id='13' is-fixed='true' is-scaled='1' param='C:/Users/lavid/AppData/Local/Temp/TableauTemp/0dt0z850mziimq16v60ta0x7y6my/Sheets1/Image/Rapaport_logo_white.svg' type-v2='bitmap' w='12886' x='3349' y='1786'>
+                <zone fixed-size='32' h='4910' id='13' is-fixed='true' is-scaled='1' param='./assets/company_logo.svg' type-v2='bitmap' w='12886' x='3349' y='1786'>
                   <zone-style>
                     <format attr='border-color' value='#000000' />
                     <format attr='border-style' value='none' />

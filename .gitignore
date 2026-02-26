@@ -1,6 +1,18 @@
 # Ignore everything by default
 *
 
+# --- Always ignore sensitive files (even if explicitly added) ---
+.env
+.env.local
+.env.*.local
+**/__pycache__/
+*.pyc
+*.pyo
+logs/
+*.log
+.DS_Store
+Thumbs.db
+
 # Allow top-level files
 !.gitignore
 !README.md

@@ -53,7 +53,7 @@ tableau-dashboard-creator-skill/
 │       ├── examples/
 │       │   ├── simple-xml-example.twb           # Minimal TWB reference
 │       │   ├── complicated-xml-example.twb      # Complex TWB reference
-│       │   └── EtoroTableauTemplates.twb        # Real-world template example
+│       │   └── OrgTableauTemplates.twb           # Real-world template example
 │       ├── references/
 │       │   ├── step-0-brand-setup.md            # Brand extraction instructions
 │       │   ├── step-a-data-exploration.md       # Data analysis instructions

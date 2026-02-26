@@ -2,7 +2,7 @@
 
 These are default Tableau design tokens used as a **fallback** when the user provides neither a `template.twb` nor a `branding/` directory. Step 0 generates a project-specific `design-tokens.md` that overrides these values.
 
-For a customer-specific example, see `examples/EtoroTableauTemplates.twb`.
+For a customer-specific example, see `examples/OrgTableauTemplates.twb`.
 
 ## Typography
 

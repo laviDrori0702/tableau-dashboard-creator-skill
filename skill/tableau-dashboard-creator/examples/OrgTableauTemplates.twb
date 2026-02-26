@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8' ?>
 
 <!-- build 20233.24.0425.1414                               -->
-<workbook source-build='2023.3.5 (20233.24.0425.1414)' source-platform='win' version='18.1' xml:base='https://reports.etorocorp.com' xmlns:user='http://www.tableausoftware.com/xml/user'>
+<workbook source-build='2023.3.5 (20233.24.0425.1414)' source-platform='win' version='18.1' xml:base='https://reports.exampleorgcorp.com' xmlns:user='http://www.tableausoftware.com/xml/user'>
   <document-format-change-manifest>
     <_.fcp.AnimationOnByDefault.true...AnimationOnByDefault />
     <AutoCreateAndUpdateDSDPhoneLayouts />
@@ -19,7 +19,7 @@
     <WorksheetBackgroundTransparency />
     <ZoneFriendlyName />
   </document-format-change-manifest>
-  <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew?rev=1.5' id='EtoroTableauTemplateNew' path='/workbooks' revision='1.7' />
+  <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew?rev=1.5' id='ExampleOrgTableauTemplateNew' path='/workbooks' revision='1.7' />
   <preferences>
     <preference name='ui.encoding.shelf.height' value='24' />
     <preference name='ui.shelf.height' value='26' />
@@ -43,7 +43,7 @@
       <connection class='federated'>
         <named-connections>
           <named-connection caption='Untitled spreadsheet' name='cloudfile:googledrive-excel-direct.1njfdc10v8acbb1g0vgce1vhdzjj'>
-            <connection class='cloudfile:googledrive-excel-direct' cleaning='no' cloudFileExtension='xlsx' cloudFileId='1RKghYlFdOQFg6H7ZJrWniTWqQE0aULE2uYxivbtIk-g' cloudFileMetadata_-_folder='root' cloudFileName='Untitled spreadsheet.xlsx' cloudFileProvider='googledrive' cloudFileRequestURL='https://www.googleapis.com/drive/v3/files/1RKghYlFdOQFg6H7ZJrWniTWqQE0aULE2uYxivbtIk-g/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' compat='no' dataRefreshTime='' filename='Untitled spreadsheet.xlsx' interpretationMode='0' server='' server-oauth='server-custom' userLanguage='en' username='samerha@etoro.com' validate='no' workgroup-auth-mode='prompt' />
+            <connection class='cloudfile:googledrive-excel-direct' cleaning='no' cloudFileExtension='xlsx' cloudFileId='EXAMPLE_FILE_ID' cloudFileMetadata_-_folder='root' cloudFileName='Untitled spreadsheet.xlsx' cloudFileProvider='googledrive' cloudFileRequestURL='https://www.googleapis.com/drive/v3/files/1RKghYlFdOQFg6H7ZJrWniTWqQE0aULE2uYxivbtIk-g/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' compat='no' dataRefreshTime='' filename='Untitled spreadsheet.xlsx' interpretationMode='0' server='' server-oauth='server-custom' userLanguage='en' username='user@example.com' validate='no' workgroup-auth-mode='prompt' />
           </named-connection>
         </named-connections>
         <_.fcp.ObjectModelEncapsulateLegacy.false...relation connection='cloudfile:googledrive-excel-direct.1njfdc10v8acbb1g0vgce1vhdzjj' name='Sheet1' table='[Sheet1$]' type='table'>
@@ -142,7 +142,7 @@
         </groupfilter>
       </group>
       <extract _.fcp.ObjectModelExtractV2.true...object-id='' _.fcp.VConnDownstreamExtractsWithWarnings.true...user-specific='false' count='-1' enabled='true' units='records'>
-        <connection authentication='auth-none' author-locale='en_US' class='hyper' dbname='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Data/Extracts/federated_0on2ra50vj4v4s1anmgpv0.hyper' default-settings='yes' schema='Extract' sslmode='' tablename='Extract' update-time='08/17/2022 09:51:59 AM' username=''>
+        <connection authentication='auth-none' author-locale='en_US' class='hyper' dbname='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Data/Extracts/federated_0on2ra50vj4v4s1anmgpv0.hyper' default-settings='yes' schema='Extract' sslmode='' tablename='Extract' update-time='08/17/2022 09:51:59 AM' username=''>
           <_.fcp.ObjectModelEncapsulateLegacy.false...relation name='Extract' table='[Extract].[Extract]' type='table' />
           <_.fcp.ObjectModelEncapsulateLegacy.true...relation name='Extract' table='[Extract].[Extract]' type='table' />
           <refresh>
@@ -1017,7 +1017,7 @@ Dashboard Creator: ______
   </worksheets>
   <dashboards>
     <dashboard name='Color Guide'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/ColorGuide?rev=' id='ColorGuide' path='/workbooks/EtoroTableauTemplateNew' revision='' site='lightricks' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/ColorGuide?rev=' id='ColorGuide' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' site='lightricks' />
       <style />
       <size maxheight='1100' maxwidth='1600' minheight='1100' minwidth='1600' sizing-mode='fixed' />
       <zones>
@@ -1039,7 +1039,7 @@ Dashboard Creator: ______
                 </zone>
                 <zone fixed-size='126' h='11455' id='154' is-fixed='true' param='vert' type-v2='layout-flow' w='82249' x='500' y='6181'>
                   <zone fixed-size='63' h='5727' id='157' is-fixed='true' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='82249' x='500' y='6181'>
-                    <zone h='5727' id='147' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Capture.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1U3j_CI82eLV7bdlabAesF7TO7zFHG79F' w='27438' x='500' y='6182'>
+                    <zone h='5727' id='147' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Capture.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1U3j_CI82eLV7bdlabAesF7TO7zFHG79F' w='27438' x='500' y='6182'>
                       <zone-style>
                         <format attr='border-color' value='#13c636' />
                         <format attr='border-style' value='solid' />
@@ -1047,7 +1047,7 @@ Dashboard Creator: ______
                         <format attr='margin' value='15' />
                       </zone-style>
                     </zone>
-                    <zone h='5727' id='149' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/3.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1QzlWTSV3CgjQgfyAJkkHyj1qg_LtqH5h' w='27437' x='27938' y='6182'>
+                    <zone h='5727' id='149' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/3.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1QzlWTSV3CgjQgfyAJkkHyj1qg_LtqH5h' w='27437' x='27938' y='6182'>
                       <zone-style>
                         <format attr='border-color' value='#13c636' />
                         <format attr='border-style' value='solid' />
@@ -1055,7 +1055,7 @@ Dashboard Creator: ______
                         <format attr='margin' value='15' />
                       </zone-style>
                     </zone>
-                    <zone h='5727' id='151' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/5.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1hcjH-H_B0uH7jKidc_AAHo9akKOA4Cj_' w='27375' x='55375' y='6182'>
+                    <zone h='5727' id='151' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/5.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1hcjH-H_B0uH7jKidc_AAHo9akKOA4Cj_' w='27375' x='55375' y='6182'>
                       <zone-style>
                         <format attr='border-color' value='#13c636' />
                         <format attr='border-style' value='solid' />
@@ -1065,7 +1065,7 @@ Dashboard Creator: ______
                     </zone>
                   </zone>
                   <zone fixed-size='63' h='5727' id='158' is-fixed='true' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='82249' x='500' y='11908'>
-                    <zone h='5727' id='148' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/2.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1OGKxZpapuK9tr1IAY239HTVEuqL6Wvy2' w='27438' x='500' y='11909'>
+                    <zone h='5727' id='148' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/2.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1OGKxZpapuK9tr1IAY239HTVEuqL6Wvy2' w='27438' x='500' y='11909'>
                       <zone-style>
                         <format attr='border-color' value='#13c636' />
                         <format attr='border-style' value='solid' />
@@ -1073,7 +1073,7 @@ Dashboard Creator: ______
                         <format attr='margin' value='15' />
                       </zone-style>
                     </zone>
-                    <zone h='5727' id='150' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/4.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1Wq1BA77mniJKbC8D4YiXQiHakC9y2e_S' w='27437' x='27938' y='11909'>
+                    <zone h='5727' id='150' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/4.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1Wq1BA77mniJKbC8D4YiXQiHakC9y2e_S' w='27437' x='27938' y='11909'>
                       <zone-style>
                         <format attr='border-color' value='#13c636' />
                         <format attr='border-style' value='solid' />
@@ -1081,7 +1081,7 @@ Dashboard Creator: ______
                         <format attr='margin' value='15' />
                       </zone-style>
                     </zone>
-                    <zone h='5727' id='152' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/6.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1LxGNwOwMcpG06km5rmxtW9k_aRjDwPEZ' w='27375' x='55375' y='11909'>
+                    <zone h='5727' id='152' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/6.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1LxGNwOwMcpG06km5rmxtW9k_aRjDwPEZ' w='27375' x='55375' y='11909'>
                       <zone-style>
                         <format attr='border-color' value='#13c636' />
                         <format attr='border-style' value='solid' />
@@ -1117,7 +1117,7 @@ Dashboard Creator: ______
                 </zone>
               </zone>
             </zone>
-            <zone h='81273' id='3' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Color Guide.PNG' type-v2='bitmap' w='99000' x='500' y='18000'>
+            <zone h='81273' id='3' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Color Guide.PNG' type-v2='bitmap' w='99000' x='500' y='18000'>
               <zone-style>
                 <format attr='border-color' value='#000000' />
                 <format attr='border-style' value='none' />
@@ -1164,7 +1164,7 @@ Dashboard Creator: ______
                     <format attr='padding' value='0' />
                   </zone-style>
                 </zone>
-                <zone fixed-size='31' h='5727' id='147' is-fixed='true' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Capture.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1U3j_CI82eLV7bdlabAesF7TO7zFHG79F' w='27438' x='500' y='6182'>
+                <zone fixed-size='31' h='5727' id='147' is-fixed='true' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Capture.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1U3j_CI82eLV7bdlabAesF7TO7zFHG79F' w='27438' x='500' y='6182'>
                   <zone-style>
                     <format attr='border-color' value='#13c636' />
                     <format attr='border-style' value='solid' />
@@ -1173,7 +1173,7 @@ Dashboard Creator: ______
                     <format attr='padding' value='0' />
                   </zone-style>
                 </zone>
-                <zone fixed-size='31' h='5727' id='149' is-fixed='true' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/3.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1QzlWTSV3CgjQgfyAJkkHyj1qg_LtqH5h' w='27437' x='27938' y='6182'>
+                <zone fixed-size='31' h='5727' id='149' is-fixed='true' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/3.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1QzlWTSV3CgjQgfyAJkkHyj1qg_LtqH5h' w='27437' x='27938' y='6182'>
                   <zone-style>
                     <format attr='border-color' value='#13c636' />
                     <format attr='border-style' value='solid' />
@@ -1182,7 +1182,7 @@ Dashboard Creator: ______
                     <format attr='padding' value='0' />
                   </zone-style>
                 </zone>
-                <zone fixed-size='31' h='5727' id='151' is-fixed='true' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/5.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1hcjH-H_B0uH7jKidc_AAHo9akKOA4Cj_' w='27375' x='55375' y='6182'>
+                <zone fixed-size='31' h='5727' id='151' is-fixed='true' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/5.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1hcjH-H_B0uH7jKidc_AAHo9akKOA4Cj_' w='27375' x='55375' y='6182'>
                   <zone-style>
                     <format attr='border-color' value='#13c636' />
                     <format attr='border-style' value='solid' />
@@ -1191,7 +1191,7 @@ Dashboard Creator: ______
                     <format attr='padding' value='0' />
                   </zone-style>
                 </zone>
-                <zone fixed-size='31' h='5727' id='148' is-fixed='true' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/2.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1OGKxZpapuK9tr1IAY239HTVEuqL6Wvy2' w='27438' x='500' y='11909'>
+                <zone fixed-size='31' h='5727' id='148' is-fixed='true' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/2.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1OGKxZpapuK9tr1IAY239HTVEuqL6Wvy2' w='27438' x='500' y='11909'>
                   <zone-style>
                     <format attr='border-color' value='#13c636' />
                     <format attr='border-style' value='solid' />
@@ -1200,7 +1200,7 @@ Dashboard Creator: ______
                     <format attr='padding' value='0' />
                   </zone-style>
                 </zone>
-                <zone fixed-size='31' h='5727' id='150' is-fixed='true' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/4.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1Wq1BA77mniJKbC8D4YiXQiHakC9y2e_S' w='27437' x='27938' y='11909'>
+                <zone fixed-size='31' h='5727' id='150' is-fixed='true' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/4.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1Wq1BA77mniJKbC8D4YiXQiHakC9y2e_S' w='27437' x='27938' y='11909'>
                   <zone-style>
                     <format attr='border-color' value='#13c636' />
                     <format attr='border-style' value='solid' />
@@ -1209,7 +1209,7 @@ Dashboard Creator: ______
                     <format attr='padding' value='0' />
                   </zone-style>
                 </zone>
-                <zone fixed-size='31' h='5727' id='152' is-fixed='true' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/6.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1LxGNwOwMcpG06km5rmxtW9k_aRjDwPEZ' w='27375' x='55375' y='11909'>
+                <zone fixed-size='31' h='5727' id='152' is-fixed='true' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/6.PNG' type-v2='bitmap' url='https://drive.google.com/drive/folders/1LxGNwOwMcpG06km5rmxtW9k_aRjDwPEZ' w='27375' x='55375' y='11909'>
                   <zone-style>
                     <format attr='border-color' value='#13c636' />
                     <format attr='border-style' value='solid' />
@@ -1218,7 +1218,7 @@ Dashboard Creator: ______
                     <format attr='padding' value='0' />
                   </zone-style>
                 </zone>
-                <zone fixed-size='280' h='81273' id='3' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Color Guide.PNG' type-v2='bitmap' w='99000' x='500' y='18000'>
+                <zone fixed-size='280' h='81273' id='3' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Color Guide.PNG' type-v2='bitmap' w='99000' x='500' y='18000'>
                   <zone-style>
                     <format attr='border-color' value='#000000' />
                     <format attr='border-style' value='none' />
@@ -1241,7 +1241,7 @@ Dashboard Creator: ______
       <simple-id uuid='{F9864E3F-907F-4908-B668-C9D30373C8BC}' />
     </dashboard>
     <dashboard name='Frame  (1*2)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/Frame12?rev=' id='Frame12' path='/workbooks/EtoroTableauTemplateNew' revision='' site='lightricks' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/Frame12?rev=' id='Frame12' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' site='lightricks' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='800' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -1249,7 +1249,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='95366' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97506' x='1247' y='2317'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='7532' id='267' is-fixed='true' type-v2='layout-basic' w='97506' x='1247' y='2317'>
               <zone friendly-name='Top Banner' h='7532' id='7' param='horz' type-v2='layout-flow' w='58059' x='1247' y='2317'>
-                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='58059' x='1247' y='2317'>
+                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='58059' x='1247' y='2317'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -1342,7 +1342,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{7F73F87F-301C-48C1-BA5C-68A1C9DE4985}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -1367,7 +1367,7 @@ Dashboard Creator: ______
                     <zone fixed-size='926' h='34299' id='24' is-fixed='true' param='horz' type-v2='layout-flow' w='84414' x='1247' y='27926'>
                       <zone h='34299' id='157' param='vert' type-v2='layout-flow' w='84414' x='1247' y='27926'>
                         <zone fixed-size='46' h='5330' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='83416' x='1746' y='28853'>
-                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='28853'>
+                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='28853'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -1436,7 +1436,7 @@ Dashboard Creator: ______
                     <zone h='32909' id='29' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='84414' x='1247' y='64774'>
                       <zone h='32909' id='32' param='vert' type-v2='layout-flow' w='84414' x='1247' y='64774'>
                         <zone fixed-size='46' h='5330' id='279' is-fixed='true' param='horz' type-v2='layout-flow' w='83416' x='1746' y='65701'>
-                          <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/03-Active-Subscriptions.png' type-v2='bitmap' w='2930' x='1746' y='65701'>
+                          <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/03-Active-Subscriptions.png' type-v2='bitmap' w='2930' x='1746' y='65701'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -1572,7 +1572,7 @@ Dashboard Creator: ______
       <simple-id uuid='{28B2C67C-E59F-45F8-928F-02204D3054A7}' />
     </dashboard>
     <dashboard name='Frame  (1+2)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/Frame12_1?rev=' id='Frame12_1' path='/workbooks/EtoroTableauTemplateNew' revision='' site='lightricks' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/Frame12_1?rev=' id='Frame12_1' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' site='lightricks' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='800' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -1580,7 +1580,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='95366' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97506' x='1247' y='2317'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='7532' id='267' is-fixed='true' type-v2='layout-basic' w='97506' x='1247' y='2317'>
               <zone friendly-name='Top Banner' h='7532' id='7' param='horz' type-v2='layout-flow' w='12604' x='1247' y='2317'>
-                <zone h='7532' id='88' is-centered='0' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12604' x='1247' y='2317'>
+                <zone h='7532' id='88' is-centered='0' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12604' x='1247' y='2317'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -1684,7 +1684,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{73F88784-5FEF-4981-A2CD-12229BA33C81}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -1707,7 +1707,7 @@ Dashboard Creator: ______
                 <zone h='71033' id='330' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='84414' x='1247' y='26650'>
                   <zone fixed-size='919' friendly-name='Left Side Chart' h='71032' id='32' is-fixed='true' param='vert' type-v2='layout-flow' w='42207' x='1247' y='26651'>
                     <zone fixed-size='46' friendly-name='Chart Title' h='5330' id='279' is-fixed='true' param='horz' type-v2='layout-flow' w='41521' x='1247' y='27926'>
-                      <zone fixed-size='46' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2868' x='1247' y='27926'>
+                      <zone fixed-size='46' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2868' x='1247' y='27926'>
                         <zone-style>
                           <format attr='border-color' value='#000000' />
                           <format attr='border-style' value='none' />
@@ -1765,7 +1765,7 @@ Dashboard Creator: ______
                     <zone h='71032' id='157' layout-strategy-id='distribute-evenly' param='vert' type-v2='layout-flow' w='42207' x='43454' y='26651'>
                       <zone fixed-size='383' friendly-name='Chart 1' h='34878' id='333' is-fixed='true' param='vert' type-v2='layout-flow' w='41521' x='44140' y='27926'>
                         <zone fixed-size='46' h='5330' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='41521' x='44140' y='27926'>
-                          <zone fixed-size='46' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/05-Churn-Subscriptions.png' type-v2='bitmap' w='2868' x='44140' y='27926'>
+                          <zone fixed-size='46' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/05-Churn-Subscriptions.png' type-v2='bitmap' w='2868' x='44140' y='27926'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -1821,7 +1821,7 @@ Dashboard Creator: ______
                       </zone>
                       <zone friendly-name='Chart 2' h='34879' id='23' param='vert' type-v2='layout-flow' w='41521' x='44140' y='62804'>
                         <zone fixed-size='46' h='5330' id='276' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='44639' y='65006'>
-                          <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 33.png' type-v2='bitmap' w='2868' x='44639' y='65006'>
+                          <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 33.png' type-v2='bitmap' w='2868' x='44639' y='65006'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -1948,7 +1948,7 @@ Dashboard Creator: ______
       <simple-id uuid='{AAC1A097-B478-4F7B-80DA-3C7A78FCEACE}' />
     </dashboard>
     <dashboard name='Frame  (2*2*1)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/Frame221_1?rev=' id='Frame221' path='/workbooks/EtoroTableauTemplateNew' revision='' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/Frame221_1?rev=' id='Frame221' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='1300' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -1956,7 +1956,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='96924' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97466' x='1267' y='1538'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='5000' id='267' is-fixed='true' type-v2='layout-basic' w='97466' x='1267' y='1538'>
               <zone friendly-name='Top Banner' h='5000' id='7' param='horz' type-v2='layout-flow' w='12600' x='1267' y='1538'>
-                <zone fixed-size='195' h='5000' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12600' x='1267' y='1538'>
+                <zone fixed-size='195' h='5000' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12600' x='1267' y='1538'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -2057,7 +2057,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{4BB72D5E-762D-4077-B76C-6B59C1D8CEFC}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -2082,7 +2082,7 @@ Dashboard Creator: ______
                     <zone fixed-size='926' h='22231' id='24' is-fixed='true' param='horz' type-v2='layout-flow' w='42115' x='1267' y='18538'>
                       <zone h='22231' id='157' param='vert' type-v2='layout-flow' w='42115' x='1267' y='18538'>
                         <zone fixed-size='46' h='3538' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='40404' x='1774' y='19153'>
-                          <zone fixed-size='47' h='3538' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2977' x='1774' y='19153'>
+                          <zone fixed-size='47' h='3538' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2977' x='1774' y='19153'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -2142,7 +2142,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone h='22231' id='23' param='vert' type-v2='layout-flow' w='42052' x='43382' y='18538'>
                       <zone fixed-size='46' h='3538' id='276' is-fixed='true' param='horz' type-v2='layout-flow' w='40341' x='44586' y='19153'>
-                        <zone fixed-size='46' h='3538' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/03-Active-Subscriptions.png' type-v2='bitmap' w='2913' x='44586' y='19153'>
+                        <zone fixed-size='46' h='3538' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/03-Active-Subscriptions.png' type-v2='bitmap' w='2913' x='44586' y='19153'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -2204,7 +2204,7 @@ Dashboard Creator: ______
                     <zone h='21385' id='29' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='84166' x='1267' y='42461'>
                       <zone h='21384' id='32' param='vert' type-v2='layout-flow' w='42115' x='1267' y='42462'>
                         <zone fixed-size='46' h='3538' id='279' is-fixed='true' param='horz' type-v2='layout-flow' w='40404' x='1774' y='43077'>
-                          <zone fixed-size='47' h='3538' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2977' x='1774' y='43077'>
+                          <zone fixed-size='47' h='3538' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2977' x='1774' y='43077'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -2267,7 +2267,7 @@ Dashboard Creator: ______
                       </zone>
                       <zone fixed-size='500' h='21384' id='28' is-fixed='true' param='vert' type-v2='layout-flow' w='42052' x='43382' y='42462'>
                         <zone fixed-size='46' h='3538' id='305' is-fixed='true' param='horz' type-v2='layout-flow' w='40341' x='44586' y='43077'>
-                          <zone fixed-size='39' h='3538' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2470' x='44586' y='43077'>
+                          <zone fixed-size='39' h='3538' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2470' x='44586' y='43077'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -2334,7 +2334,7 @@ Dashboard Creator: ______
                   </zone>
                   <zone h='34616' id='333' param='vert' type-v2='layout-flow' w='84166' x='1267' y='63846'>
                     <zone fixed-size='46' h='3538' id='337' is-fixed='true' param='horz' type-v2='layout-flow' w='83152' x='1774' y='66153'>
-                      <zone fixed-size='39' h='3538' id='342' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='2977' x='1774' y='66153'>
+                      <zone fixed-size='39' h='3538' id='342' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='2977' x='1774' y='66153'>
                         <zone-style>
                           <format attr='border-color' value='#000000' />
                           <format attr='border-style' value='none' />
@@ -2446,7 +2446,7 @@ Dashboard Creator: ______
       <simple-id uuid='{C02FC4E8-F1D1-418C-8D69-9BEF1E31BD1E}' />
     </dashboard>
     <dashboard name='Frame  (2+3)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/Frame23?rev=' id='Frame23' path='/workbooks/EtoroTableauTemplateNew' revision='' site='lightricks' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/Frame23?rev=' id='Frame23' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' site='lightricks' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='800' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -2454,7 +2454,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='95366' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97506' x='1247' y='2317'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='7532' id='267' is-fixed='true' type-v2='layout-basic' w='97506' x='1247' y='2317'>
               <zone friendly-name='Top Banner' h='7532' id='7' param='horz' type-v2='layout-flow' w='12614' x='1247' y='2317'>
-                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12614' x='1247' y='2317'>
+                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12614' x='1247' y='2317'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -2555,7 +2555,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{3AF14015-E7FF-4DDA-801D-FD53D679A621}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -2580,7 +2580,7 @@ Dashboard Creator: ______
                     <zone fixed-size='926' h='34299' id='24' is-fixed='true' param='horz' type-v2='layout-flow' w='42207' x='1247' y='27926'>
                       <zone h='34299' id='157' param='vert' type-v2='layout-flow' w='42207' x='1247' y='27926'>
                         <zone fixed-size='46' h='5330' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='1746' y='28853'>
-                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='28853'>
+                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='28853'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -2640,7 +2640,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone h='34299' id='23' param='vert' type-v2='layout-flow' w='42207' x='43454' y='27926'>
                       <zone fixed-size='46' h='5330' id='276' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='44639' y='28853'>
-                        <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 33.png' type-v2='bitmap' w='2868' x='44639' y='28853'>
+                        <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 33.png' type-v2='bitmap' w='2868' x='44639' y='28853'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -2702,7 +2702,7 @@ Dashboard Creator: ______
                     <zone h='32909' id='29' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='84414' x='1247' y='64774'>
                       <zone h='32909' id='32' param='vert' type-v2='layout-flow' w='28179' x='1247' y='64774'>
                         <zone fixed-size='46' h='5330' id='279' is-fixed='true' param='horz' type-v2='layout-flow' w='26495' x='1746' y='65701'>
-                          <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2930' x='1746' y='65701'>
+                          <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2930' x='1746' y='65701'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -2765,7 +2765,7 @@ Dashboard Creator: ______
                       </zone>
                       <zone fixed-size='500' h='32909' id='28' is-fixed='true' param='vert' type-v2='layout-flow' w='28118' x='29426' y='64774'>
                         <zone fixed-size='46' h='5330' id='305' is-fixed='true' param='horz' type-v2='layout-flow' w='25748' x='30611' y='65701'>
-                          <zone fixed-size='39' h='5330' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2431' x='30611' y='65701'>
+                          <zone fixed-size='39' h='5330' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2431' x='30611' y='65701'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -2817,7 +2817,7 @@ Dashboard Creator: ______
                       </zone>
                       <zone h='32909' id='33' param='vert' type-v2='layout-flow' w='28117' x='57544' y='64774'>
                         <zone fixed-size='46' h='5330' id='307' is-fixed='true' param='horz' type-v2='layout-flow' w='26433' x='58729' y='65701'>
-                          <zone fixed-size='39' h='5330' id='308' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 45.png' type-v2='bitmap' w='2431' x='58729' y='65701'>
+                          <zone fixed-size='39' h='5330' id='308' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 45.png' type-v2='bitmap' w='2431' x='58729' y='65701'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -2941,7 +2941,7 @@ Dashboard Creator: ______
       <simple-id uuid='{AD6BC7D7-F8E5-42AA-9ACC-B619F91A886F}' />
     </dashboard>
     <dashboard name='Frame  (3*2)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/Frame32?rev=' id='Frame32' path='/workbooks/EtoroTableauTemplateNew' revision='' site='lightricks' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/Frame32?rev=' id='Frame32' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' site='lightricks' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='800' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -2949,7 +2949,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='95000' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='96702' x='1649' y='2500'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='8125' id='267' is-fixed='true' type-v2='layout-basic' w='96702' x='1649' y='2500'>
               <zone friendly-name='Top Banner' h='8125' id='7' param='horz' type-v2='layout-flow' w='12506' x='1649' y='2500'>
-                <zone fixed-size='195' h='8125' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12506' x='1649' y='2500'>
+                <zone fixed-size='195' h='8125' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12506' x='1649' y='2500'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -3051,7 +3051,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{E6E54FB5-9C64-4D2A-B62A-5805459D5AEF}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -3075,7 +3075,7 @@ Dashboard Creator: ______
                   <zone fixed-size='278' friendly-name='Row 1' h='34375' id='20' is-fixed='true' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='79390' x='1649' y='28750'>
                     <zone friendly-name='Chart 1' h='33000' id='157' param='vert' type-v2='layout-flow' w='26463' x='1649' y='30125'>
                       <zone fixed-size='46' h='5750' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='24236' x='2309' y='31125'>
-                        <zone fixed-size='47' h='5750' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='3875' x='2309' y='31125'>
+                        <zone fixed-size='47' h='5750' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='3875' x='2309' y='31125'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -3134,7 +3134,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone friendly-name='Chart 2' h='33000' id='329' param='vert' type-v2='layout-flow' w='26463' x='28112' y='30125'>
                       <zone fixed-size='56' h='7000' id='331' is-fixed='true' param='horz' type-v2='layout-flow' w='23329' x='29679' y='30125'>
-                        <zone fixed-size='38' h='7000' id='333' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='3793' x='29679' y='30125'>
+                        <zone fixed-size='38' h='7000' id='333' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='3793' x='29679' y='30125'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -3194,7 +3194,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone friendly-name='Chart 3' h='33000' id='23' param='vert' type-v2='layout-flow' w='26464' x='54575' y='30125'>
                       <zone fixed-size='46' h='5750' id='276' is-fixed='true' param='horz' type-v2='layout-flow' w='24237' x='56142' y='31125'>
-                        <zone fixed-size='46' h='5750' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='3792' x='56142' y='31125'>
+                        <zone fixed-size='46' h='5750' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='3792' x='56142' y='31125'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -3255,7 +3255,7 @@ Dashboard Creator: ______
                   <zone h='34375' id='29' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='79390' x='1649' y='63125'>
                     <zone h='31625' id='32' param='vert' type-v2='layout-flow' w='26463' x='1649' y='65875'>
                       <zone fixed-size='46' h='5750' id='279' is-fixed='true' param='horz' type-v2='layout-flow' w='24236' x='2309' y='66875'>
-                        <zone fixed-size='47' h='5750' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='3875' x='2309' y='66875'>
+                        <zone fixed-size='47' h='5750' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='3875' x='2309' y='66875'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -3318,7 +3318,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone fixed-size='500' h='31625' id='28' is-fixed='true' param='vert' type-v2='layout-flow' w='26463' x='28112' y='65875'>
                       <zone fixed-size='46' h='5750' id='305' is-fixed='true' param='horz' type-v2='layout-flow' w='23329' x='29679' y='66875'>
-                        <zone fixed-size='39' h='5750' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='3215' x='29679' y='66875'>
+                        <zone fixed-size='39' h='5750' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='3215' x='29679' y='66875'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -3370,7 +3370,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone h='31625' id='33' param='vert' type-v2='layout-flow' w='26464' x='54575' y='65875'>
                       <zone fixed-size='46' h='5750' id='307' is-fixed='true' param='horz' type-v2='layout-flow' w='24237' x='56142' y='66875'>
-                        <zone fixed-size='39' h='5750' id='308' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='3875' x='56142' y='66875'>
+                        <zone fixed-size='39' h='5750' id='308' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='3875' x='56142' y='66875'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -3481,7 +3481,7 @@ Dashboard Creator: ______
       <simple-id uuid='{BA2A414B-F27D-4ADB-9819-C7606592E467}' />
     </dashboard>
     <dashboard name='Frame  With Main KPI (1*1)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/FrameWithMainKPI11?rev=' id='FrameWithMainKPI11' path='/workbooks/EtoroTableauTemplateNew' revision='' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/FrameWithMainKPI11?rev=' id='FrameWithMainKPI11' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='800' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -3489,7 +3489,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='95366' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97506' x='1247' y='2317'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='7532' id='267' is-fixed='true' type-v2='layout-basic' w='97506' x='1247' y='2317'>
               <zone friendly-name='Top Banner' h='7532' id='7' param='horz' type-v2='layout-flow' w='58052' x='1247' y='2317'>
-                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='58052' x='1247' y='2317'>
+                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='58052' x='1247' y='2317'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -3582,7 +3582,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{0D48B7C9-AA8D-4E05-9797-B0D01C22D6DF}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -3716,7 +3716,7 @@ Dashboard Creator: ______
                     <zone fixed-size='926' h='32214' id='24' is-fixed='true' param='horz' type-v2='layout-flow' w='84414' x='1247' y='41367'>
                       <zone h='32214' id='157' param='vert' type-v2='layout-flow' w='84414' x='1247' y='41367'>
                         <zone fixed-size='46' h='5330' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='83416' x='1746' y='42294'>
-                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='42294'>
+                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='42294'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -3835,7 +3835,7 @@ Dashboard Creator: ______
       <simple-id uuid='{D2448574-444A-4A2A-A7A0-3E4DC6A16B44}' />
     </dashboard>
     <dashboard name='Frame  With Main KPI (1*2)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/FrameWithMainKPI12?rev=' id='FrameWithMainKPI12' path='/workbooks/EtoroTableauTemplateNew' revision='' site='lightricks' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/FrameWithMainKPI12?rev=' id='FrameWithMainKPI12' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' site='lightricks' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='800' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -3843,7 +3843,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='95366' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97506' x='1247' y='2317'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='7532' id='267' is-fixed='true' type-v2='layout-basic' w='97506' x='1247' y='2317'>
               <zone friendly-name='Top Banner' h='7532' id='7' param='horz' type-v2='layout-flow' w='58053' x='1247' y='2317'>
-                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='58053' x='1247' y='2317'>
+                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='58053' x='1247' y='2317'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -3936,7 +3936,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{F766C803-0BAC-41C3-A9C1-D0AE7D514D37}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -4070,7 +4070,7 @@ Dashboard Creator: ______
                     <zone fixed-size='926' h='27579' id='24' is-fixed='true' param='horz' type-v2='layout-flow' w='84414' x='1247' y='41367'>
                       <zone h='27579' id='157' param='vert' type-v2='layout-flow' w='84414' x='1247' y='41367'>
                         <zone fixed-size='46' h='5330' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='83416' x='1746' y='42294'>
-                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='42294'>
+                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='42294'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -4139,7 +4139,7 @@ Dashboard Creator: ______
                     <zone h='26188' id='29' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='84414' x='1247' y='71495'>
                       <zone h='26188' id='32' param='vert' type-v2='layout-flow' w='84414' x='1247' y='71495'>
                         <zone fixed-size='46' h='5330' id='279' is-fixed='true' param='horz' type-v2='layout-flow' w='83416' x='1746' y='72422'>
-                          <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/03-Active-Subscriptions.png' type-v2='bitmap' w='2930' x='1746' y='72422'>
+                          <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/03-Active-Subscriptions.png' type-v2='bitmap' w='2930' x='1746' y='72422'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -4269,7 +4269,7 @@ Dashboard Creator: ______
       <simple-id uuid='{8D419FD5-05EF-44C5-81C1-1056164B18C3}' />
     </dashboard>
     <dashboard name='Frame  With Main KPI (1+2)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/FrameWithMainKPI12_1?rev=' id='FrameWithMainKPI12_1' path='/workbooks/EtoroTableauTemplateNew' revision='' site='lightricks' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/FrameWithMainKPI12_1?rev=' id='FrameWithMainKPI12_1' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' site='lightricks' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='800' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -4277,7 +4277,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='95366' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97506' x='1247' y='2317'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='7532' id='267' is-fixed='true' type-v2='layout-basic' w='97506' x='1247' y='2317'>
               <zone friendly-name='Top Banner' h='7532' id='7' param='horz' type-v2='layout-flow' w='12609' x='1247' y='2317'>
-                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12609' x='1247' y='2317'>
+                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12609' x='1247' y='2317'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -4378,7 +4378,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{56F8737C-D61B-4D6E-A6D2-617E40B69202}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -4512,7 +4512,7 @@ Dashboard Creator: ______
                 <zone h='55853' id='330' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='84414' x='1247' y='41830'>
                   <zone fixed-size='919' friendly-name='Left Side Chart' h='55852' id='32' is-fixed='true' param='vert' type-v2='layout-flow' w='42207' x='1247' y='41831'>
                     <zone fixed-size='46' friendly-name='Chart Title' h='5330' id='279' is-fixed='true' param='horz' type-v2='layout-flow' w='41521' x='1247' y='43106'>
-                      <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1247' y='43106'>
+                      <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1247' y='43106'>
                         <zone-style>
                           <format attr='border-color' value='#000000' />
                           <format attr='border-style' value='none' />
@@ -4570,7 +4570,7 @@ Dashboard Creator: ______
                     <zone h='55852' id='157' layout-strategy-id='distribute-evenly' param='vert' type-v2='layout-flow' w='42207' x='43454' y='41831'>
                       <zone fixed-size='195' friendly-name='Chart 1' h='27347' id='333' is-fixed='true' param='vert' type-v2='layout-flow' w='41521' x='44140' y='43105'>
                         <zone fixed-size='48' h='5562' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='41521' x='44140' y='43105'>
-                          <zone fixed-size='47' h='5562' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/05-Churn-Subscriptions.png' type-v2='bitmap' w='2930' x='44140' y='43105'>
+                          <zone fixed-size='47' h='5562' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/05-Churn-Subscriptions.png' type-v2='bitmap' w='2930' x='44140' y='43105'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -4626,7 +4626,7 @@ Dashboard Creator: ______
                       </zone>
                       <zone friendly-name='Chart 2' h='27231' id='23' param='vert' type-v2='layout-flow' w='41521' x='44140' y='70452'>
                         <zone fixed-size='46' h='5330' id='276' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='44639' y='72654'>
-                          <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 33.png' type-v2='bitmap' w='2868' x='44639' y='72654'>
+                          <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 33.png' type-v2='bitmap' w='2868' x='44639' y='72654'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -4747,7 +4747,7 @@ Dashboard Creator: ______
       <simple-id uuid='{9BEB9A3D-0D41-4C3C-9372-18C23A974714}' />
     </dashboard>
     <dashboard name='Frame  With Main KPI (2*2)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/FrameWithMainKPI22?rev=' id='FrameWithMainKPI22' path='/workbooks/EtoroTableauTemplateNew' revision='' site='lightricks' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/FrameWithMainKPI22?rev=' id='FrameWithMainKPI22' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' site='lightricks' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='800' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -4755,7 +4755,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='95366' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97506' x='1247' y='2317'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='7532' id='267' is-fixed='true' type-v2='layout-basic' w='97506' x='1247' y='2317'>
               <zone friendly-name='Top Banner' h='7532' id='7' param='horz' type-v2='layout-flow' w='12612' x='1247' y='2317'>
-                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12612' x='1247' y='2317'>
+                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12612' x='1247' y='2317'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -4856,7 +4856,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{87242E46-F36F-46D5-92C8-240D7280CB29}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -4990,7 +4990,7 @@ Dashboard Creator: ______
                     <zone fixed-size='926' h='27579' id='24' is-fixed='true' param='horz' type-v2='layout-flow' w='42207' x='1247' y='41367'>
                       <zone h='27579' id='157' param='vert' type-v2='layout-flow' w='42207' x='1247' y='41367'>
                         <zone fixed-size='46' h='5330' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='1746' y='42294'>
-                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='42294'>
+                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='42294'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -5050,7 +5050,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone h='27579' id='23' param='vert' type-v2='layout-flow' w='42207' x='43454' y='41367'>
                       <zone fixed-size='46' h='5330' id='276' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='44639' y='42294'>
-                        <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/03-Active-Subscriptions.png' type-v2='bitmap' w='2868' x='44639' y='42294'>
+                        <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/03-Active-Subscriptions.png' type-v2='bitmap' w='2868' x='44639' y='42294'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -5112,7 +5112,7 @@ Dashboard Creator: ______
                     <zone h='26188' id='29' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='84414' x='1247' y='71495'>
                       <zone h='26188' id='32' param='vert' type-v2='layout-flow' w='42207' x='1247' y='71495'>
                         <zone fixed-size='46' h='5330' id='279' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='1746' y='72422'>
-                          <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2930' x='1746' y='72422'>
+                          <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2930' x='1746' y='72422'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -5175,7 +5175,7 @@ Dashboard Creator: ______
                       </zone>
                       <zone fixed-size='500' h='26188' id='28' is-fixed='true' param='vert' type-v2='layout-flow' w='42207' x='43454' y='71495'>
                         <zone fixed-size='46' h='5330' id='305' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='44639' y='72422'>
-                          <zone fixed-size='39' h='5330' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2431' x='44639' y='72422'>
+                          <zone fixed-size='39' h='5330' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2431' x='44639' y='72422'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -5294,7 +5294,7 @@ Dashboard Creator: ______
       <simple-id uuid='{F49D69D2-16E1-4165-8120-1AAB2DC426CC}' />
     </dashboard>
     <dashboard name='Frame  With Main KPI (2*2*1)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/FrameWithMainKPI221?rev=' id='FrameWithMainKPI221' path='/workbooks/EtoroTableauTemplateNew' revision='' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/FrameWithMainKPI221?rev=' id='FrameWithMainKPI221' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='1300' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -5302,7 +5302,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='96924' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97466' x='1267' y='1538'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='5000' id='267' is-fixed='true' type-v2='layout-basic' w='97466' x='1267' y='1538'>
               <zone friendly-name='Top Banner' h='5000' id='7' param='horz' type-v2='layout-flow' w='12600' x='1267' y='1538'>
-                <zone fixed-size='195' h='5000' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12600' x='1267' y='1538'>
+                <zone fixed-size='195' h='5000' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12600' x='1267' y='1538'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -5403,7 +5403,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{EF367E5F-D195-43D3-A732-DAEB8C7F5E78}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -5537,7 +5537,7 @@ Dashboard Creator: ______
                     <zone fixed-size='926' h='22230' id='24' is-fixed='true' param='horz' type-v2='layout-flow' w='42115' x='1267' y='27462'>
                       <zone h='22230' id='157' param='vert' type-v2='layout-flow' w='42115' x='1267' y='27462'>
                         <zone fixed-size='46' h='3538' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='40404' x='1774' y='28077'>
-                          <zone fixed-size='47' h='3538' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2977' x='1774' y='28077'>
+                          <zone fixed-size='47' h='3538' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2977' x='1774' y='28077'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -5597,7 +5597,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone h='22230' id='23' param='vert' type-v2='layout-flow' w='42052' x='43382' y='27462'>
                       <zone fixed-size='46' h='3538' id='276' is-fixed='true' param='horz' type-v2='layout-flow' w='40341' x='44586' y='28077'>
-                        <zone fixed-size='46' h='3538' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/03-Active-Subscriptions.png' type-v2='bitmap' w='2913' x='44586' y='28077'>
+                        <zone fixed-size='46' h='3538' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/03-Active-Subscriptions.png' type-v2='bitmap' w='2913' x='44586' y='28077'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -5659,7 +5659,7 @@ Dashboard Creator: ______
                     <zone h='21385' id='29' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='84166' x='1267' y='51384'>
                       <zone h='21384' id='32' param='vert' type-v2='layout-flow' w='42115' x='1267' y='51385'>
                         <zone fixed-size='46' h='3538' id='279' is-fixed='true' param='horz' type-v2='layout-flow' w='40404' x='1774' y='52000'>
-                          <zone fixed-size='47' h='3538' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2977' x='1774' y='52000'>
+                          <zone fixed-size='47' h='3538' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2977' x='1774' y='52000'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -5722,7 +5722,7 @@ Dashboard Creator: ______
                       </zone>
                       <zone fixed-size='500' h='21384' id='28' is-fixed='true' param='vert' type-v2='layout-flow' w='42052' x='43382' y='51385'>
                         <zone fixed-size='46' h='3538' id='305' is-fixed='true' param='horz' type-v2='layout-flow' w='40341' x='44586' y='52000'>
-                          <zone fixed-size='39' h='3538' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2470' x='44586' y='52000'>
+                          <zone fixed-size='39' h='3538' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2470' x='44586' y='52000'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -5789,7 +5789,7 @@ Dashboard Creator: ______
                   </zone>
                   <zone h='25693' id='333' param='vert' type-v2='layout-flow' w='84166' x='1267' y='72769'>
                     <zone fixed-size='46' h='3538' id='337' is-fixed='true' param='horz' type-v2='layout-flow' w='83152' x='1774' y='75076'>
-                      <zone fixed-size='39' h='3538' id='342' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='2977' x='1774' y='75076'>
+                      <zone fixed-size='39' h='3538' id='342' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Copy Trader.png' type-v2='bitmap' w='2977' x='1774' y='75076'>
                         <zone-style>
                           <format attr='border-color' value='#000000' />
                           <format attr='border-style' value='none' />
@@ -5901,7 +5901,7 @@ Dashboard Creator: ______
       <simple-id uuid='{3A5AA7CC-446D-4F72-89E5-02688BA8B8CD}' />
     </dashboard>
     <dashboard name='Frame  With Main KPI (2+3)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/FrameWithMainKPI23?rev=' id='FrameWithMainKPI23' path='/workbooks/EtoroTableauTemplateNew' revision='' site='lightricks' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/FrameWithMainKPI23?rev=' id='FrameWithMainKPI23' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' site='lightricks' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='800' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -5909,7 +5909,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='95366' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97506' x='1247' y='2317'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='7532' id='267' is-fixed='true' type-v2='layout-basic' w='97506' x='1247' y='2317'>
               <zone friendly-name='Top Banner' h='7532' id='7' param='horz' type-v2='layout-flow' w='12614' x='1247' y='2317'>
-                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12614' x='1247' y='2317'>
+                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12614' x='1247' y='2317'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -6010,7 +6010,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{67D61D5A-D034-44C2-9685-D310E7312A16}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -6144,7 +6144,7 @@ Dashboard Creator: ______
                     <zone fixed-size='926' h='27579' id='24' is-fixed='true' param='horz' type-v2='layout-flow' w='42207' x='1247' y='41367'>
                       <zone h='27579' id='157' param='vert' type-v2='layout-flow' w='42207' x='1247' y='41367'>
                         <zone fixed-size='46' h='5330' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='1746' y='42294'>
-                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='42294'>
+                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='42294'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -6204,7 +6204,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone h='27579' id='23' param='vert' type-v2='layout-flow' w='42207' x='43454' y='41367'>
                       <zone fixed-size='46' h='5330' id='276' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='44639' y='42294'>
-                        <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 33.png' type-v2='bitmap' w='2868' x='44639' y='42294'>
+                        <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 33.png' type-v2='bitmap' w='2868' x='44639' y='42294'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -6266,7 +6266,7 @@ Dashboard Creator: ______
                     <zone h='26188' id='29' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='84414' x='1247' y='71495'>
                       <zone h='26188' id='32' param='vert' type-v2='layout-flow' w='28179' x='1247' y='71495'>
                         <zone fixed-size='46' h='5330' id='279' is-fixed='true' param='horz' type-v2='layout-flow' w='26495' x='1746' y='72422'>
-                          <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2930' x='1746' y='72422'>
+                          <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2930' x='1746' y='72422'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -6329,7 +6329,7 @@ Dashboard Creator: ______
                       </zone>
                       <zone fixed-size='500' h='26188' id='28' is-fixed='true' param='vert' type-v2='layout-flow' w='28118' x='29426' y='71495'>
                         <zone fixed-size='46' h='5330' id='305' is-fixed='true' param='horz' type-v2='layout-flow' w='25748' x='30611' y='72422'>
-                          <zone fixed-size='39' h='5330' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2431' x='30611' y='72422'>
+                          <zone fixed-size='39' h='5330' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2431' x='30611' y='72422'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -6381,7 +6381,7 @@ Dashboard Creator: ______
                       </zone>
                       <zone h='26188' id='33' param='vert' type-v2='layout-flow' w='28117' x='57544' y='71495'>
                         <zone fixed-size='46' h='5330' id='307' is-fixed='true' param='horz' type-v2='layout-flow' w='26433' x='58729' y='72422'>
-                          <zone fixed-size='39' h='5330' id='308' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 45.png' type-v2='bitmap' w='2431' x='58729' y='72422'>
+                          <zone fixed-size='39' h='5330' id='308' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 45.png' type-v2='bitmap' w='2431' x='58729' y='72422'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -6499,7 +6499,7 @@ Dashboard Creator: ______
       <simple-id uuid='{37E4ABA2-7A8E-4E20-9A40-E70B506CE034}' />
     </dashboard>
     <dashboard name='Frame  With Main KPI (3*2)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/FrameWithMainKPI32?rev=' id='FrameWithMainKPI32' path='/workbooks/EtoroTableauTemplateNew' revision='' site='lightricks' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/FrameWithMainKPI32?rev=' id='FrameWithMainKPI32' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' site='lightricks' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='800' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -6507,7 +6507,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='95366' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97506' x='1247' y='2317'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='7532' id='267' is-fixed='true' type-v2='layout-basic' w='97506' x='1247' y='2317'>
               <zone friendly-name='Top Banner' h='7532' id='7' param='horz' type-v2='layout-flow' w='12609' x='1247' y='2317'>
-                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12609' x='1247' y='2317'>
+                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12609' x='1247' y='2317'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -6608,7 +6608,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{DF73AD1D-2B3E-476B-B095-336F71B40EF9}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -6741,7 +6741,7 @@ Dashboard Creator: ______
                   <zone fixed-size='278' friendly-name='Row 1' h='28853' id='20' is-fixed='true' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='84414' x='1247' y='40093'>
                     <zone friendly-name='Chart 1' h='27579' id='157' param='vert' type-v2='layout-flow' w='28179' x='1247' y='41367'>
                       <zone fixed-size='46' h='5330' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='26495' x='1746' y='42294'>
-                        <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='42294'>
+                        <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='42294'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -6800,7 +6800,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone friendly-name='Chart 2' h='27579' id='329' param='vert' type-v2='layout-flow' w='28118' x='29426' y='41367'>
                       <zone fixed-size='56' h='6489' id='331' is-fixed='true' param='horz' type-v2='layout-flow' w='25748' x='30611' y='41367'>
-                        <zone fixed-size='38' h='6489' id='333' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/12-Installs.png' type-v2='bitmap' w='2868' x='30611' y='41367'>
+                        <zone fixed-size='38' h='6489' id='333' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/12-Installs.png' type-v2='bitmap' w='2868' x='30611' y='41367'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -6860,7 +6860,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone friendly-name='Chart 3' h='27579' id='23' param='vert' type-v2='layout-flow' w='28117' x='57544' y='41367'>
                       <zone fixed-size='46' h='5330' id='276' is-fixed='true' param='horz' type-v2='layout-flow' w='26433' x='58729' y='42294'>
-                        <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 33.png' type-v2='bitmap' w='2868' x='58729' y='42294'>
+                        <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 33.png' type-v2='bitmap' w='2868' x='58729' y='42294'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -6921,7 +6921,7 @@ Dashboard Creator: ______
                   <zone h='28737' id='29' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='84414' x='1247' y='68946'>
                     <zone h='26188' id='32' param='vert' type-v2='layout-flow' w='28179' x='1247' y='71495'>
                       <zone fixed-size='46' h='5330' id='279' is-fixed='true' param='horz' type-v2='layout-flow' w='26495' x='1746' y='72422'>
-                        <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2930' x='1746' y='72422'>
+                        <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2930' x='1746' y='72422'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -6984,7 +6984,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone fixed-size='500' h='26188' id='28' is-fixed='true' param='vert' type-v2='layout-flow' w='28118' x='29426' y='71495'>
                       <zone fixed-size='46' h='5330' id='305' is-fixed='true' param='horz' type-v2='layout-flow' w='25748' x='30611' y='72422'>
-                        <zone fixed-size='39' h='5330' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2431' x='30611' y='72422'>
+                        <zone fixed-size='39' h='5330' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2431' x='30611' y='72422'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -7036,7 +7036,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone h='26188' id='33' param='vert' type-v2='layout-flow' w='28117' x='57544' y='71495'>
                       <zone fixed-size='46' h='5330' id='307' is-fixed='true' param='horz' type-v2='layout-flow' w='26433' x='58729' y='72422'>
-                        <zone fixed-size='39' h='5330' id='308' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 45.png' type-v2='bitmap' w='2930' x='58729' y='72422'>
+                        <zone fixed-size='39' h='5330' id='308' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 45.png' type-v2='bitmap' w='2930' x='58729' y='72422'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -7147,7 +7147,7 @@ Dashboard Creator: ______
       <simple-id uuid='{AD5297C4-BF95-4512-B5C6-86F7537A8102}' />
     </dashboard>
     <dashboard name='Frame (1*1)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/Frame11?rev=' id='Frame11' path='/workbooks/EtoroTableauTemplateNew' revision='' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/Frame11?rev=' id='Frame11' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='800' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -7155,7 +7155,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='95366' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97506' x='1247' y='2317'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='7532' id='267' is-fixed='true' type-v2='layout-basic' w='97506' x='1247' y='2317'>
               <zone friendly-name='Top Banner' h='7532' id='7' param='horz' type-v2='layout-flow' w='58061' x='1247' y='2317'>
-                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='58061' x='1247' y='2317'>
+                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='58061' x='1247' y='2317'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -7248,7 +7248,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{781C2944-0145-4317-AD7A-358D9D643E82}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -7271,7 +7271,7 @@ Dashboard Creator: ______
                 <zone fixed-size='926' h='33604' id='24' is-fixed='true' param='horz' type-v2='layout-flow' w='84414' x='1247' y='26650'>
                   <zone h='33604' id='157' param='vert' type-v2='layout-flow' w='84414' x='1247' y='26650'>
                     <zone fixed-size='46' h='5330' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='83416' x='1746' y='27577'>
-                      <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='27577'>
+                      <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='27577'>
                         <zone-style>
                           <format attr='border-color' value='#000000' />
                           <format attr='border-style' value='none' />
@@ -7390,7 +7390,7 @@ Dashboard Creator: ______
       <simple-id uuid='{9B1B908D-9592-47DF-BF29-FEC25432D2A4}' />
     </dashboard>
     <dashboard name='Frame (2*2)'>
-      <repository-location derived-from='https://reports.etorocorp.com/workbooks/EtoroTableauTemplateNew/Frame22?rev=' id='Frame22' path='/workbooks/EtoroTableauTemplateNew' revision='' site='lightricks' />
+      <repository-location derived-from='https://reports.exampleorgcorp.com/workbooks/ExampleOrgTableauTemplateNew/Frame22?rev=' id='Frame22' path='/workbooks/ExampleOrgTableauTemplateNew' revision='' site='lightricks' />
       <style />
       <size maxheight='1700' maxwidth='1920' minheight='800' minwidth='1020' sizing-mode='range' />
       <zones>
@@ -7398,7 +7398,7 @@ Dashboard Creator: ______
           <zone fixed-size='1249' friendly-name='Content' h='95366' id='3' is-fixed='true' param='vert' type-v2='layout-flow' w='97506' x='1247' y='2317'>
             <zone fixed-size='65' friendly-name='Logo, Info, Last update' h='7532' id='267' is-fixed='true' type-v2='layout-basic' w='97506' x='1247' y='2317'>
               <zone friendly-name='Top Banner' h='7532' id='7' param='horz' type-v2='layout-flow' w='12612' x='1247' y='2317'>
-                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12612' x='1247' y='2317'>
+                <zone fixed-size='195' h='7532' id='88' is-centered='0' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/unnamed.png' type-v2='bitmap' w='12612' x='1247' y='2317'>
                   <zone-style>
                     <format attr='border-color' value='#f6f7f9' />
                     <format attr='border-style' value='solid' />
@@ -7499,7 +7499,7 @@ Dashboard Creator: ______
                   <toggle-action>tabdoc:toggle-button-click-action window-id=&quot;{FD353127-B6BE-474E-AF9F-42A7349833E4}&quot; zone-id=&quot;266&quot; zone-ids=[264]</toggle-action>
                   <button-visual-state />
                   <button-visual-state>
-                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Full.png</image-path>
+                    <image-path>C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Full.png</image-path>
                   </button-visual-state>
                 </button>
                 <zone-style>
@@ -7524,7 +7524,7 @@ Dashboard Creator: ______
                     <zone fixed-size='926' h='34299' id='24' is-fixed='true' param='horz' type-v2='layout-flow' w='42207' x='1247' y='27926'>
                       <zone h='34299' id='157' param='vert' type-v2='layout-flow' w='42207' x='1247' y='27926'>
                         <zone fixed-size='46' h='5330' id='271' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='1746' y='28853'>
-                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='28853'>
+                          <zone fixed-size='47' h='5330' id='278' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/01-Revenue.png' type-v2='bitmap' w='2930' x='1746' y='28853'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -7584,7 +7584,7 @@ Dashboard Creator: ______
                     </zone>
                     <zone h='34299' id='23' param='vert' type-v2='layout-flow' w='42207' x='43454' y='27926'>
                       <zone fixed-size='46' h='5330' id='276' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='44639' y='28853'>
-                        <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/03-Active-Subscriptions.png' type-v2='bitmap' w='2868' x='44639' y='28853'>
+                        <zone fixed-size='46' h='5330' id='282' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/03-Active-Subscriptions.png' type-v2='bitmap' w='2868' x='44639' y='28853'>
                           <zone-style>
                             <format attr='border-color' value='#000000' />
                             <format attr='border-style' value='none' />
@@ -7646,7 +7646,7 @@ Dashboard Creator: ______
                     <zone h='32909' id='29' layout-strategy-id='distribute-evenly' param='horz' type-v2='layout-flow' w='84414' x='1247' y='64774'>
                       <zone h='32909' id='32' param='vert' type-v2='layout-flow' w='42207' x='1247' y='64774'>
                         <zone fixed-size='46' h='5330' id='279' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='1746' y='65701'>
-                          <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2930' x='1746' y='65701'>
+                          <zone fixed-size='47' h='5330' id='280' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/10-Usage-Retention.png' type-v2='bitmap' w='2930' x='1746' y='65701'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
@@ -7709,7 +7709,7 @@ Dashboard Creator: ______
                       </zone>
                       <zone fixed-size='500' h='32909' id='28' is-fixed='true' param='vert' type-v2='layout-flow' w='42207' x='43454' y='64774'>
                         <zone fixed-size='46' h='5330' id='305' is-fixed='true' param='horz' type-v2='layout-flow' w='40523' x='44639' y='65701'>
-                          <zone fixed-size='39' h='5330' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/EtoroTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2431' x='44639' y='65701'>
+                          <zone fixed-size='39' h='5330' id='306' is-fixed='true' is-scaled='1' param='C:/Users/lavitz/OneDrive - globaltrad/Documents/My Tableau Repository/Workbooks/ExampleOrgTableauTemplates.twb Files/Image/Asset 37.png' type-v2='bitmap' w='2431' x='44639' y='65701'>
                             <zone-style>
                               <format attr='border-color' value='#000000' />
                               <format attr='border-style' value='none' />
