@@ -4,6 +4,13 @@
 # Allow top-level files
 !.gitignore
 !README.md
+!LICENSE
+!CONTRIBUTING.md
+!requirements.txt
+
+# Allow assets/ (screenshots, images)
+!assets/
+!assets/**
 
 # Allow skill/ tree
 !skill/

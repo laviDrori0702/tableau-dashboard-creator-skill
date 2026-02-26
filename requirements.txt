@@ -1,0 +1,6 @@
+# Required for all database integrations
+pandas
+python-dotenv
+
+# PostgreSQL
+psycopg2-binary

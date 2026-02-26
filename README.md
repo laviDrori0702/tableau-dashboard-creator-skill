@@ -1,6 +1,24 @@
-# Tableau Dashboard Creator — Claude Code Skill
+# Tableau Dashboard Creator Skill
 
-A Claude Code skill that transforms a human-language dashboard request into an implementable Tableau specification, complete with interactive HTML mock, technical implementation blueprint, and an experimental `.twbx` workbook — all through a guided, approval-gated workflow.
+An agentic AI skill that transforms a human-language dashboard request into an implementable Tableau specification, complete with interactive HTML mock, technical implementation blueprint, and an experimental `.twbx` workbook — all through a guided, approval-gated workflow.
+
+Works with **Claude Code**, **Cursor**, and any other agentic AI coding tool that supports skills.
+
+## Preview
+
+> The skill generates an interactive HTML mock (Step C) that previews your dashboard before building it in Tableau.
+
+![Dashboard Mock Preview](assets/mock-preview.png)
+
+*Open `demo/output/mock-version/v_1/mock.html` in a browser to try the interactive version.*
+
+## Prerequisites
+
+| Requirement | Details |
+|-------------|---------|
+| **Agentic AI tool** | [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor](https://www.cursor.com/), or any tool that supports skill files (`SKILL.md`) |
+| **Python 3.7+** | Required only if using SQL database queries (Step A) |
+| **Tableau Desktop** | Required only for opening `.twbx` workbooks (Step E) |
 
 ## What This Skill Does
 
@@ -22,8 +40,11 @@ Each step outputs a versioned artifact. You review, request changes, or approve 
 ## Repository Structure
 
 ```
-tableau-dashboard-creation-skill/
+tableau-dashboard-creator-skill/
 ├── README.md                                    ← You are here
+├── LICENSE                                      # MIT License
+├── CONTRIBUTING.md                              # Contribution guidelines
+├── requirements.txt                             # Python dependencies
 ├── skill/
 │   └── tableau-dashboard-creator/               ← The skill itself (copy this)
 │       ├── SKILL.md                             # Skill definition & workflow
@@ -73,26 +94,39 @@ tableau-dashboard-creation-skill/
 
 ## Installation — Adding the Skill to Your Environment
 
-### 1. Copy the skill directory
+### Claude Code
 
-Copy the entire `skill/tableau-dashboard-creator/` folder into your Claude Code skills directory:
+Copy the skill directory into your Claude Code skills location:
 
 ```bash
-# The standard Claude Code skills location:
-cp -r skill/tableau-dashboard-creator ~/.claude/skills/tableau-dashboard-creator
+git clone https://github.com/laviDrori0702/tableau-dashboard-creator-skill.git
+cp -r tableau-dashboard-creator-skill/skill/tableau-dashboard-creator ~/.claude/skills/
 ```
 
-> The skill directory **must** contain `SKILL.md` at its root — this is what Claude Code uses to discover and invoke the skill.
+Verify by running `/skill tableau-dashboard-creator` in Claude Code.
 
-### 2. Verify the skill is available
+### Cursor
 
-Open Claude Code and run:
+Copy the skill directory into your Cursor rules or skills location:
 
+```bash
+git clone https://github.com/laviDrori0702/tableau-dashboard-creator-skill.git
+cp -r tableau-dashboard-creator-skill/skill/tableau-dashboard-creator /path/to/your/cursor/skills/
 ```
-/skill tableau-dashboard-creator
-```
 
-If the skill is installed correctly, Claude will begin the guided workflow.
+### Other Agentic AI Tools
+
+The skill is defined in `skill/tableau-dashboard-creator/SKILL.md`. Copy the entire `skill/tableau-dashboard-creator/` directory to wherever your tool discovers skill files.
+
+> The skill directory **must** contain `SKILL.md` at its root — this is what agentic AI tools use to discover and invoke the skill.
+
+### Python Dependencies (optional)
+
+Only needed if you use SQL database queries in Step A:
+
+```bash
+pip install -r requirements.txt
+```
 
 ---
 
@@ -118,9 +152,6 @@ mkdir sample-data
 Create a `QUERIES.md` file with queries grouped by database type:
 
 ```markdown
-## Databricks
-SELECT * FROM catalog.schema.my_table
-
 ## PostgreSQL
 SELECT * FROM public.my_table
 ```
@@ -202,9 +233,9 @@ The skill includes query scripts for three databases. Required packages per data
 
 | Database | Packages | Key `.env` Variables |
 |----------|----------|---------------------|
-| Databricks | `databricks-sql-connector`, `pandas`, `python-dotenv` | `DATABRICKS_SERVER`, `DATABRICKS_HTTP_PATH`, `DATABRICKS_TOKEN` |
 | PostgreSQL | `psycopg2-binary`, `pandas`, `python-dotenv` | `PG_HOST`, `PG_PORT`, `PG_DATABASE`, `PG_USER`, `PG_PASSWORD` |
-| Snowflake | `snowflake-connector-python`, `pandas`, `python-dotenv` | `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PASSWORD`, `SNOWFLAKE_WAREHOUSE` |
+
+> Databricks and Snowflake query scripts are included but not yet fully supported. Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 All query scripts enforce a **LIMIT 500** safety cap on results.
 
@@ -240,3 +271,13 @@ Revisions increment the version: `v_2/`, `v_3/`, etc. Each version is a complete
 - **No box shadows** — Not natively supported in Tableau
 - **Container hierarchy** must follow Tableau's zone model (layout-basic → layout-flow → sheets)
 - **Step E (TWB generation) is experimental** — Always review the generated workbook in Tableau Desktop before publishing
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on reporting issues, suggesting features, and submitting pull requests.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
