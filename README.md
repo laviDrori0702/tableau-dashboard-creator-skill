@@ -106,14 +106,14 @@ tableau-dashboard-creator-skill/
 
 ### Claude Code
 
-Copy the skill directory into your Claude Code skills location:
+Copy the skill directory into your Claude Code skills location (Note the difference between Project/User location):
 
 ```bash
 git clone https://github.com/laviDrori0702/tableau-dashboard-creator-skill.git
 cp -r tableau-dashboard-creator-skill/skill/tableau-dashboard-creator ~/.claude/skills/
 ```
 
-Verify by running `/skill tableau-dashboard-creator` in Claude Code.
+Verify by running `/tableau-dashboard-creator` in your agentic code environment.
 
 ### Cursor
 
@@ -137,6 +137,27 @@ Only needed if you use SQL database queries in Step A:
 ```bash
 pip install -r requirements.txt
 ```
+
+---
+
+## Try the Skill with Demo Data
+
+Want to see the skill in action before using your own data? The `demo/` directory contains a complete worked example you can run yourself.
+
+1. **Create a test directory and copy the demo inputs:**
+   ```bash
+   mkdir demo-test && cd demo-test
+   cp -r /path/to/tableau-dashboard-creator-skill/demo/input/* .
+   ```
+
+2. **Run the skill** — it will detect `SalesPerformance-PDR.md`, `sample-data/`, and `branding/` and start the workflow:
+   ```
+   /skill tableau-dashboard-creator
+   ```
+
+3. **Compare your results** with the pre-generated outputs in `demo/output/` to see what each step should produce.
+
+> The demo uses a Sales Performance dashboard with 4 KPIs, 4 charts, and 3 filters — small enough to complete quickly, rich enough to showcase every step.
 
 ---
 

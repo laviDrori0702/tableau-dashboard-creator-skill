@@ -10,7 +10,7 @@ A multi-step workflow that transforms a human-language dashboard request into an
 
 ## Prerequisites
 
-Before starting, verify the user has provided:
+Before starting, scan the user's project root for:
 
 ```
 Checklist:
@@ -23,7 +23,7 @@ Checklist:
       - template.twb — Organization's Tableau template workbook (in project root)
 ```
 
-If any are missing, offer to run **Project Scaffolding** (below) to generate the required file structure with placeholders, or ask the user to provide them manually.
+**If any are missing, immediately run Project Scaffolding (below) before doing anything else.** Do NOT ask the user to manually provide files — scaffold first, then let them customize.
 
 ### QUERIES.md Format
 
@@ -58,23 +58,25 @@ Step D: Implementation Spec ──[user approval]──> Step E: TWB Generation 
 
 **Do NOT skip steps. Wait for explicit user approval before moving to the next step.**
 
-## Project Scaffolding (Optional)
+## Project Scaffolding
 
-If the user's project does not yet have the required input files, offer to scaffold the project:
+**When to run**: Automatically when the prerequisites check finds missing files. Skip only if all prerequisite files already exist.
 
-1. **Ask the user for permission** before creating any files
-2. **Copy the contents of `skeleton/`** into the user's project root. This creates:
+**Process**:
+
+1. **Ask the user for permission** to scaffold their project directory
+2. **Read each file from `skeleton/`** in the skill directory and **write its contents** into the user's project root, preserving the directory structure. This creates:
    - `sample-data/` — starter CSV files (sales orders, customer segments, monthly targets) for immediate testing
    - `.env.example` — database credentials template (rename to `.env` when ready)
    - `EXAMPLE-PDR.md` — blank PDR template with section headers and placeholder examples
    - `QUERIES.md` — SQL query template with database type headings
    - `branding/branding.md` — branding spec template with section headers and placeholder values
    - `SalesPerformance-PDR.md` — partially filled Sales Performance PDR as a starting reference
-3. **Inform the user** about each file and what they need to fill in
+3. **List every file created** and briefly explain what the user should fill in or customize
 4. **Encourage the user** to explore the `demo/` directory in the skill repository for a complete worked example with all steps already generated
-5. **Proceed to Step 0** once the user has filled in their branding and PDR
+5. **Wait for the user** to confirm they have reviewed/customized the files, then proceed to Step 0
 
-> This step is optional — skip it if the user already has the required files in place.
+> **Important**: Do NOT use shell `cp` commands — the skeleton directory is inside the skill installation, not the user's project. Read each skeleton file with the Read tool and write it to the user's project root with the Write tool.
 
 > **Every step is iterative.** The agent will not produce a perfect result in a single pass — this is expected and by design. Encourage the user to review each artifact carefully, request changes, and iterate until satisfied. This is especially true for Step C (HTML mock) and Step E (TWB generation). For Step C, encourage the user to share the mock with stakeholders for validation before approving — a well-reviewed mock prevents costly rework downstream.
 
