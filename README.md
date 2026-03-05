@@ -296,7 +296,7 @@ your-project/
         └── dashboard.twbx               # Generated — Step E (primary deliverable)
 ```
 
-Revisions increment the version: `v_2/`, `v_3/`, etc. Each version is a complete standalone copy.
+Revisions to Steps D or E increment the version: `v_2/`, `v_3/`, etc. Step C mock revisions overwrite in-place within the current version directory. Each version is a complete standalone copy.
 
 ---
 

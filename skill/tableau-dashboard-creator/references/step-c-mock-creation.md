@@ -144,6 +144,8 @@ Implement where applicable:
 
 Save to `mock-version/v_N/mock.html` where N is the current version number (start with 1).
 
-Present the mock to the user (tell them to open the HTML file in a browser) and **wait for approval** before proceeding to Step D. If the user requests changes, increment version number and create a new full mock.
+Present the mock to the user (tell them to open the HTML file in a browser) and **wait for approval** before proceeding to Step D. If the user requests changes, overwrite `mock.html` in the current `v_N` directory (do NOT create a new version directory — version increments only happen at Steps D or E).
+
+When the user approves the mock, review whether the approved mock diverged from the current `DASHBOARD-PLAN.md` or `design-tokens.md` (e.g., added/removed KPIs, changed chart types, adjusted layout, new colors). If it did, update those root-level files to match the approved mock before proceeding to Step D.
 
 > **Important — this is an iterative process.** The HTML mock is unlikely to be perfect on the first attempt. Expect multiple revision cycles — this is normal and by design. Encourage the user to share the mock with stakeholders for feedback before approving. A well-validated mock saves significant rework in later steps (D and E). Take your time here — it's better to iterate on the mock than to rebuild the implementation spec or workbook.

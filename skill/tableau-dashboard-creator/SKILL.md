@@ -135,6 +135,7 @@ Summary:
 3. Create interactive HTML mock with Chart.js and sample data
 4. Save to `mock-version/v_N/mock.html`
 5. Present mock to the user for approval
+6. If approved, update `DASHBOARD-PLAN.md` and `design-tokens.md` if the mock diverged from them
 
 ## Step D: Tableau Implementation Spec
 
@@ -144,6 +145,7 @@ Summary:
 1. Translate the approved HTML mock into a technical Tableau implementation spec
 2. Document container hierarchy, sheets, calculated fields, parameters
 3. Save to `mock-version/v_N/TABLEAU-IMPLEMENTATION.md`
+4. If approved, update `DASHBOARD-PLAN.md` if the implementation spec diverged from it
 
 ## Step E: TWB Workbook Generation (Experimental)
 
@@ -161,7 +163,7 @@ Summary:
 
 - All mock and implementation files go inside `mock-version/v_N/` (e.g., `mock-version/v_1/`)
 - Each version is a **full standalone copy** (mock.html + TABLEAU-IMPLEMENTATION.md + dashboard.twb + dashboard.twbx)
-- When the user requests revisions after step C, D, or E, increment the version number
+- When the user requests revisions after Step D or E, increment the version number. Step C revisions overwrite the current mock in-place (same `v_N` directory).
 - DS-ARCHITECTURE.md, DASHBOARD-PLAN.md, and design-tokens.md live at the project root (shared across versions)
 
 ## File Structure (per project)

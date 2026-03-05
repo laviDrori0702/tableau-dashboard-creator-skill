@@ -10,6 +10,7 @@ Create `TABLEAU-IMPLEMENTATION.md` that serves as a technical blueprint for buil
 4. **Review design-tokens.md** for styling values and template layout
 5. **Create TABLEAU-IMPLEMENTATION.md** with all sections below
 6. **Save to** `mock-version/v_N/TABLEAU-IMPLEMENTATION.md`
+7. **Sync root-level docs** — When the user approves the implementation spec, review whether it diverged from `DASHBOARD-PLAN.md` (e.g., added/removed sheets, changed calculated fields, new filters or actions). If it did, update `DASHBOARD-PLAN.md` to match before proceeding to Step E.
 
 ## TABLEAU-IMPLEMENTATION.md Template
 
