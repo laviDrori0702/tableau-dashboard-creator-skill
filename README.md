@@ -22,9 +22,10 @@ Works with **Claude Code**, **Cursor**, and any other agentic AI coding tool tha
 
 ## What This Skill Does
 
-The skill guides you through **6 steps**, each requiring your approval before proceeding:
+The skill guides you through **6 steps** (plus optional scaffolding), each requiring your approval before proceeding:
 
 ```
+Scaffolding (optional)     → Creates project structure with placeholder files
 Step 0: Brand Setup         → Extracts design tokens from your branding/template
 Step A: Data Exploration    → Analyzes your data sources, builds a data dictionary
 Step B: Dashboard Planning  → Plans KPIs, charts, filters, and layout
@@ -63,6 +64,17 @@ tableau-dashboard-creator-skill/
 │       │   ├── step-e-twb-generation.md         # TWB XML generation instructions
 │       │   ├── tableau-design-tokens.md         # Design token reference
 │       │   └── twb-xml-reference.md             # TWB XML schema docs
+│       ├── skeleton/                              ← Project scaffold (copied to user projects)
+│       │   ├── sample-data/                       # Starter CSV files
+│       │   │   ├── sales_orders.csv
+│       │   │   ├── customer_segments.csv
+│       │   │   └── monthly_targets.csv
+│       │   ├── branding/
+│       │   │   └── branding.md                    # Branding template with placeholders
+│       │   ├── .env.example                       # DB credentials template
+│       │   ├── EXAMPLE-PDR.md                     # Blank PDR template
+│       │   ├── QUERIES.md                         # SQL query template
+│       │   └── SalesPerformance-PDR.md            # Partially filled PDR reference
 │       └── scripts/
 │           └── query_postgresql.py              # PostgreSQL SQL executor
 └── demo/
@@ -132,11 +144,13 @@ pip install -r requirements.txt
 
 ### 1. Set up your project directory
 
-Create a new working directory for your dashboard project:
+Create a new working directory and let the skill scaffold it for you:
 
 ```bash
 mkdir my-dashboard && cd my-dashboard
 ```
+
+When you run the skill, it will offer to copy starter files (sample data, templates, branding placeholders) into your project. You can also set up files manually — see below.
 
 ### 2. Provide your data (choose one)
 
@@ -205,7 +219,8 @@ These are the files a user provides before running the skill:
 | `SalesPerformance-PDR.md` | Dashboard request: 4 KPIs, 4 charts, 3 filters |
 | `sample-data/*.csv` | Three CSV files with sales, customer, and target data |
 | `branding/branding.md` | Brand spec (palette, fonts, padding, sizing) |
-| `EXAMPLE-PDR.md` | Blank template you can copy for your own project |
+| `branding/logo.svg` | Demo logo (ACME Analytics) |
+| `EXAMPLE-PDR.md` | Complete demo PDR with all fields filled in |
 | `QUERIES.md` | SQL query template (not used in this demo — uses CSVs) |
 | `.env.example` | DB credentials template (not used in this demo) |
 
