@@ -16,8 +16,12 @@
 
 ## Padding & Spacing
 - Card padding: 8px
-- Section gap: 11px
+- Section spacing: 11px
 - Container margin: 4px
+
+## Icons
+Place 40x40 `.svg` files in `branding/icons/` for chart header enrichment (e.g., `bar-chart.svg`, `trend.svg`).
+If omitted, the agent will generate simple inline SVG icons during Step C.
 
 ## Dashboard Sizing
 - Mode: Range

@@ -49,6 +49,7 @@ If no `branding/` directory is found, but a `template.twb` (or any `.twb` file) 
 If a `branding/` directory is found (checked **before** `template.twb`), look for:
 - **Logo**: `.svg` or `.jpg` file (e.g., `logo.svg`, `logo.jpg`)
 - **Branding spec**: `branding.md` — a markdown file describing the desired palette, fonts, padding, and dashboard sizing
+- **Icons** (optional): `icons/` subdirectory containing 40x40 `.svg` files for chart title-bar enrichment (e.g., `bar-chart.svg`, `trend.svg`, `funnel.svg`). If provided, list them in the design-tokens.md output under an `## Icons` section mapping icon names to file paths.
 
 ### Expected `branding.md` format:
 
@@ -71,7 +72,7 @@ If a `branding/` directory is found (checked **before** `template.twb`), look fo
 
 ## Padding & Spacing
 - Card padding: 8px
-- Section gap: 11px
+- Section spacing: 11px
 - Container margin: 4px
 
 ## Dashboard Sizing
@@ -164,6 +165,14 @@ Generate this file in the project root:
 
 ## Chart Card Pattern
 [Structure of chart cards]
+
+## Icons
+[If `branding/icons/` exists, list available icons:]
+| Icon Name | File | Size |
+|-----------|------|------|
+| [name] | [branding/icons/filename.svg] | 40x40 |
+
+[If no icons provided, note that Step C will generate simple inline SVG icons matching chart types.]
 
 ## Spacing Reference
 | Element | Property | Value |

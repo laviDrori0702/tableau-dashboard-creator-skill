@@ -31,6 +31,8 @@
    - Flex containers fill remaining space
 3. **No box shadows** unless explicitly requested (Tableau does not have native shadows)
 4. **Border-style: none** on all containers (except logo zone which uses a background-blending border)
+5. **Fixed-size elements**: Use explicit `min-height` / `min-width` in CSS on structural elements (title bars, KPI rows, filter bars, accent bars, icons, logo) to prevent compression on smaller screens. Only chart areas and main content should flex.
+6. **Tableau-native terminology**: Use Tableau spacing terms (`margin`, `padding`) in design documentation — avoid CSS-specific terms like `gap` which have no Tableau equivalent.
 
 ### Design Token Application
 
@@ -86,6 +88,16 @@ body {
     background-color: /* from design-tokens: Colors > Separator line */;
     margin: 0 10px;
 }
+
+/* Inner padding for all worksheet/sheet zones — space between zone border and content */
+.sheet-zone {
+    padding: 8px;
+}
+
+/* Flexible spacer — every flow container should include one to prevent layout collapse */
+.spacer {
+    flex: 1;
+}
 ```
 
 ### Container Layout Pattern
@@ -97,17 +109,20 @@ Follow this HTML structure mirroring Tableau's zone hierarchy (adapt based on de
   <div class="content-wrapper">                 <!-- Content (vert flow) -->
     <div class="top-banner">                    <!-- Logo, Info, Last update -->
       <div class="logo-area">...</div>
+      <div class="spacer"></div>                <!-- Flexible spacer -->
       <div class="update-info">...</div>
     </div>
     <div class="dashboard-title">Title</div>    <!-- Dashboard Title -->
     <div class="filter-bar">                    <!-- Top Filters -->
       <span class="filter-label">Filters</span>
       <div class="filter-controls">...</div>
+      <div class="spacer"></div>                <!-- Flexible spacer -->
     </div>
     <div class="main-content">                  <!-- Charts & Hidden Filters -->
       <div class="charts-area">                 <!-- KPI & Charts -->
         <div class="kpi-row">...</div>          <!-- Main KPI (if applicable) -->
         <div class="chart-row">...</div>        <!-- Chart rows -->
+        <div class="spacer"></div>              <!-- Flexible spacer -->
       </div>
       <div class="hidden-filters">...</div>     <!-- Hidden Filters panel -->
     </div>
@@ -122,6 +137,13 @@ If a logo file was identified in design-tokens.md:
 - For SVG: inline the SVG or use `<img>` with a relative path
 - For PNG: use `<img>` with a relative path or base64-encode for self-containment
 - Match the dimensions and padding from the design tokens
+
+### Icon Integration
+
+Chart title bars should include a small icon for visual enrichment:
+- If `branding/icons/` contains SVG files, use the matching icon for each chart (filenames should match the icon names suggested in DASHBOARD-PLAN.md, e.g., `bar-chart.svg`, `trend.svg`)
+- If no icons are provided, generate simple monochrome 40x40 SVG icons inline, using the brand primary color and matching the chart type (e.g., a small bar-chart icon for bar charts, a line icon for trend charts)
+- Icons are placed in the chart title bar at 40x40 pixels, before the chart title text
 
 ### Chart Implementation
 

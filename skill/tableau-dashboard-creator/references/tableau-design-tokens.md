@@ -50,21 +50,25 @@ layout-basic (root, 100% x 100%)
 └── Content (vertical flow, centered)
     ├── Top Banner (layout-basic, fixed-size 65)
     │   ├── Logo area (fixed-size 195, padding: 7, padding-left: 12)
+    │   ├── Spacer (Blank, flex)
     │   └── Right section
-    │       ├── Update Time (fixed-size 305)
+    │       ├── Update Time (fixed-size 305, inner-padding: 8)
     │       └── Info icon (fixed-size 34, margin: 4)
     ├── Dashboard Title (horizontal flow, fixed-size 70)
     │   └── Text (margin: 4, margin-bottom: 1, bg: title area color)
     ├── Top Filters (horizontal flow, fixed-size 53)
     │   ├── Label (fixed-size 185, margin: 4)
     │   ├── Filter placeholder (margin: 4)
+    │   ├── Spacer (Blank, flex)
     │   └── Expand/collapse button (fixed-size ~38, margin: 4)
     │   └── [margin-top: 11, margin-bottom: 11]
     └── Charts & Hidden Filters (horizontal flow, flex)
         ├── KPI & Charts (vertical flow, ~86% width)
         │   ├── Main KPI row (horizontal, distribute-evenly, fixed-size 94)
-        │   └── Chart rows (per layout)
+        │   ├── Chart rows (per layout)
+        │   └── Spacer (Blank, flex)
         └── Hidden Filters panel (vertical flow, ~14% width, collapsible)
+            └── Spacer (Blank, flex)
 ```
 
 ## KPI Card Pattern
@@ -73,7 +77,8 @@ layout-basic (root, 100% x 100%)
 KPI container (horizontal flow, margin-right: 16)
 └── Inner wrapper (vertical flow, bg: card background)
     ├── Accent bar (3px height, margin: 0, bg: accent color)
-    └── KPI content area (sheet placeholder)
+    ├── KPI content area (sheet, inner-padding: 8)
+    └── Spacer (Blank, flex)
 ```
 
 ## Chart Card Pattern
@@ -83,11 +88,13 @@ Chart wrapper (horizontal flow, margin-top: 11)
 └── Chart outer (horizontal flow)
     └── Chart inner (vertical flow, padding: 8, bg: card background)
         ├── Title bar (horizontal flow, fixed-size 46)
-        │   ├── Icon image (fixed-size 47)
+        │   ├── Icon image (40x40, fixed-size 47, from branding/icons/)
         │   ├── Chart title text (margin: 4, margin-left: 10)
+        │   ├── Spacer (Blank, flex)
         │   └── Info icon (fixed-size 38, margin: 4)
         ├── Separator line (3px, margin-lr: 10, bg: separator color)
-        └── Chart sheet area (flex)
+        ├── Chart sheet area (flex, inner-padding: 8)
+        └── Spacer (Blank, flex)
 ```
 
 ## Available Template Layouts
@@ -120,6 +127,7 @@ Same chart layouts prefixed with a KPI row containing 4 evenly distributed KPI c
 | Chart card inner | padding | 8 |
 | Chart title text | margin | 4 (margin-left: 10) |
 | Separator line | margin-right/left | 10 |
+| Sheet zone | inner padding | 8 |
 
 ## Constraints
 
@@ -128,3 +136,5 @@ Same chart layouts prefixed with a KPI row containing 4 evenly distributed KPI c
 - Charts have white background, dashboard has light gray background
 - Use distribute-evenly layout strategy for KPI rows and multi-chart rows
 - Hidden filters panel uses collapsible toggle button (DZV pattern)
+- Use `fixed-size` on structural elements (title bars, KPI rows, filter bars, accent/separator bars, icons, logo) — only chart areas and main content should flex
+- Every `layout-flow` container must include at least one Spacer (Blank, flex) to prevent layout collapse

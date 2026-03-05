@@ -61,7 +61,7 @@
 - **Measures**: [column names + aggregation]
 - **Source datasource**: [from DS-ARCHITECTURE.md]
 - **Suggested filters**: [relevant filters for this chart]
-- **Icon suggestion**: [descriptive icon name]
+- **Icon suggestion**: [descriptive icon name — should match an SVG filename in `branding/icons/` if provided, e.g., `bar-chart`, `trend`; otherwise the agent generates a simple inline SVG in Step C]
 
 ### Chart 2: [Chart Title]
 [Same structure]

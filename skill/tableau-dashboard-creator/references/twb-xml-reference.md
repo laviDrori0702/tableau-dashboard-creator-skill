@@ -691,13 +691,22 @@ Every zone should have a `<zone-style>` child:
               <format attr='background-color' value='#4e79a7' />
             </zone-style>
           </zone>
-          <!-- KPI sheet -->
+          <!-- KPI sheet (inner-padding: 8 = space between zone border and content) -->
           <zone h='14500' id='36' name='KPI Total Sales' w='32800' x='800' y='10000'>
             <zone-style>
               <format attr='border-style' value='none' />
               <format attr='border-width' value='0' />
               <format attr='margin' value='0' />
+              <format attr='padding' value='8' />
               <format attr='background-color' value='#ffffff' />
+            </zone-style>
+          </zone>
+          <!-- Spacer (Blank, flex) — prevents container collapse -->
+          <zone h='100' id='40' type-v2='empty' w='32800' x='800' y='24500'>
+            <zone-style>
+              <format attr='border-style' value='none' />
+              <format attr='border-width' value='0' />
+              <format attr='margin' value='0' />
             </zone-style>
           </zone>
           <zone-style>
@@ -738,13 +747,22 @@ Every zone should have a `<zone-style>` child:
               <format attr='padding' value='0' />
             </zone-style>
           </zone>
-          <!-- Chart sheet (flex) -->
+          <!-- Chart sheet (flex, inner-padding: 8) -->
           <zone h='44700' id='65' name='Sales by Country' w='49000' x='800' y='30300'>
             <zone-style>
               <format attr='border-style' value='none' />
               <format attr='border-width' value='0' />
               <format attr='margin' value='0' />
+              <format attr='padding' value='8' />
               <format attr='background-color' value='#ffffff' />
+            </zone-style>
+          </zone>
+          <!-- Spacer (Blank, flex) — prevents container collapse -->
+          <zone h='100' id='66' type-v2='empty' w='49000'>
+            <zone-style>
+              <format attr='border-style' value='none' />
+              <format attr='border-width' value='0' />
+              <format attr='margin' value='0' />
             </zone-style>
           </zone>
           <zone-style>

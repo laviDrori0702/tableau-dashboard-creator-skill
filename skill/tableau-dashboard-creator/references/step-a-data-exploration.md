@@ -84,8 +84,24 @@ Use the template below:
 
 ---
 
-## Relationships
-[Describe how datasources connect - shared keys, join conditions]
+## Data Model: Joins vs Relationships
+
+Tableau distinguishes between **Joins** and **Relationships** at the data-model level:
+
+| Approach | When to Use | Example |
+|----------|-------------|---------|
+| **Join** | Tables share the same granularity (e.g., both are at User ID level) | `orders` JOIN `order_details` on `order_id` |
+| **Relationship** | Tables have different granularity (e.g., opportunities vs account-level targets) | `opportunities` related to `ae_targets` via `account_executive_id` |
+
+**Why it matters**: Joins at mismatched granularity cause row duplication (the "table explosion" problem — e.g., joining 100 opportunities to 5 AE targets produces 500 rows). Relationships let Tableau query each table independently and combine results only when needed, preserving correct aggregation.
+
+### Connections
+[For each pair of related datasources, specify:]
+- **Tables**: [Table A] ↔ [Table B]
+- **Type**: Join / Relationship
+- **Key**: [shared field(s)]
+- **Granularity**: [Table A granularity] vs [Table B granularity]
+- **Rationale**: [Why join vs relationship was chosen]
 
 ## Data Quality Notes
 [Any concerns: nulls, duplicates, unexpected values, type mismatches]
@@ -98,4 +114,5 @@ Use the template below:
 - If a query fails, document the error and suggest fixes
 - If data looks sparse or suspicious, note it in observations
 - When using local files, note the file format and any parsing considerations (encoding, delimiters)
+- Choose **Join** when tables share the same granularity; use **Relationship** when granularity differs to avoid row duplication
 - Present DS-ARCHITECTURE.md to the user and **wait for approval** before proceeding to Step B

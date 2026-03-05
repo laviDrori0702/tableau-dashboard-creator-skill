@@ -18,7 +18,7 @@
 
 ## Padding & Spacing
 - Card padding: 8px
-- Section gap: 11px
+- Section spacing: 11px
 - Container margin: 4px
 
 ## Dashboard Sizing

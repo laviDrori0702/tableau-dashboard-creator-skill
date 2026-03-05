@@ -35,34 +35,45 @@ Root Container (layout-basic)
 │   ├── Top Banner (Tiled, fixed-height: [px])
 │   │   ├── Logo (Image, [w]x[h], padding: [values])
 │   │   ├── Spacer (Blank, flex)
-│   │   ├── Update Time (Sheet, [w]x[h])
-│   │   └── Info Icon (Sheet, [w]x[h])
+│   │   ├── Update Time (Sheet, [w]x[h], inner-padding: 8)
+│   │   └── Info Icon (Sheet, [w]x[h], inner-padding: 8)
 │   ├── Dashboard Title (Text, fixed-height: [px])
 │   │   └── "[Title Text]" ([font], [size], bold, [color], bg: [color])
 │   ├── Filter Bar (Horizontal, fixed-height: [px], margin-top: 11, margin-bottom: 11)
 │   │   ├── "Filters" Label (Text, fixed-width: [px])
 │   │   ├── [Filter 1] (Filter, type: [dropdown/slider/date])
 │   │   ├── [Filter 2] (Filter, type: [type])
+│   │   ├── Spacer (Blank, flex)
 │   │   └── Expand Button (Button, fixed-width: [px])
 │   └── Main Area (Horizontal, flex)
 │       ├── Charts Area (Vertical, ~86% width)
 │       │   ├── KPI Row (Horizontal, distribute-evenly, fixed-height: [px])
 │       │   │   ├── KPI 1 Container (Vertical, bg: [card bg color])
 │       │   │   │   ├── Accent Bar (Blank, 3px, bg: [accent color])
-│       │   │   │   └── [KPI Sheet Name] (Sheet)
+│       │   │   │   ├── [KPI Sheet Name] (Sheet, inner-padding: 8)
+│       │   │   │   └── Spacer (Blank, flex)
 │       │   │   └── [... more KPIs]
 │       │   ├── Chart Row 1 (Horizontal, distribute-evenly, margin-top: 11)
 │       │   │   └── Chart 1 Container (Vertical, padding: 8, bg: [card bg color])
 │       │   │       ├── Title Bar (Horizontal, fixed-height: 46)
-│       │   │       │   ├── Icon (Image)
+│       │   │       │   ├── Icon (Image, 40x40, from branding/icons/ or generated)
 │       │   │       │   ├── "[Chart Title]" (Text, [size], [color])
+│       │   │       │   ├── Spacer (Blank, flex)
 │       │   │       │   └── Info Icon (Sheet)
 │       │   │       ├── Separator (Blank, 3px, bg: [separator color], margin: 0 10px)
-│       │   │       └── [Chart Sheet Name] (Sheet, flex)
+│       │   │       ├── [Chart Sheet Name] (Sheet, flex, inner-padding: 8)
+│       │   │       └── Spacer (Blank, flex)
 │       │   └── [... more chart rows]
 │       └── Hidden Filters Panel (Vertical, ~14% width, collapsible)
-│           └── [Hidden filter sheets]
+│           ├── [Hidden filter sheets]
+│           └── Spacer (Blank, flex)
 ```
+
+### Container Rules
+
+- **Spacer (Blank, flex)**: Every `layout-flow` container must include at least one blank zone (`type='empty'`) with flexible size. This prevents Tableau from collapsing containers when sheets are hidden or empty.
+- **Inner padding on sheets**: All worksheet (Sheet) zones default to `inner-padding: 8` (Tableau `padding` attribute) unless explicitly overridden. This is the space between the zone border and the sheet content — not outer margin.
+- **Fixed-size rule**: Apply `fixed-size` and `is-fixed='true'` to elements that should not shrink on smaller viewports — specifically: title bars, KPI rows, filter bars, accent bars, separator lines, icon images, and logo areas. Only chart sheet areas and main content areas should use `flex` sizing.
 
 ### Container Details
 
@@ -146,3 +157,5 @@ Root Container (layout-basic)
 - Specify tooltip content including field references in square brackets
 - Document all dashboard actions including field mappings
 - This document will be used as input for Step E (TWB generation) — ensure all details are machine-parseable
+- Every `layout-flow` container in the tree must include a Spacer (Blank, flex) to prevent layout collapse
+- All Sheet zones must specify `inner-padding: 8` unless overridden by design tokens
