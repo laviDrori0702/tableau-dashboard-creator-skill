@@ -19,8 +19,8 @@ Checklist:
 - [ ] <DASHBOARD-NAME>-PDR.md — Human-language dashboard request
 - [ ] .env — Database credentials (skip if using sample-data/)
 - [ ] ONE of the following for branding:
+      - branding/ directory containing: logo (.svg or .jpg) + branding.md (palette, fonts, padding, sizing)
       - template.twb — Organization's Tableau template workbook (in project root)
-      - branding/ directory containing: logo (PNG/SVG) + palette (PDF or JSON)
 ```
 
 If any are missing, ask the user to provide them before proceeding.
@@ -66,8 +66,8 @@ Step D: Implementation Spec ──[user approval]──> Step E: TWB Generation 
 Read [references/step-0-brand-setup.md](references/step-0-brand-setup.md) for detailed instructions.
 
 Summary:
-1. Detect branding source: `template.twb` in project root OR `branding/` directory
-2. Extract design tokens from `.twb` XML, or build them from logo + palette
+1. Detect branding source: `branding/` directory (preferred) OR `template.twb` in project root
+2. Extract design tokens from `branding.md` + logo, or from `.twb` XML
 3. Generate `design-tokens.md` in the project root
 4. Present design-tokens.md to the user for approval
 
@@ -148,10 +148,10 @@ project-root/
 ├── QUERIES.md                      (user input — with DB type headings)
 ├── <DASHBOARD-NAME>-PDR.md         (user input)
 ├── .env                            (user input — DB credentials)
-├── template.twb                    (user input — option A: org template)
-├── branding/                       (user input — option B: logo + palette)
-│   ├── logo.png / logo.svg
-│   └── palette.pdf / palette.json
+├── template.twb                    (user input — option B: org template)
+├── branding/                       (user input — option A: logo + branding spec)
+│   ├── logo.svg / logo.jpg
+│   └── branding.md
 ├── sample-data/                    (user input — optional, skip DB queries)
 │   └── *.csv / *.json / *.xlsx
 ├── design-tokens.md                (generated - step 0)

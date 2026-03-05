@@ -5,8 +5,8 @@
 ## Process
 
 1. **Detect branding source** — check the user's project root for one of:
-   - `template.twb` — the organization's Tableau template workbook (preferred)
-   - `branding/` directory — containing logo file(s) and a color palette file
+   - `branding/` directory — containing logo file and a `branding.md` spec (preferred)
+   - `template.twb` — the organization's Tableau template workbook (fallback)
 
 2. **Extract or build design tokens** depending on which source is found
 3. **Generate `design-tokens.md`** in the project root
@@ -16,7 +16,7 @@
 
 ## Path A: Extract from `.twb` Template
 
-If a `template.twb` (or any `.twb` file) is found in the project root:
+If no `branding/` directory is found, but a `template.twb` (or any `.twb` file) exists in the project root:
 
 1. **Read the TWB XML** — it is standard XML. Parse it to extract:
    - **Typography**: font family, sizes for titles/labels/tooltips, weights, colors
@@ -44,33 +44,46 @@ If a `template.twb` (or any `.twb` file) is found in the project root:
 
 ---
 
-## Path B: Build from Logo + Palette
+## Path B: Build from Logo + Branding Spec
 
-If no `.twb` is found, look for `branding/` directory containing:
-- **Logo**: `logo.png`, `logo.svg`, or any image file
-- **Palette**: `palette.json` or `palette.pdf`
+If a `branding/` directory is found (checked **before** `template.twb`), look for:
+- **Logo**: `.svg` or `.jpg` file (e.g., `logo.svg`, `logo.jpg`)
+- **Branding spec**: `branding.md` — a markdown file describing the desired palette, fonts, padding, and dashboard sizing
 
-### Palette JSON format (if provided):
-```json
-{
-  "primary": "#1a2b3c",
-  "secondary": "#4d5e6f",
-  "accent_colors": ["#13c636", "#e96e14", "#f7b42c", "#f887cc"],
-  "background": "#f6f7f9",
-  "card_background": "#ffffff",
-  "text_dark": "#000021",
-  "text_medium": "#5f5f71"
-}
+### Expected `branding.md` format:
+
+```markdown
+# Branding Specification
+
+## Color Palette
+- Primary: #1a2b3c
+- Secondary: #4d5e6f
+- Accent colors: #13c636, #e96e14, #f7b42c, #f887cc
+- Background: #f6f7f9
+- Card background: #ffffff
+- Text dark: #000021
+- Text medium: #5f5f71
+
+## Fonts
+- Primary font: Open Sans
+- Title weight: Bold
+- Body weight: Regular
+
+## Padding & Spacing
+- Card padding: 8px
+- Section gap: 11px
+- Container margin: 4px
+
+## Dashboard Sizing
+- Mode: Range
+- Minimum: 1100 x 800
+- Maximum: Flexible
 ```
 
-### Palette PDF:
-If the user provides a PDF palette, visually inspect it to identify:
-- Primary brand color
-- Secondary/accent colors
-- Use these as KPI accent bars and chart series colors
+> Any section the user omits will use Tableau defaults from `references/tableau-design-tokens.md`.
 
 ### Build tokens from branding:
-When only logo + palette are available (no `.twb` template), use Tableau's default layout conventions:
+When logo + `branding.md` are available (no `.twb` template), use Tableau's default layout conventions for any values not specified in the branding spec:
 - **Font family**: Open Sans (Tableau default)
 - **Dashboard sizing**: Range, min 1100x800, no max
 - **Container hierarchy**: Use the standard hierarchy from the fallback design tokens
@@ -81,7 +94,7 @@ When only logo + palette are available (no `.twb` template), use Tableau's defau
 
 ## Path C: No Branding Provided
 
-If neither `template.twb` nor `branding/` directory exists:
+If neither `branding/` directory nor `template.twb` exists:
 1. **Ask the user** to provide one of them
 2. If the user explicitly wants to proceed without branding, use the fallback tokens from `references/tableau-design-tokens.md` as a starting point
 3. Warn the user that the mock will use generic Tableau defaults

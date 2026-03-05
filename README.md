@@ -72,7 +72,7 @@ tableau-dashboard-creator-skill/
     │   ├── QUERIES.md                           # SQL query template
     │   ├── .env.example                         # Database credentials template
     │   ├── branding/
-    │   │   └── palette.json                     # Color palette example
+    │   │   └── branding.md                       # Brand spec (palette, fonts, padding, sizing)
     │   └── sample-data/
     │       ├── sales_orders.csv                 # 40 sales transactions
     │       ├── customer_segments.csv            # 7 customer records
@@ -158,14 +158,15 @@ Then create a `.env` file with your database credentials (see `demo/input/.env.e
 
 ### 3. Provide your branding (choose one)
 
-**Option A — Tableau template (preferred):**
-Place your organization's `template.twb` file in the project root.
-
-**Option B — Logo + palette:**
+**Option A — Branding directory (preferred):**
 ```bash
 mkdir branding
-# Place logo.png/svg and palette.json/pdf in branding/
+# Place logo.svg/jpg and branding.md in branding/
 ```
+See `demo/input/branding/branding.md` for the expected format (palette, fonts, padding, sizing).
+
+**Option B — Tableau template:**
+Place your organization's `template.twb` file in the project root.
 
 **Option C — No branding:**
 The skill will use default Tableau styling (Open Sans, standard colors).
@@ -203,7 +204,7 @@ These are the files a user provides before running the skill:
 |------|---------|
 | `SalesPerformance-PDR.md` | Dashboard request: 4 KPIs, 4 charts, 3 filters |
 | `sample-data/*.csv` | Three CSV files with sales, customer, and target data |
-| `branding/palette.json` | Corporate color palette |
+| `branding/branding.md` | Brand spec (palette, fonts, padding, sizing) |
 | `EXAMPLE-PDR.md` | Blank template you can copy for your own project |
 | `QUERIES.md` | SQL query template (not used in this demo — uses CSVs) |
 | `.env.example` | DB credentials template (not used in this demo) |

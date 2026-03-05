@@ -1,6 +1,6 @@
 # Design Tokens
 
-**Source**: branding directory (palette.json only — no logo provided)
+**Source**: branding directory (branding.md — no logo provided)
 
 ## Typography
 - **Font family**: Open Sans
