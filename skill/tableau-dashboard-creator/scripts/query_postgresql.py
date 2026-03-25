@@ -1,8 +1,8 @@
 """Execute PostgreSQL queries with LIMIT 500 enforcement.
 
 Usage:
-    python scripts/query_postgresql.py "SELECT * FROM public.your_table"
-    python scripts/query_postgresql.py --file queries.sql --output results/
+    python "<SKILL_PATH>/scripts/query_postgresql.py" "SELECT * FROM public.your_table"
+    python "<SKILL_PATH>/scripts/query_postgresql.py" --file queries.sql --output results/
 
 Requires .env with: PG_HOST, PG_PORT, PG_DATABASE, PG_USER, PG_PASSWORD
 Packages: psycopg2-binary, python-dotenv, pandas

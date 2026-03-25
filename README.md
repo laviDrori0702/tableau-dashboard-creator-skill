@@ -17,7 +17,7 @@ Works with **Claude Code**, **Cursor**, and any other agentic AI coding tool tha
 | Requirement | Details |
 |-------------|---------|
 | **Agentic AI tool** | [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor](https://www.cursor.com/), or any tool that supports skill files (`SKILL.md`) |
-| **Python 3.7+** | Required only if using SQL database queries (Step A) |
+| **Python 3.8+** | Required only if using SQL database queries (Step A) |
 | **Tableau Desktop** | Required only for opening `.twbx` workbooks (Step E) |
 
 ## What This Skill Does
@@ -49,11 +49,9 @@ tableau-dashboard-creator-skill/
 │   └── tableau-dashboard-creator/               ← The skill itself (copy this)
 │       ├── SKILL.md                             # Skill definition & workflow
 │       ├── assets/
-│       │   └── fallback-design-tokens.md        # Default Tableau styling
+│       │   └── fallback-design-tokens.md        # Pointer to the canonical fallback token reference
 │       ├── examples/
-│       │   ├── simple-xml-example.twb           # Minimal TWB reference
-│       │   ├── complicated-xml-example.twb      # Complex TWB reference
-│       │   └── OrgTableauTemplates.twb           # Real-world template example
+│       │   └── top-level-workbook-example.twb   # Supplemental TWB reference
 │       ├── references/
 │       │   ├── step-0-brand-setup.md            # Brand extraction instructions
 │       │   ├── step-a-data-exploration.md       # Data analysis instructions
@@ -61,10 +59,12 @@ tableau-dashboard-creator-skill/
 │       │   ├── step-c-mock-creation.md          # HTML mock generation instructions
 │       │   ├── step-d-implementation-spec.md    # Tableau spec instructions
 │       │   ├── step-e-twb-generation.md         # TWB XML generation instructions
-│       │   ├── tableau-design-tokens.md         # Design token reference
-│       │   └── twb-xml-reference.md             # TWB XML schema docs
+│       │   ├── tableau-design-tokens.md         # Canonical fallback design token reference
+│       │   └── snippets/                        # TWB XML snippet library (scaffold, data-model, worksheets, dashboard, features)
+│       ├── skeleton/                            # Project scaffolding files copied into analyst projects
 │       └── scripts/
-│           └── query_postgresql.py              # PostgreSQL SQL executor
+│           ├── query_postgresql.py              # PostgreSQL SQL executor
+│           └── validate_twb.py                  # TWB validator utility
 └── demo/
     ├── input/                                   ← What YOU provide (example files)
     │   ├── SalesPerformance-PDR.md              # Completed dashboard request
@@ -72,7 +72,7 @@ tableau-dashboard-creator-skill/
     │   ├── QUERIES.md                           # SQL query template
     │   ├── .env.example                         # Database credentials template
     │   ├── branding/
-    │   │   └── palette.json                     # Color palette example
+    │   │   └── branding.md                      # Branding spec example
     │   └── sample-data/
     │       ├── sales_orders.csv                 # 40 sales transactions
     │       ├── customer_segments.csv            # 7 customer records
@@ -140,10 +140,10 @@ mkdir my-dashboard && cd my-dashboard
 
 ### 2. Provide your data (choose one)
 
-**Option A — Local files (easiest):**
+**Option A — Local CSV files (easiest):**
 ```bash
 mkdir sample-data
-# Place your CSV, JSON, or XLSX files in sample-data/
+# Place your CSV files in sample-data/
 ```
 
 **Option B — SQL queries:**
@@ -158,14 +158,15 @@ Then create a `.env` file with your database credentials (see `demo/input/.env.e
 
 ### 3. Provide your branding (choose one)
 
-**Option A — Tableau template (preferred):**
-Place your organization's `template.twb` file in the project root.
-
-**Option B — Logo + palette:**
+**Option A — Branding spec (preferred):**
 ```bash
 mkdir branding
-# Place logo.png/svg and palette.json/pdf in branding/
+# Place branding.md in branding/
+# Optionally add logo.svg/logo.jpg and branding/icons/*.svg
 ```
+
+**Option B — Tableau template:**
+Place your organization's `template.twb` file in the project root.
 
 **Option C — No branding:**
 The skill will use default Tableau styling (Open Sans, standard colors).
@@ -203,7 +204,7 @@ These are the files a user provides before running the skill:
 |------|---------|
 | `SalesPerformance-PDR.md` | Dashboard request: 4 KPIs, 4 charts, 3 filters |
 | `sample-data/*.csv` | Three CSV files with sales, customer, and target data |
-| `branding/palette.json` | Corporate color palette |
+| `branding/branding.md` | Corporate colors, typography, spacing, and sizing |
 | `EXAMPLE-PDR.md` | Blank template you can copy for your own project |
 | `QUERIES.md` | SQL query template (not used in this demo — uses CSVs) |
 | `.env.example` | DB credentials template (not used in this demo) |
@@ -227,7 +228,7 @@ These are the artifacts the skill generated from the inputs above:
 
 ## Database Support
 
-The skill ships with a PostgreSQL query script. Additional database connectors can be added to `skill/tableau-dashboard-creator/scripts/` to match your environment.
+The skill ships with a PostgreSQL query script. The agent reads `QUERIES.md` from your project and runs the connector from the installed skill path. Additional database connectors can be added to `skill/tableau-dashboard-creator/scripts/` to match your environment.
 
 | Database | Packages | Key `.env` Variables |
 |----------|----------|---------------------|
@@ -265,9 +266,10 @@ Revisions increment the version: `v_2/`, `v_3/`, etc. Each version is a complete
 
 ## Key Constraints
 
-- **No rounded corners** — Tableau doesn't support `border-radius` until 2026.1
+- **No rounded corners by default** — keep the mock Tableau-faithful unless the user explicitly accepts otherwise
 - **No box shadows** — Not natively supported in Tableau
 - **Container hierarchy** must follow Tableau's zone model (layout-basic → layout-flow → sheets)
+- **Fallback-driven design choices must be disclosed** — when the skill uses Tableau defaults for missing branding input, it should say so
 - **Step E (TWB generation) is experimental** — Always review the generated workbook in Tableau Desktop before publishing
 
 ---

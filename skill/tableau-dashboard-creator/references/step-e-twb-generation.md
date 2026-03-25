@@ -2,6 +2,8 @@
 
 **Identity**: You are a Tableau XML engineer. Your goal is to generate a valid `.twbx` packaged workbook that can be opened directly in Tableau Desktop, fully implementing the dashboard from Step D's specification.
 
+**Target Version**: `source-build='2025.1.10 (20251.25.1121.1650)'`
+
 > **Experimental**: This step generates Tableau XML programmatically. The output should be a functional starting point, though minor adjustments in Tableau Desktop may be needed.
 
 ## Process
@@ -10,231 +12,249 @@
 2. **Read design-tokens.md** for all styling values
 3. **Read DS-ARCHITECTURE.md** for field names and types
 4. **Locate sample data CSVs** from Step A (in the project root or `sample-data/` directory)
-5. **Read the TWB XML reference** from [twb-xml-reference.md](twb-xml-reference.md)
-6. **Generate `dashboard.twb`** as valid Tableau XML (intermediate file)
+5. **Read the relevant snippet files and companion docs** (see Assembly Workflow below)
+6. **Assemble `dashboard.twb`** from validated snippet patterns
 7. **Package as `dashboard.twbx`** — a ZIP archive bundling the `.twb` with all sample CSV data files
-8. **Save to** `mock-version/v_N/dashboard.twbx` (also keep `dashboard.twb` for reference)
+8. **Save to** `mock-version/v_N/` (both `.twb` and `.twbx`)
 
 ---
 
-## TWB XML Structure Overview
+## Assembly Workflow
 
-A `.twb` file is XML with this top-level structure:
+### Step 1: Start from the Scaffold
 
-```xml
-<?xml version='1.0' encoding='utf-8' ?>
-<workbook ...>
-  <preferences />
-  <datasources>
-    <datasource name='...' caption='...' inline='true'>
-      <connection class='textscan' directory='...' filename='...' />
-      <column datatype='...' name='...' role='...' type='...' />
-      ...
-    </datasource>
-  </datasources>
-  <worksheets>
-    <worksheet name='...'>
-      <table>
-        <view> ... </view>
-        <style> ... </style>
-        <panes> ... </panes>
-      </table>
-    </worksheet>
-  </worksheets>
-  <dashboards>
-    <dashboard name='...'>
-      <zones>
-        <zone type='layout-basic'> ... </zone>
-      </zones>
-    </dashboard>
-  </dashboards>
+Read the **actual XML** in `snippets/scaffold/workbook-skeleton.twb` and the companion `snippets/scaffold/SCAFFOLD.md`.
+
+> **Important**: Always read both the `.twb` file (source of truth for exact XML structure) AND the companion `.md` (explains the patterns and parameterization). The `.md` alone is not sufficient — you need the actual XML to assemble from.
+
+This is your base template. All generated workbooks follow this structure:
+
+```
+<workbook>
+  1. <document-format-change-manifest>   ← from scaffold
+  2. <preferences>                        ← from scaffold
+  3. <datasources>                        ← from data-model snippets
+  4. <actions>                            ← from dashboard action snippets (if any)
+  5. <worksheets>                         ← from worksheet snippets
+  6. <dashboards>                         ← from dashboard snippets
+  7. <windows>                            ← assembled from worksheets + dashboard
+  8. <thumbnails>                         ← empty placeholders
 </workbook>
 ```
 
-**Refer to [twb-xml-reference.md](twb-xml-reference.md) for the complete XML schema, element ordering, required attributes, and examples.**
+**Element order is STRICT** — violating it causes Tableau to reject the file.
 
----
+### Step 2: Select Data Model Pattern
 
-## Implementation Requirements
+Read `snippets/data-model/DATA_MODEL.md` and the relevant `.twb` snippet.
 
-### 1. Datasources
+| DS-ARCHITECTURE says... | Use snippet | Key |
+|------------------------|-------------|-----|
+| 1 CSV file | `data-model/single-csv.twb` | Single `<relation type='table'>` |
+| Multiple CSVs, independent tables | `data-model/multi-csv-relationship.twb` | `<relation type='collection'>` + `<relationships>` in object-graph |
+| Multiple CSVs, pre-joined | `data-model/multi-csv-join.twb` | `<relation type='join'>` with `<clause>` |
 
-For each datasource in DS-ARCHITECTURE.md:
+**Always generate as live connection** — do NOT include `<extract>` sections. If the snippet contains an extract block, ignore it.
 
-- Use `class='textscan'` connection type (CSV files)
-- **Always** set `directory='.'` (current directory) and `filename` to the bare CSV file name — this is critical for `.twbx` packaging where CSVs sit alongside the `.twb` inside the archive
-- Define `<column>` elements for every field with correct:
-  - `datatype`: `string`, `integer`, `real`, `date`, `datetime`, `boolean`
-  - `role`: `dimension` or `measure`
-  - `type`: `nominal`, `ordinal`, `quantitative`
-  - `name`: field name enclosed in brackets `[field_name]`
-  - `caption`: human-readable name from DS-ARCHITECTURE.md
+Parameterize: datasource name (new hash), named-connection name (new hash), object-ID GUIDs, CSV filenames, all column definitions (4-way redundancy — see SCAFFOLD.md).
 
-### 2. Calculated Fields
+### Step 3: Build Worksheets
 
-For each calculated field in TABLEAU-IMPLEMENTATION.md:
+Read `snippets/worksheets/WORKSHEETS.md` and the relevant chart-type `.twb` snippets.
 
-```xml
-<column caption='Calc Name' datatype='...' name='[Calculation_N]' role='...' type='...'>
-  <calculation class='tableau' formula='...' />
-</column>
-```
+#### Snippet Lookup Table
 
-- Use Tableau formula syntax (not SQL)
-- Reference field names exactly as defined in the datasource columns
+When TABLEAU-IMPLEMENTATION.md specifies a chart type or feature, use this table to find the correct snippet:
 
-### 3. Parameters
+| Implementation Spec Term | Snippet File(s) | Notes |
+|--------------------------|------------------|-------|
+| "bar chart" | `worksheets/bar-chart.twb` | Add `-sorted`/`-styled`/`-filtered` as needed |
+| "stacked bar" / "stacked chart" | `worksheets/stacked-bar-chart.twb` | Color encoding on stacking dimension |
+| "line chart" / "trend" | `worksheets/line-chart.twb` | Continuous date on Columns |
+| "area chart" | `worksheets/area-chart.twb` | Explicit `mark class='Area'` |
+| "combo chart" / "bar and line" | `worksheets/combo-chart.twb` | Per-pane mark class overrides (Bar + Line) |
+| "dual axis" | `worksheets/dual-axis.twb` | Same mark type on both axes |
+| "pie chart" / "donut" | `worksheets/pie-chart.twb` | All data through encodings, empty shelves |
+| "scatter plot" | `worksheets/scatter-plot.twb` | Measures on both axes |
+| "text table" / "crosstab" | `worksheets/text-table.twb` | Dimensions on both axes, measure as `<text>` |
+| "KPI card" / "big number" | `worksheets/text-table.twb` | Single-measure, centered; see WORKSHEETS.md § KPI |
+| "histogram" / "distribution" | `worksheets/histogram.twb` | Bin calculation (`class='bin'`), count aggregation |
+| "map" / "geographic" | `worksheets/map-chart.twb` | Generated lat/lon fields, `<mapsources>` |
+| "custom tooltip" | `worksheets/custom-tooltip.twb` | Three-part chain pattern |
+| "calculated field" | `features/calculated-field.twb` | Datasource-level `<column>` + `<calculation>` |
+| "LOD expression" | `features/lod-expression.twb` | `{FIXED/INCLUDE/EXCLUDE}` formula syntax |
+| "table calculation" / "running total" / "percent of total" | `features/tablea-calculation.twb` | `<table-calc>` nested inside `<column-instance>` |
+| "reference line" / "average line" / "benchmark" | `features/reference-line.twb` | `<reference-line>` in `<view>`, styling via `<style-rule element='refline'>` |
+| "parameter" | `features/parameter-control.twb` | `<datasource name='Parameters'>` pseudo-datasource |
+| "filter action" | `dashboard/action-filter.twb` | `tsc:tsl-filter` command pattern |
+| "highlight action" | `dashboard/highlight-action.twb` | Highlight on select |
+| "parameter action" | `dashboard/parameter-action.twb` | `<edit-parameter-action>` pattern |
+| "single-sheet dashboard" | `dashboard/single-sheet-layout.twb` | Minimal zone hierarchy |
+| "multi-sheet dashboard" | `dashboard/multi-sheet-layout.twb` | Nested container pattern |
+| "single CSV" | `data-model/single-csv.twb` | Single `<relation type='table'>` |
+| "multiple CSVs" (join) | `data-model/multi-csv-join.twb` | `<relation type='join'>` with `<clause>` |
+| "multiple CSVs" (relationship) | `data-model/multi-csv-relationship.twb` | `<relation type='collection'>` + `<relationships>` |
 
-For each parameter in TABLEAU-IMPLEMENTATION.md:
-
-```xml
-<datasource name='Parameters' caption='Parameters' inline='true'>
-  <column caption='Param Name' datatype='...' name='[Parameter N]'
-          param-domain-type='...' role='measure' type='quantitative' value='...'>
-    <range granularity='...' max='...' min='...' />  <!-- for range type -->
-    <members>  <!-- for list type -->
-      <member value='...' />
-    </members>
-  </column>
-</datasource>
-```
-
-### 4. Worksheets
+> **If the implementation spec uses a term not in this table**, check snippet companion docs (`WORKSHEETS.md`, `DASHBOARD.md`, `FEATURES.md`) for the closest match. If no snippet covers the feature, follow the Feature Resolution Strategy below (Tier 3 → Tier 4).
 
 For each sheet in TABLEAU-IMPLEMENTATION.md:
 
-- **Mark type**: Set via `<mark class='...' />`
-- **Shelves**: Map Columns/Rows/Color/Size/Label/Detail/Tooltip to the correct XML elements
-- **Filters**: Define `<filter>` elements with correct field references and filter types
-- **Formatting**: Apply font sizes, colors, number formats, axis visibility from design-tokens.md
-- **Tooltips**: Use `<formatted-text>` with field references in `<run>` elements
+1. **Identify chart type** → select the matching snippet from the table above
+2. **Read the snippet** to understand the mark class, shelf configuration, and required encodings
+3. **Parameterize**: worksheet name, datasource reference, field names on shelves, column-instances in datasource-dependencies
+4. **Apply styling** from `bar-chart-styled.twb` pattern:
+   - Worksheet title: `<layout-options>` > `<title>` > `<formatted-text>` > `<run>`
+   - Body font: `<style-rule element='worksheet'>` > `<format attr='font-family'>`
+   - Axis titles: `<style-rule element='axis'>` > `<format attr='title'>`
+5. **Add filters** if specified — use `bar-chart-filtered.twb` pattern
+6. **Add sorting** if specified — use `bar-chart-sorted.twb` pattern
+7. **Add custom tooltip** if specified — use `custom-tooltip.twb` pattern
 
-### 5. Dashboard
+### Step 4: Build Dashboard(s)
 
-Build the zone hierarchy matching the Container Tree from TABLEAU-IMPLEMENTATION.md:
+Read `snippets/dashboard/DASHBOARD.md` and the relevant layout/action `.twb` snippets.
 
-```xml
-<dashboard name='Dashboard Name'>
-  <size maxheight='...' maxwidth='...' minheight='800' minwidth='1100' />
-  <zones>
-    <zone type='layout-basic' ...>
-      <zone type='layout-flow' flow='vertical' ...>
-        <!-- Nested zones matching the container hierarchy -->
-      </zone>
-    </zone>
-  </zones>
-</dashboard>
-```
+For **each dashboard** in TABLEAU-IMPLEMENTATION.md (workbooks can contain multiple dashboards):
 
-- Apply `fixed-size`, `margin`, `padding` attributes from the implementation spec
-- Set background colors via `<format>` elements
-- Reference worksheets via `<zone type='sheet' name='...'>`
+1. **Zone hierarchy**: Match the Container Tree from TABLEAU-IMPLEMENTATION.md
+   - Use `multi-sheet-layout.twb` for nested container patterns
+   - Apply `is-fixed` + `fixed-size` for fixed containers, proportional fill otherwise
+   - `<zone-style>` must be the **LAST child** of every zone
+   - Add `friendly-name` attribute to every layout zone (see DASHBOARD.md § Zone Friendly Names)
+   - **Title pattern**: Prefer separate `<zone type-v2='text'>` elements above each worksheet zone for titles, with `show-title='false'` on the sheet zone (see DASHBOARD.md § Title Pattern)
+   - **Legend zones**: When a chart uses color encoding, add a `type-v2='color'` legend zone below the chart (see DASHBOARD.md § Legend Zones). Prefer dashboard legend zones over window-edge legend cards for better positioning control.
+   - **Dashboard-level datasource declarations**: When the dashboard includes quick filters, the `<dashboard>` element must contain its own `<datasources>` and `<datasource-dependencies>` blocks declaring the filtered fields (separate from workbook-level datasources)
+2. **Actions**: Add `<action>` or `<edit-parameter-action>` elements inside `<actions>` at workbook level (between `</datasources>` and `<worksheets>`)
+   - Filter: `action-filter.twb` pattern
+   - Highlight: `highlight-action.twb` pattern
+   - Parameter: `parameter-action.twb` pattern
+   - Navigation: `navigation-button.twb` pattern (for cross-dashboard goto-sheet buttons)
+3. **Parameter controls**: Add `paramctrl` zones if parameters are shown on the dashboard
+4. **Multiple dashboards** share the same `<datasources>` and `<actions>` sections at workbook level
 
-### 6. Dashboard Actions
+### Step 5: Add Features
 
-For each action in TABLEAU-IMPLEMENTATION.md:
+Read `snippets/features/FEATURES.md` and the relevant `.twb` snippets.
 
-```xml
-<actions>
-  <action name='...' caption='...'>
-    <source type='sheet' worksheet='...' dashboard='...' />
-    <target type='sheet' worksheet='...' dashboard='...' />
-    <command command='...'> <!-- tsc:filter, tsc:highlight, tsc:url -->
-      <param name='field' value='...' />
-    </command>
-  </action>
-</actions>
-```
+- **Calculated fields**: Define at datasource level + reference in worksheet datasource-dependencies
+- **Parameters**: Define in `<datasource name='Parameters'>` pseudo-datasource
+- **LOD expressions**: Same pattern as calculated fields, formula uses `{FIXED/INCLUDE/EXCLUDE}` syntax
+- **Context filters**: Add `context='true'` to filters that must execute before FIXED LODs
+- **Dynamic Zone Visibility**: Use `parameter-control.twb` — boolean calc referencing a parameter + `hidden-by-user='true'` on zones + `<dashboard-zone-visibility-node>` elements in windows
+
+### Step 6: Assemble Windows
+
+For each worksheet and dashboard, create a `<window>` element:
+
+- Worksheet windows: `class='worksheet'`, with standard card layout (left: pages/filters/marks, top: columns/rows/title). Add `hidden='true'` for worksheets that only appear on dashboards (not standalone).
+- Dashboard windows: `class='dashboard'`, with viewpoints for each sheet. Set `maximized='true'` on the primary (first) dashboard.
+- **All viewpoints must include `<zoom type='entire-view' />`** — never use the default `'standard'` option. `entire-view` ensures sheets fill their allocated space correctly across all sheet types.
+- Every `<window>` must include `<simple-id uuid='{GUID}' />` — these UUIDs are referenced by navigation buttons for cross-dashboard links.
+- Add right-edge legend cards for any chart using `<color>` or `<size>` encodings (only when not using dashboard-level legend zones)
+
+### Step 7: Generate IDs
+
+All IDs must be **unique** within the workbook:
+
+- **Datasource names**: `federated.` + new 32-char lowercase alphanumeric hash
+- **Named connections**: `textscan.` + new 32-char lowercase alphanumeric hash
+- **Object IDs**: `{filename}_{32-hex-GUID}` (uppercase hex, no dashes)
+- **Simple IDs**: `{GUID}` in standard UUID format with braces — mandatory on every `<window>` element, referenced by navigation buttons
+- **Zone IDs**: Sequential integers starting from 1
+- **Action names**: `[Action1_{32-hex-GUID}]`
+- **Calculation names**: `[Calculation_{18-digit-numeric-id}]`
+
+**Never reuse IDs from the snippet files.**
 
 ---
 
 ## Sample Data as Datasource
 
-The generated `.twb` will use CSV files as its datasource:
-
 - If `sample-data/` contains the CSVs → use those files
 - If Step A generated CSVs during query execution → use those
-- The CSV column headers must match the field names in DS-ARCHITECTURE.md exactly
-- **Inside the `.twb` XML, always use `directory='.'`** — never use `sample-data/` or any other subdirectory path, because in the `.twbx` package the CSVs are placed at the root alongside the `.twb`
-
-**Important note for the user**: After opening the generated workbook in Tableau Desktop, use **Data → Replace Data Source** to swap the sample CSV datasources with your live database connections.
+- CSV column headers must match field names in DS-ARCHITECTURE.md exactly
+- **Inside the `.twb` XML, always use `directory='.'`** — never use subdirectory paths
 
 ## Packaging as .twbx
 
-After generating the `.twb`, **always** package it as a `.twbx` (Tableau Packaged Workbook). This bundles the data files with the workbook, eliminating path-resolution errors when the user opens the file.
-
-### .twbx Structure
-
-A `.twbx` is a standard ZIP archive with this internal layout:
+After generating the `.twb`, **always** package it as a `.twbx`. A `.twbx` is a standard ZIP archive:
 
 ```
 dashboard.twbx (ZIP)
 ├── dashboard.twb          ← the workbook XML
 ├── sales_orders.csv       ← sample data files (flat, at root)
 ├── customer_segments.csv
-└── monthly_targets.csv
+├── monthly_targets.csv
+└── Image/                 ← optional, only if dashboard includes logos/icons
+    └── company_logo.svg
 ```
 
 ### Packaging Script (Python)
-
-Use the following Python snippet to create the `.twbx`:
 
 ```python
 import zipfile
 import os
 
-def create_twbx(twb_path: str, csv_paths: list[str], twbx_path: str) -> None:
+def create_twbx(twb_path: str, csv_paths: list[str], twbx_path: str,
+                image_paths: list[str] | None = None) -> None:
     """
-    Package a .twb and its CSV datasources into a .twbx archive.
+    Package a .twb and its datasources into a .twbx archive.
 
     Args:
         twb_path: Path to the generated .twb file
         csv_paths: List of paths to CSV data files
         twbx_path: Output path for the .twbx file
+        image_paths: Optional list of image files (logos, icons) to include
     """
     with zipfile.ZipFile(twbx_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        # Add the .twb at the archive root
         zf.write(twb_path, os.path.basename(twb_path))
-        # Add each CSV at the archive root (flat alongside the .twb)
         for csv_path in csv_paths:
             zf.write(csv_path, os.path.basename(csv_path))
+        for img_path in (image_paths or []):
+            zf.write(img_path, f'Image/{os.path.basename(img_path)}')
 ```
-
-Run this after saving the `.twb`:
-1. Collect all CSV file paths from `sample-data/` (or wherever Step A placed them)
-2. Call `create_twbx()` with the `.twb` path, CSV paths, and the desired `.twbx` output path
-3. Save both `dashboard.twb` and `dashboard.twbx` to `mock-version/v_N/`
 
 ---
 
 ## CRITICAL RULES — Common Pitfalls to Avoid
 
-These rules are derived from real Tableau Desktop validation failures. Violating any of them will cause the workbook to fail to open.
+These rules are derived from real Tableau Desktop validation failures.
 
 ### Version & Manifest
-1. **Use `source-build='2024.2.0 (20242.24.0705.1443)'`** — targeting 2025.x causes "Incompatible Document" errors on most installs
-2. **Manifest flags must use simple names only** — e.g., `<SheetIdentifierTracking />`. NEVER use FCP-prefixed names like `<_.fcp.AnimationOnByDefault.true...just />` (causes "Unrecognized Format Changes" errors)
-3. **Keep manifest minimal** — only `<SheetIdentifierTracking />` and `<WindowsPersistSimpleIdentifiers />` unless specific features require more
+1. **Use `source-build='2025.1.10 (20251.25.1121.1650)'`** — use the version from the scaffold snippet
+2. **Manifest flags**: Copy from `workbook-skeleton.twb` as the baseline. Add `<SortTagCleanup />` if using sorting, `<ObjectModelExtractV2 />` only if extract is needed (it shouldn't be)
+3. **Never use FCP-prefixed names** like `<_.fcp.AnimationOnByDefault.true...>` — causes "Unrecognized Format Changes" errors
 
 ### Datasource Structure
-4. **`<relation>` must be plain** — never wrap with `<_.fcp.ObjectModelEncapsulateLegacy.false...relation>` or any FCP wrapper
-5. **`<layout>` requires `dim-percentage` and `measure-percentage`** — always include `dim-percentage='0.5' measure-percentage='0.4'`. Omitting these causes "missing required attribute" errors
-6. **`directory='.'` always** — never use subdirectory paths like `sample-data/` in datasource connections
+4. **`<relation>` must be plain** — never wrap with FCP wrappers
+5. **`<layout>` requires `dim-percentage` and `measure-percentage`** — always include `dim-percentage='0.5' measure-percentage='0.4'`
+6. **`directory='.'` always** — never use subdirectory paths in connections
+7. **Generate as live connection only** — no `<extract>` sections
+8. **4-way column redundancy** — every column must be defined in: `relation > columns`, `metadata-records`, `object-graph > properties > relation > columns`, AND `datasource > column` direct children (see SCAFFOLD.md)
 
 ### Column & Formatting
-7. **Calculated field formatting uses `default-format` attribute** — e.g., `<column default-format='$#,##0' ...>`. NEVER nest `<format>` elements inside `<column>` (causes "no declaration found for element 'format'" error)
-8. **Valid `<run>` attributes**: `bold`, `fontcolor`, `fontname`, `fontsize`, `italic`, `underline` only. NEVER use `fontstyle` (not declared in schema)
+9. **Calculated field formatting uses `default-format` attribute** — never nest `<format>` inside `<column>`
+10. **Valid `<run>` attributes**: `bold`, `fontcolor`, `fontname`, `fontsize`, `italic`, `underline` only. Never use `fontstyle`
+11. **Tooltip line breaks**: Use `&#198;&#9;` (AE ligature + tab). Never `\n` or `<br/>`
 
 ### Worksheet Structure
-9. **Color encoding goes in `<pane><encodings>`** — `<color column='...' />` inside `<encodings>`. NEVER place `<color>` as direct child of `<table>`
-10. **Sorting uses `<computed-sort>`** — place inside `<view>`. There is NO `<sort>` element in the TWB schema
-11. **Measure Names field reference**: Use `[:Measure Names]` (with colon prefix). NEVER use `:Measure Names` without brackets
+12. **Color encoding goes in `<pane><encodings>`** — never as direct child of `<table>`
+13. **Sorting uses `<computed-sort>`** inside `<view>` — for computed sorts by measure
+14. **Measure Names reference**: `[:Measure Names]` with brackets and colon prefix
+15. **Element order inside `<view>`**: `<datasources>` → `<datasource-dependencies>` → `<reference-line>` (if any) → `<filter>` → `<computed-sort>` → `<slices>` → `<aggregation>`
 
 ### Dashboard Structure
-12. **`<zone-style>` must be the LAST child** of any zone — after all nested zones, `<formatted-text>`, etc. Wrong ordering causes validation errors
-13. **Dashboard actions go at `<workbook>` level** — between `</dashboards>` and `<windows>`. NEVER place `<actions>` inside `<dashboard>` (not part of content model)
-14. **No `auto-generated` on `<devicelayout>`** — this attribute is not declared in older Tableau versions
-15. **No `layout-flow-orientation` format attribute** — flow direction is controlled by `param='vert'` or `param='horz'` on the zone, not via format attributes
+16. **`<zone-style>` must be the LAST child** of any zone
+17. **`<actions>` go at `<workbook>` level** — between `</datasources>` and `<worksheets>`, NOT inside `<dashboard>` (verified in all action snippets)
+18. **Flow direction**: Controlled by `param='vert'` or `param='horz'` on the zone, not via format attributes
+
+### XML Formatting Conventions
+19. **CDATA for field references in `<run>` elements**: Field reference expressions (e.g., KPI values, tooltips) must use CDATA wrapping: `<![CDATA[<[datasource].[field:qk]>]]>`. Never use XML entity encoding (`&lt;...&gt;`) — Tableau will display them as literal text instead of resolving the value.
+20. **Lowercase hex colors**: Always write `#2e86c1`, never `#2E86C1`. Tableau Desktop normalizes to lowercase.
+21. **Alphabetical attribute ordering**: Attributes on XML elements should be written in alphabetical order (e.g., `bold`, `fontcolor`, `fontname`, `fontsize` on `<run>` elements). Tableau Desktop sorts attributes alphabetically when saving.
+22. **No XML comments**: Never emit `<!-- ... -->` comments in the generated `.twb`. Tableau Desktop strips all comments on save.
+23. **Default dimension filter mode**: For dimension filters on dashboards, use `mode='checkdropdown'` as the default (standard Tableau UX). Only use `typeinlist` when the dimension has many values (100+). Measure filters use different modes (range sliders, etc.).
+24. **Style rules alphabetical order**: Style rules inside `<style>` blocks must be ordered alphabetically by `element` attribute (e.g., `cell` < `mark` < `worksheet`). Tableau Desktop enforces this order.
 
 ---
 
@@ -243,23 +263,69 @@ These rules are derived from real Tableau Desktop validation failures. Violating
 Before saving the `.twb`, verify:
 
 - [ ] XML is well-formed (all tags properly closed)
-- [ ] `source-build` is `2024.2.0` (NOT 2025.x)
-- [ ] Manifest uses only simple tag names (no FCP prefixes)
-- [ ] All datasource connections use `directory='.'` (NOT `sample-data/` or any subdirectory)
+- [ ] `source-build` is `2025.1.10 (20251.25.1121.1650)`
+- [ ] Manifest tags copied from scaffold (simple names, no FCP prefixes)
+- [ ] All datasource connections use `directory='.'`
+- [ ] All columns defined in all 4 redundancy locations
 - [ ] All `<layout>` elements include `dim-percentage` and `measure-percentage`
 - [ ] All `<relation>` elements are plain (no FCP wrappers)
-- [ ] All datasource field names match DS-ARCHITECTURE.md
-- [ ] All calculated field formatting uses `default-format` attribute (no nested `<format>`)
-- [ ] All `<run>` elements use only valid attributes (no `fontstyle`)
-- [ ] Color encodings are inside `<pane><encodings>` (not on `<table>`)
-- [ ] All sorting uses `<computed-sort>` (not `<sort>`)
+- [ ] No `<extract>` sections present
+- [ ] All field names match DS-ARCHITECTURE.md
+- [ ] All calculated field formatting uses `default-format` attribute
+- [ ] All `<run>` elements use only valid attributes
+- [ ] Color encodings are inside `<pane><encodings>`
 - [ ] All `<zone-style>` elements are the last child of their parent zone
-- [ ] Dashboard actions are at `<workbook>` level (not inside `<dashboard>`)
-- [ ] No `auto-generated` attribute on `<devicelayout>`
-- [ ] All worksheets reference valid datasource fields
+- [ ] Dashboard actions are at `<workbook>` level
+- [ ] All IDs are unique (no reuse from snippets)
+- [ ] Tooltip field references exist in both `<encodings>` and `<datasource-dependencies>`
+- [ ] `<slices>` lists every filtered column
 - [ ] Dashboard zone hierarchy matches TABLEAU-IMPLEMENTATION.md container tree
-- [ ] Design tokens (colors, fonts, spacing) are applied throughout
-- [ ] The `.twbx` archive contains the `.twb` and all referenced CSV files
+- [ ] All zones have `friendly-name` attributes
+- [ ] Design tokens (colors, fonts, spacing) applied throughout
+- [ ] All hex colors are lowercase
+- [ ] No XML comments in generated output
+- [ ] All `<run>` field references use CDATA wrapping (not entity encoding)
+- [ ] All viewpoints include `<zoom type='entire-view' />`
+- [ ] All `<window>` elements include `<simple-id uuid='...' />`
+- [ ] Utility worksheets have `hidden='true'` on their windows
+- [ ] Style rules ordered alphabetically by `element` attribute
+- [ ] Dimension filters use `mode='checkdropdown'` by default
+- [ ] Dashboard-level `<datasources>` and `<datasource-dependencies>` present when filters are used
+- [ ] The `.twbx` archive contains the `.twb`, all referenced CSV files, and any images under `Image/`
+
+---
+
+## Feature Resolution Strategy
+
+When implementing a feature, resolve it using this priority order:
+
+1. **Tier 1 — Snippet library** (primary source): Check `snippets/` for a matching `.twb` file + companion `.md`. This covers the vast majority of generation work — core chart types, layout patterns, data models, actions, and features. Snippets and their companion docs are the **single source of truth** for XML structure.
+
+2. **Tier 2 — Pattern blocks** (companion docs): Check companion `.md` files for documented XML pattern blocks. These cover reusable fragments that don't need a full `.twb` file — legend zones, KPI formatting, button elements, number formatting, etc. Still part of `snippets/`.
+
+3. **Tier 3 — Example extraction** (last resort before asking): If no snippet or pattern block covers the requested feature, search `examples/*.twb` for a real-world implementation. These are large, complex production workbooks — **do not read them in full**. Grep for the relevant XML section only, adapt it, and flag the output as `⚠️ ADAPTED FROM EXAMPLE`. This tier should be rare.
+
+4. **Tier 4 — Ask the user**: If none of the above apply, stop and offer:
+   - **Provide a reference `.twb`** — build a minimal example in Tableau Desktop, provide the path, and the agent extracts the pattern
+   - **Skip and document** — generate everything else correctly and write `MANUAL_STEPS.md` listing what the user needs to add manually
+
+## Snippets as Baseline, Not Templates
+
+The `snippets/` directory is the **primary baseline** for all XML generation. Snippets and their companion `.md` docs encode the XML mechanics — element structure, nesting rules, required attributes, style patterns, action wiring.
+
+**What to learn from snippets**: XML structure, element nesting, attribute names, required child elements, zone-style patterns — the *mechanics* of how Tableau represents a feature.
+
+**What NOT to copy from snippets**: Specific field names, datasource references, color schemes, layout dimensions, number of worksheets, zone IDs — anything tied to the snippet's example content.
+
+**When user requirements differ from snippet patterns**: Adapt the learned XML mechanics to the user's needs:
+- Snippet shows 2 KPI cards → user wants 6 → replicate the KPI card XML pattern with different fields
+- Snippet uses a horizontal legend → user wants vertical → change `leg-item-layout` attribute
+- Snippet has 1 dashboard → user wants 3 → add `<dashboard>` elements following the same structural rules
+- Snippet uses example colors → user has different design tokens → substitute from `design-tokens.md`
+
+**Principle**: Understand the *pattern* from snippets, then apply it to the user's context. Snippets teach "how Tableau represents X in XML"; the dashboard plan (TABLEAU-IMPLEMENTATION.md) defines "what X should be."
+
+The `examples/` directory contains complex production workbooks (`.twb` XML files). These are **not** the primary reference — `snippets/` is. Only grep into `examples/*.twb` as a Tier 3 fallback when no snippet or pattern block covers the requested feature. Never read example files in full.
 
 ---
 
@@ -270,7 +336,7 @@ Save both files to `mock-version/v_N/`:
 - `dashboard.twbx` — the packaged workbook with embedded CSV data (**primary deliverable**)
 
 Present to the user with these instructions:
-1. Open **`dashboard.twbx`** in Tableau Desktop (this is the packaged file with data included)
+1. Open **`dashboard.twbx`** in Tableau Desktop (packaged file with data included)
 2. The workbook uses sample CSV data from Step A — no path configuration needed
 3. Go to **Data → Replace Data Source** to connect to your live database
 4. Review and adjust any formatting or layout details as needed
@@ -280,9 +346,9 @@ Present to the user with these instructions:
 
 ## Limitations
 
-- Complex Tableau features (e.g., Level of Detail expressions, table calculations with addressing) may require manual adjustment
+- Complex features without validated snippets may require manual adjustment (see "Handling Unknown Features")
 - Custom shapes, map layers, and image-based marks are not generated
-- The workbook targets Tableau Desktop 2023.1+ compatibility
-- Datasource connection credentials are NOT embedded — the user must configure these after replacing datasources
+- Datasource connection credentials are NOT embedded — user must configure after replacing datasources
+- Dynamic Zone Visibility (DZV) is supported — use `snippets/features/parameter-control.twb` as the reference pattern
 
-> **Important — this is an iterative process.** The generated `.twbx` is unlikely to be perfect on the first attempt. Tableau's XML schema is complex and strict — minor issues (wrong field references, layout quirks, formatting mismatches) are expected. Encourage the user to open the workbook in Tableau Desktop, identify what needs fixing, and report back. Each iteration improves fidelity. This step is experimental by nature — treat it as a strong starting point, not a finished product.
+> **This is an iterative process.** The generated `.twbx` is unlikely to be perfect on the first attempt. Tableau's XML is complex and strict — minor issues are expected. The user should open in Tableau Desktop, identify issues, and report back. Each iteration improves fidelity.

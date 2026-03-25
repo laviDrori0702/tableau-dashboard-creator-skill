@@ -5,8 +5,8 @@
 ## Process
 
 1. **Detect branding source** — check the user's project root for one of:
-   - `template.twb` — the organization's Tableau template workbook (preferred)
-   - `branding/` directory — containing logo file(s) and a color palette file
+   - `branding/` directory — containing `branding.md` and optionally a logo file or `icons/` directory (preferred)
+   - `template.twb` — the organization's Tableau template workbook (fallback)
 
 2. **Extract or build design tokens** depending on which source is found
 3. **Generate `design-tokens.md`** in the project root
@@ -14,9 +14,20 @@
 
 ---
 
+## Entry Requirements
+
+Before generating `design-tokens.md`, verify:
+- a branding source exists, or the user explicitly approves fallback defaults
+- the brand source is unambiguous (`branding/` takes precedence over `template.twb`)
+- you know which values are extracted vs assumed
+
+If any fallback values are used, list them explicitly in the output under a dedicated section so the user knows why the design was shaped that way.
+
+---
+
 ## Path A: Extract from `.twb` Template
 
-If a `template.twb` (or any `.twb` file) is found in the project root:
+If no `branding/` directory is found, but `template.twb` exists in the project root:
 
 1. **Read the TWB XML** — it is standard XML. Parse it to extract:
    - **Typography**: font family, sizes for titles/labels/tooltips, weights, colors
@@ -44,47 +55,68 @@ If a `template.twb` (or any `.twb` file) is found in the project root:
 
 ---
 
-## Path B: Build from Logo + Palette
+## Path B: Build from Logo + Branding Spec
 
-If no `.twb` is found, look for `branding/` directory containing:
-- **Logo**: `logo.png`, `logo.svg`, or any image file
-- **Palette**: `palette.json` or `palette.pdf`
+If a `branding/` directory is found (checked **before** `template.twb`), look for:
+- **Logo**: `.svg` or `.jpg` file (e.g., `logo.svg`, `logo.jpg`)
+- **Branding spec**: `branding.md` — a markdown file describing the desired palette, fonts, padding, and dashboard sizing
+- **Icons** (optional): `icons/` subdirectory containing 40x40 `.svg` files for chart title-bar enrichment (e.g., `bar-chart.svg`, `trend.svg`, `funnel.svg`). If provided, list them in the design-tokens.md output under an `## Icons` section mapping icon names to file paths.
 
-### Palette JSON format (if provided):
-```json
-{
-  "primary": "#1a2b3c",
-  "secondary": "#4d5e6f",
-  "accent_colors": ["#13c636", "#e96e14", "#f7b42c", "#f887cc"],
-  "background": "#f6f7f9",
-  "card_background": "#ffffff",
-  "text_dark": "#000021",
-  "text_medium": "#5f5f71"
-}
+### Expected `branding.md` format:
+
+```markdown
+# Branding Specification
+
+## Color Palette
+- Primary: #1a2b3c
+- Secondary: #4d5e6f
+- Accent colors: #13c636, #e96e14, #f7b42c, #f887cc
+- Background: #f6f7f9
+- Card background: #ffffff
+- Text dark: #000021
+- Text medium: #5f5f71
+
+## Fonts
+- Primary font: Open Sans
+- Title weight: Bold
+- Body weight: Regular
+
+## Padding & Spacing
+- Card padding: 8px
+- Section spacing: 11px
+- Container margin: 4px
+
+## Dashboard Sizing
+- Mode: Range
+- Minimum height: 800
+- Minimum width: 1100
+- Maximum: Flexible
 ```
 
-### Palette PDF:
-If the user provides a PDF palette, visually inspect it to identify:
-- Primary brand color
-- Secondary/accent colors
-- Use these as KPI accent bars and chart series colors
+> Any section the user omits will use Tableau defaults from `references/tableau-design-tokens.md`.
 
 ### Build tokens from branding:
-When only logo + palette are available (no `.twb` template), use Tableau's default layout conventions:
+When logo + `branding.md` are available (no `.twb` template), use Tableau's default layout conventions for any values not specified in the branding spec:
 - **Font family**: Open Sans (Tableau default)
-- **Dashboard sizing**: Range, min 1100x800, no max
+- **Dashboard sizing**: Range, minimum height 800 and minimum width 1100, no max
 - **Container hierarchy**: Use the standard hierarchy from the fallback design tokens
 - **Colors**: Map from the provided palette
 - **Template layouts**: Use generic layout names (e.g., "2x2 Grid", "KPI Row + 2 Charts")
+
+For every value you infer from fallback defaults rather than the user's files, record it in `design-tokens.md` under `## Fallback Decisions` with:
+- the token name
+- the fallback value used
+- why it was needed
 
 ---
 
 ## Path C: No Branding Provided
 
-If neither `template.twb` nor `branding/` directory exists:
-1. **Ask the user** to provide one of them
-2. If the user explicitly wants to proceed without branding, use the fallback tokens from `references/tableau-design-tokens.md` as a starting point
+If neither `branding/` directory nor `template.twb` exists:
+1. Confirm that the user wants to proceed with fallback defaults
+2. Use the fallback tokens from `references/tableau-design-tokens.md` as a starting point
 3. Warn the user that the mock will use generic Tableau defaults
+4. Record every fallback-driven design decision in `design-tokens.md`
 
 ---
 
@@ -96,6 +128,7 @@ Generate this file in the project root:
 # Design Tokens
 
 **Source**: [template.twb / branding directory / fallback defaults]
+**Derived for**: [Step 0 approval candidate]
 
 ## Typography
 - **Font family**: [extracted font]
@@ -137,7 +170,8 @@ Generate this file in the project root:
 
 ## Dashboard Sizing
 - **Sizing mode**: [Range / Fixed / Automatic]
-- **Minimum**: [w] x [h]
+- **Minimum height**: [px]
+- **Minimum width**: [px]
 - **Maximum**: [w] x [h] or Flex
 
 ## Standard Container Hierarchy
@@ -152,6 +186,19 @@ Generate this file in the project root:
 ## Chart Card Pattern
 [Structure of chart cards]
 
+## Icons
+[If `branding/icons/` exists, list available icons:]
+| Icon Name | File | Size |
+|-----------|------|------|
+| [name] | [branding/icons/filename.svg] | 40x40 |
+
+[If no icons provided, note that Step C will generate simple inline SVG icons matching chart types.]
+
+## Fallback Decisions
+| Token / Decision | Fallback Value Used | Why It Was Needed |
+|------------------|---------------------|-------------------|
+| [token name] | [value] | [missing brand input or template detail] |
+
 ## Spacing Reference
 | Element | Property | Value |
 |---------|----------|-------|
@@ -164,6 +211,9 @@ Generate this file in the project root:
 ## Guidelines
 
 - If extracting from `.twb`, be thorough — capture every styling detail so Steps C and D don't need to reference the TWB directly
-- If building from palette, clearly mark which values are "assumed defaults" vs "extracted from branding"
+- If building from branding assets, clearly mark which values are "assumed defaults" vs "extracted from branding"
 - The generated `design-tokens.md` becomes the **single source of truth** for all subsequent steps
+- Use explicit wording like `Fallback used:` whenever a value comes from Tableau defaults rather than customer input
+- Keep sizing unambiguous by writing `Minimum height` and `Minimum width` instead of a bare `WxH` pair
+- Approval is not just aesthetic: the user should be able to see every fallback value you introduced
 - Present to the user and **wait for approval** before proceeding to Step A

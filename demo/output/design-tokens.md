@@ -1,6 +1,6 @@
 # Design Tokens
 
-**Source**: branding directory (palette.json only — no logo provided)
+**Source**: branding directory (`branding.md`, no logo provided)
 
 ## Typography
 - **Font family**: Open Sans
@@ -41,7 +41,8 @@
 
 ## Dashboard Sizing
 - **Sizing mode**: Range
-- **Minimum**: 1100 x 800
+- **Minimum height**: 800
+- **Minimum width**: 1100
 - **Maximum**: Flex (no max set)
 
 ## Standard Container Hierarchy
@@ -125,3 +126,8 @@ Chart wrapper (horizontal flow, margin-top: 11)
 - Charts have white background (#FFFFFF), dashboard has light gray background (#F4F6F7)
 - Use distribute-evenly layout strategy for KPI rows and multi-chart rows
 - Hidden filters panel uses collapsible toggle button (DZV pattern)
+
+## Fallback Decisions
+| Token / Decision | Fallback Value Used | Why It Was Needed |
+|------------------|---------------------|-------------------|
+| Logo placement | Reserved top-left banner area | No logo file was provided in the demo branding inputs |

@@ -36,6 +36,8 @@ Thumbs.db
 !skill/tableau-dashboard-creator/references/**
 !skill/tableau-dashboard-creator/scripts/
 !skill/tableau-dashboard-creator/scripts/**
+!skill/tableau-dashboard-creator/skeleton/
+!skill/tableau-dashboard-creator/skeleton/**
 
 # Allow demo/ tree
 !demo/

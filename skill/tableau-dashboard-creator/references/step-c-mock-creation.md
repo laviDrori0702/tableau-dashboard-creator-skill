@@ -10,19 +10,33 @@
 4. **Build the HTML mock** following Tableau constraints
 5. **Save to** `mock-version/v_N/mock.html`
 
+## Entry Requirements
+
+Before Step C begins, verify:
+- `DASHBOARD-PLAN.md` is approved
+- `design-tokens.md` is approved
+- every chart in the plan has a defined slot or layout position
+- any fallback-driven design decisions are visible in the approved root docs
+
+If the approved plan cannot fit cleanly inside the minimum dashboard frame, do not force it into one page. Revise the layout or split the experience.
+
 ## Technical Requirements
 
 ### HTML Structure
 - Single self-contained HTML file (inline CSS + JS)
 - Use Chart.js via CDN for interactive charts: `https://cdn.jsdelivr.net/npm/chart.js`
 - Load the font family specified in design-tokens.md (default: Open Sans via Google Fonts)
-- Responsive within the sizing range defined in design-tokens.md (default: min 1100px wide x 800px tall, no max)
+- Responsive within the sizing range defined in design-tokens.md
+- Default dashboard frame if no customer sizing is specified:
+  - minimum height: `800px`
+  - minimum width: `1100px`
+  - no fixed maximum, but the layout must remain proportional beyond the minimum frame
 
 ### Tableau Fidelity Rules
 
 **CRITICAL - these constraints must be followed:**
 
-1. **No rounded corners** anywhere (Tableau does not support them until 2026.1)
+1. **No rounded corners** anywhere unless the user explicitly accepts a non-Tableau-faithful mock
    - `border-radius: 0` on all elements
 2. **Container hierarchy** must match Tableau's zone model:
    - Outer: `layout-basic` (absolute positioning root)
@@ -31,6 +45,22 @@
    - Flex containers fill remaining space
 3. **No box shadows** unless explicitly requested (Tableau does not have native shadows)
 4. **Border-style: none** on all containers (except logo zone which uses a background-blending border)
+5. **Fixed-size elements**: Use explicit `min-height` / `min-width` in CSS on structural elements (title bars, KPI rows, filter bars, accent bars, icons, logo) to prevent compression on smaller screens. Only chart areas and main content should flex.
+6. **Tableau-native terminology**: Use Tableau spacing terms (`margin`, `padding`) in design documentation — avoid CSS-specific terms like `gap` which have no Tableau equivalent.
+7. **No out-of-bounds rendering**: Titles, legends, labels, canvases, and controls must stay inside their card boundaries at the minimum dashboard frame.
+8. **Avoid empty-space-heavy layouts**: if a row or card leaves large dead areas, rebalance the layout or choose a denser template. Do not leave charts visibly undersized relative to their containers.
+
+### Layout Sizing Contract
+
+The mock should be visually disciplined, not just approximate. Apply these rules:
+- Use an explicit root dashboard frame with minimum `800px` height and `1100px` width
+- Use a consistent outer padding and internal row/column spacing derived from the design tokens
+- Give each chart card a defined slot and expected size from `DASHBOARD-PLAN.md`
+- KPI cards should use equal widths within a row
+- Multi-chart rows should distribute space evenly unless the approved plan explicitly calls for a dominant chart
+- Each chart's plot area should occupy roughly `70%` or more of its card after title bars, separators, legends, and padding
+- If a legend on the right would compress the plot area too much, move the legend to the bottom or simplify the chart
+- If labels, legends, or filter controls overflow at the minimum frame, the layout must be revised rather than stretched
 
 ### Design Token Application
 
@@ -86,6 +116,16 @@ body {
     background-color: /* from design-tokens: Colors > Separator line */;
     margin: 0 10px;
 }
+
+/* Inner padding for all worksheet/sheet zones — space between zone border and content */
+.sheet-zone {
+    padding: 8px;
+}
+
+/* Flexible spacer — every flow container should include one to prevent layout collapse */
+.spacer {
+    flex: 1;
+}
 ```
 
 ### Container Layout Pattern
@@ -97,17 +137,20 @@ Follow this HTML structure mirroring Tableau's zone hierarchy (adapt based on de
   <div class="content-wrapper">                 <!-- Content (vert flow) -->
     <div class="top-banner">                    <!-- Logo, Info, Last update -->
       <div class="logo-area">...</div>
+      <div class="spacer"></div>                <!-- Flexible spacer -->
       <div class="update-info">...</div>
     </div>
     <div class="dashboard-title">Title</div>    <!-- Dashboard Title -->
     <div class="filter-bar">                    <!-- Top Filters -->
       <span class="filter-label">Filters</span>
       <div class="filter-controls">...</div>
+      <div class="spacer"></div>                <!-- Flexible spacer -->
     </div>
     <div class="main-content">                  <!-- Charts & Hidden Filters -->
       <div class="charts-area">                 <!-- KPI & Charts -->
         <div class="kpi-row">...</div>          <!-- Main KPI (if applicable) -->
         <div class="chart-row">...</div>        <!-- Chart rows -->
+        <div class="spacer"></div>              <!-- Flexible spacer -->
       </div>
       <div class="hidden-filters">...</div>     <!-- Hidden Filters panel -->
     </div>
@@ -123,6 +166,20 @@ If a logo file was identified in design-tokens.md:
 - For PNG: use `<img>` with a relative path or base64-encode for self-containment
 - Match the dimensions and padding from the design tokens
 
+### Icon Integration
+
+Chart title bars should include a small icon for visual enrichment:
+- If `branding/icons/` contains SVG files, use the matching icon for each chart (filenames should match the icon names suggested in DASHBOARD-PLAN.md, e.g., `bar-chart.svg`, `trend.svg`)
+- If no icons are provided, generate simple monochrome 40x40 SVG icons inline, using the brand primary color and matching the chart type (e.g., a small bar-chart icon for bar charts, a line icon for trend charts)
+- Icons are placed in the chart title bar at 40x40 pixels, before the chart title text
+
+### DOM Security Rules
+
+- **Never use `innerHTML`** to set content — even for hardcoded data. Security hooks flag it as an XSS risk.
+- Use `textContent` for plain text (labels, KPI values, titles).
+- Use safe DOM methods (`createElement`, `appendChild`, `setAttribute`) when building HTML elements dynamically.
+- For Chart.js tooltips and callbacks, use the Chart.js API (which handles rendering safely) rather than injecting raw HTML.
+
 ### Chart Implementation
 
 Use Chart.js with dummy data that represents the expected data shape:
@@ -131,6 +188,8 @@ Use Chart.js with dummy data that represents the expected data shape:
 - Apply chart series colors from design-tokens.md
 - Use accent colors from design-tokens.md for KPI cards
 - Include tooltips showing the metric name and value
+- Keep chart proportions consistent with their assigned slots; a full-width chart should visibly dominate a half-width chart
+- Favor readable axes and labels over squeezing in more marks or decorations
 
 ### Interactive Elements
 
@@ -144,6 +203,15 @@ Implement where applicable:
 
 Save to `mock-version/v_N/mock.html` where N is the current version number (start with 1).
 
-Present the mock to the user (tell them to open the HTML file in a browser) and **wait for approval** before proceeding to Step D. If the user requests changes, increment version number and create a new full mock.
+Present the mock to the user (tell them to open the HTML file in a browser) and **wait for approval** before proceeding to Step D. If the user requests changes, overwrite `mock.html` in the current `v_N` directory (do NOT create a new version directory — version increments only happen at Steps D or E).
+
+When the user approves the mock, review whether the approved mock diverged from the current `DASHBOARD-PLAN.md` or `design-tokens.md` (e.g., added/removed KPIs, changed chart types, adjusted layout, new colors). If it did, update those root-level files to match the approved mock before proceeding to Step D.
+
+When presenting the mock, include a short review checklist:
+- layout fits cleanly within the minimum dashboard frame
+- no chart or control is clipped or out of bounds
+- chart proportions feel intentional, with no oversized empty areas
+- any fallback-driven design choices are called out explicitly
+- any interaction that is illustrative rather than Tableau-exact is called out explicitly
 
 > **Important — this is an iterative process.** The HTML mock is unlikely to be perfect on the first attempt. Expect multiple revision cycles — this is normal and by design. Encourage the user to share the mock with stakeholders for feedback before approving. A well-validated mock saves significant rework in later steps (D and E). Take your time here — it's better to iterate on the mock than to rebuild the implementation spec or workbook.
