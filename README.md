@@ -185,7 +185,7 @@ A good PDR includes:
 ### 5. Run the skill
 
 ```
-/skill tableau-dashboard-creator
+/tableau-dashboard-creator
 ```
 
 The skill will walk you through each step, presenting results for your approval.
