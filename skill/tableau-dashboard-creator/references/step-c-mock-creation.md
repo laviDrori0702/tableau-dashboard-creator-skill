@@ -6,9 +6,14 @@
 
 1. **Read the approved DASHBOARD-PLAN.md**
 2. **Read design-tokens.md** (generated in Step 0) for all styling values
-3. **Select the matching template layout** based on the recommended layout in the dashboard plan
-4. **Build the HTML mock** following Tableau constraints
-5. **Save to** `mock-version/v_N/mock.html`
+3. **Ask the user for their target screen size** — present these options:
+   - **Standard Laptop** (1100×800): Standard laptop screen resolution — good for dashboards viewed primarily on portable devices
+   - **Home Screen** (2100×1000): Larger home/desktop monitor — good for dashboards viewed on wide external displays
+   - **Custom**: Let the user specify their own width × height
+   - If the user skips or doesn't respond, default to **Standard Laptop** (1100×800)
+4. **Select the matching template layout** based on the recommended layout in the dashboard plan
+5. **Build the HTML mock** following Tableau constraints, using the chosen screen dimensions as the dashboard frame
+6. **Save to** `mock-version/v_N/mock.html`
 
 ## Entry Requirements
 
@@ -27,10 +32,12 @@ If the approved plan cannot fit cleanly inside the minimum dashboard frame, do n
 - Use Chart.js via CDN for interactive charts: `https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js`
 - Load the font family specified in design-tokens.md (default: Open Sans via Google Fonts)
 - Responsive within the sizing range defined in design-tokens.md
-- Default dashboard frame if no customer sizing is specified:
-  - minimum height: `800px`
-  - minimum width: `1100px`
-  - no fixed maximum, but the layout must remain proportional beyond the minimum frame
+- Dashboard frame dimensions are set by the user's screen-size choice (see Process step 3):
+  - **Standard Laptop**: minimum height `800px`, minimum width `1100px`
+  - **Home Screen**: minimum height `1000px`, minimum width `2100px`
+  - **Custom**: user-specified dimensions
+  - If the user skipped the prompt, default to Standard Laptop (1100×800)
+  - No fixed maximum — the layout must remain proportional beyond the minimum frame
 
 ### Tableau Fidelity Rules
 
@@ -53,7 +60,7 @@ If the approved plan cannot fit cleanly inside the minimum dashboard frame, do n
 ### Layout Sizing Contract
 
 The mock should be visually disciplined, not just approximate. Apply these rules:
-- Use an explicit root dashboard frame with minimum `800px` height and `1100px` width
+- Use an explicit root dashboard frame with the minimum height and width chosen by the user in the screen-size prompt (defaults to `800px` height and `1100px` width for Standard Laptop)
 - Use a consistent outer padding and internal row/column spacing derived from the design tokens
 - Give each chart card a defined slot and expected size from `DASHBOARD-PLAN.md`
 - KPI cards should use equal widths within a row

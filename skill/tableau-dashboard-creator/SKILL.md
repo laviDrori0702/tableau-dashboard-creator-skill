@@ -140,11 +140,12 @@ Read [references/step-c-mock-creation.md](references/step-c-mock-creation.md) fo
 Summary:
 1. Read `design-tokens.md` (generated in Step 0)
 2. Select appropriate template layout based on design tokens
-3. Create interactive HTML mock with Chart.js and sample data using a strict minimum dashboard frame of `800px` height by `1100px` width
-4. Save to `mock-version/v_N/mock.html`
-5. Prevent empty-space-heavy, compressed, or out-of-bounds chart layouts by enforcing explicit slot sizes and readable chart occupancy
-6. Present the mock to the user for approval
-7. If approved, update `DASHBOARD-PLAN.md` and `design-tokens.md` if the mock diverged from them
+3. Ask the user for their target screen size: **Standard Laptop** (1100×800) for portable devices, **Home Screen** (2100×1000) for wide external displays, or **Custom** dimensions. Defaults to Standard Laptop if skipped.
+4. Create interactive HTML mock with Chart.js and sample data using the chosen screen dimensions as the dashboard frame
+5. Save to `mock-version/v_N/mock.html`
+6. Prevent empty-space-heavy, compressed, or out-of-bounds chart layouts by enforcing explicit slot sizes and readable chart occupancy
+7. Present the mock to the user for approval
+8. If approved, update `DASHBOARD-PLAN.md` and `design-tokens.md` if the mock diverged from them
 
 ## Step D: Tableau Implementation Spec
 
