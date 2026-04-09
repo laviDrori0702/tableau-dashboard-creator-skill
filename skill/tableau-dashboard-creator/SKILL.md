@@ -13,14 +13,20 @@ A multi-step workflow that transforms a human-language dashboard request into an
 Before starting, scan the user's project root for:
 
 ```
-Checklist:
+Checklist (all paths are inside the project directory the skill is executed in, except `.env` — see note below):
 - [ ] QUERIES.md — SQL queries grouped under database type headings (e.g., PostgreSQL)
       OR sample-data/ directory with CSV files
 - [ ] <DASHBOARD-NAME>-PDR.md — Human-language dashboard request
-- [ ] .env — Database credentials (skip if using sample-data/)
-- [ ] ONE of the following for branding:
-      - branding/ directory containing: branding.md (palette, fonts, padding, sizing) and optionally a logo (.svg or .jpg)
-      - template.twb — Organization's Tableau template workbook (in project root)
+- [ ] .env — Database credentials (skip if using sample-data/). Does **not** need to live
+      inside the project directory — `load_dotenv()` walks upward from the current
+      working directory and picks up the closest `.env` it finds, so the user can keep
+      credentials in a parent directory and avoid copying secrets into the project.
+      Required variables (PostgreSQL): `PG_HOST`, `PG_DATABASE`, `PG_USER`, `PG_PASSWORD`,
+      and optionally `PG_PORT` (defaults to `5432`).
+- [ ] branding/ directory (required) containing ONE of:
+      - branding.md — brand spec (palette, fonts, padding, sizing)
+      - template.twb — Organization's Tableau template workbook
+      Optionally, a logo (.svg or .jpg) can be added to branding/ in either case.
 ```
 
 **If any are missing, immediately run Project Scaffolding (below) before doing anything else.** Do NOT ask the user to manually provide files — scaffold first, then let them customize.
@@ -94,8 +100,8 @@ Step D: Implementation Spec ──[user approval]──> Step E: TWB Generation 
 Read [references/step-0-brand-setup.md](references/step-0-brand-setup.md) for detailed instructions.
 
 Summary:
-1. Detect branding source: `branding/` directory (preferred) OR `template.twb` in project root
-2. Extract design tokens from `branding.md` + logo, or from `.twb` XML
+1. Detect branding source inside `branding/`: `branding.md` OR `template.twb`
+2. Extract design tokens from `branding.md` (or from the `.twb` XML), plus optional logo if present
 3. If fallback defaults are used for any missing brand decision, call out each fallback decision explicitly in `design-tokens.md`
 4. Generate `design-tokens.md` in the project root
 5. Present `design-tokens.md` to the user for approval
@@ -208,11 +214,11 @@ project-root/
 ├── QUERIES.md                      (user input — with DB type headings)
 ├── <DASHBOARD-NAME>-PDR.md         (user input)
 ├── .env                            (user input — DB credentials)
-├── template.twb                    (user input — option B: org template)
-├── branding/                       (user input — option A: branding spec + optional logo/icons)
-│   ├── logo.svg / logo.jpg         (optional)
-│   ├── icons/                      (optional)
-│   └── branding.md
+├── branding/                       (user input — required; contains brand source)
+│   ├── branding.md                 (option A: brand spec)
+│   ├── template.twb                (option B: org Tableau template)
+│   ├── logo.svg / logo.jpg         (optional, either case)
+│   └── icons/                      (optional)
 ├── sample-data/                    (user input — optional, skip DB queries)
 │   └── *.csv
 ├── design-tokens.md                (generated - step 0)

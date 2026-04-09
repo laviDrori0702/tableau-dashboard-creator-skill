@@ -4,7 +4,12 @@ Usage:
     python "<SKILL_PATH>/scripts/query_postgresql.py" "SELECT * FROM public.your_table"
     python "<SKILL_PATH>/scripts/query_postgresql.py" --file queries.sql --output results/
 
-Requires .env with: PG_HOST, PG_PORT, PG_DATABASE, PG_USER, PG_PASSWORD
+Requires .env with: PG_HOST, PG_PORT (optional, default 5432),
+                    PG_DATABASE, PG_USER, PG_PASSWORD
+
+The .env file does not need to live inside the project directory — load_dotenv()
+walks upward from the current working directory and picks the closest .env it finds.
+
 Packages: psycopg2-binary, python-dotenv, pandas
 """
 
