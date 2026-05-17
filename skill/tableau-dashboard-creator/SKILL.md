@@ -16,7 +16,7 @@ Before starting, scan the user's project root for:
 Checklist (all paths are inside the project directory the skill is executed in, except `.env` — see note below):
 - [ ] QUERIES.md — SQL queries grouped under database type headings (e.g., PostgreSQL)
       OR sample-data/ directory with CSV files
-- [ ] <DASHBOARD-NAME>-PDR.md — Human-language dashboard request
+- [ ] <DASHBOARD-NAME>-PRD.md — Human-language dashboard request
 - [ ] .env — Database credentials (skip if using sample-data/). Does **not** need to live
       inside the project directory — `load_dotenv()` walks upward from the current
       working directory and picks up the closest `.env` it finds, so the user can keep
@@ -76,10 +76,10 @@ Step D: Implementation Spec ──[user approval]──> Step E: TWB Generation 
 2. **Read each file from `skeleton/`** in the skill directory and **write its contents** into the user's project root, preserving the directory structure. This creates:
    - `sample-data/` — starter CSV files (sales orders, customer segments, monthly targets) for immediate testing
    - `.env.example` — database credentials template (rename to `.env` when ready)
-   - `EXAMPLE-PDR.md` — blank PDR template with section headers and placeholder examples
+   - `EXAMPLE-PRD.md` — blank PRD template with section headers and placeholder examples
    - `QUERIES.md` — SQL query template with database type headings
    - `branding/branding.md` — branding spec template with section headers and placeholder values
-   - `SalesPerformance-PDR.md` — partially filled Sales Performance PDR as a starting reference
+   - `SalesPerformance-PRD.md` — partially filled Sales Performance PRD as a starting reference
 3. **List every file created** and briefly explain what the user should fill in or customize
 4. **Be explicit about scaffold state**:
    - `sample-data/` means the project is immediately usable in demo mode
@@ -130,7 +130,7 @@ Summary:
 Read [references/step-b-dashboard-planning.md](references/step-b-dashboard-planning.md) for detailed instructions.
 
 Summary:
-1. Read the PDR file, `DS-ARCHITECTURE.md`, and `design-tokens.md`
+1. Read the PRD file, `DS-ARCHITECTURE.md`, and `design-tokens.md`
 2. Identify KPIs and chart types from the user request
 3. Map each visualization to specific columns from `DS-ARCHITECTURE.md`
 4. Assign stable IDs for KPIs, charts, filters, and actions so later steps can reuse the same identifiers
@@ -213,7 +213,7 @@ If the user requests a Tableau feature that has no validated snippet in `referen
 ```
 project-root/
 ├── QUERIES.md                      (user input — with DB type headings)
-├── <DASHBOARD-NAME>-PDR.md         (user input)
+├── <DASHBOARD-NAME>-PRD.md         (user input)
 ├── .env                            (user input — DB credentials)
 ├── branding/                       (user input — required; contains brand source)
 │   ├── branding.md                 (option A: brand spec)

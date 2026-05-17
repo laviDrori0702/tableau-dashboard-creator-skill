@@ -8,7 +8,7 @@ Thanks for your interest in improving the Tableau Dashboard Creator skill!
 
 - Open a [GitHub Issue](../../issues) with a clear description of the problem
 - Include which step of the workflow failed (Step 0–E)
-- Attach relevant input files if possible (PDR, sample data) — **never share credentials or `.env` files**
+- Attach relevant input files if possible (PRD, sample data) — **never share credentials or `.env` files**
 
 ### Suggesting Features
 

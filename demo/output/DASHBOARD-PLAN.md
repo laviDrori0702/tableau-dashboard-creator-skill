@@ -8,7 +8,7 @@ A regional sales performance dashboard for the VP of Sales and regional managers
 
 **Frame With Main KPI (2*2)**: KPI row (4 cards) + 2 rows of 2 charts each.
 
-Justification: The PDR requests 4 KPIs and 4 visualizations — this maps perfectly to a KPI row + 2×2 chart grid. The layout provides equal visual weight to each chart while keeping KPIs prominent at the top.
+Justification: The PRD requests 4 KPIs and 4 visualizations — this maps perfectly to a KPI row + 2×2 chart grid. The layout provides equal visual weight to each chart while keeping KPIs prominent at the top.
 
 ---
 
@@ -64,7 +64,7 @@ Justification: The PDR requests 4 KPIs and 4 visualizations — this maps perfec
 - **Color**: Measure Names — actual revenue in #1B4F72, target in #E5E8E8 (lighter/muted)
 - **Source datasource**: sales_orders.csv joined with monthly_targets.csv on region
 - **Suggested filters**: Date range
-- **Conditional formatting**: Highlight regions where actual < target in #E74C3C (red) — per PDR requirement
+- **Conditional formatting**: Highlight regions where actual < target in #E74C3C (red) — per PRD requirement
 - **Icon suggestion**: bar chart comparison icon
 
 ### Chart 3: Profit by Product Category (Bottom-left)
@@ -84,7 +84,7 @@ Justification: The PDR requests 4 KPIs and 4 visualizations — this maps perfec
 - **Measures**: SUM([revenue]) per customer
 - **Source datasource**: sales_orders.csv joined with customer_segments.csv on customer_name
 - **Suggested filters**: Date range, Region, Product Category
-- **Sortable**: Yes — per PDR requirement, users should be able to sort by any column
+- **Sortable**: Yes — per PRD requirement, users should be able to sort by any column
 - **Icon suggestion**: users/people icon
 
 ---
@@ -119,7 +119,7 @@ Justification: The PDR requests 4 KPIs and 4 visualizations — this maps perfec
 
 1. **Revenue vs Target % KPI delta**: Already included as comparison in KPI 1 and KPI 3. Could add conditional coloring — green when above target, red when below.
 
-2. **Discount Impact Analysis**: The data has a `discount` field — a chart showing average discount by category or region could reveal margin pressure. Not requested in PDR, but valuable for the VP of Sales.
+2. **Discount Impact Analysis**: The data has a `discount` field — a chart showing average discount by category or region could reveal margin pressure. Not requested in PRD, but valuable for the VP of Sales.
 
 3. **Customer Segment Revenue Split**: A small donut or stacked bar showing Enterprise vs Mid-Market revenue contribution. Available from the data but not requested.
 

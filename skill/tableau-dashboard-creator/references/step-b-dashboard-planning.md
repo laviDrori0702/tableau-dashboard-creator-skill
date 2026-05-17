@@ -4,7 +4,7 @@
 
 ## Process
 
-1. **Read the PDR file** (`<DASHBOARD-NAME>-PDR.md`) thoroughly
+1. **Read the PRD file** (`<DASHBOARD-NAME>-PRD.md`) thoroughly
 2. **Read DS-ARCHITECTURE.md** to understand available data
 3. **Read design-tokens.md** to understand available template layouts and accent colors
 4. **Identify explicit KPIs** the user requested
@@ -17,7 +17,7 @@
 ## Entry Requirements
 
 Before Step B begins, verify:
-- the PDR is present and readable
+- the PRD is present and readable
 - `DS-ARCHITECTURE.md` has approved datasource and field mappings
 - `design-tokens.md` has approved layout and styling guidance
 

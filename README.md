@@ -69,8 +69,8 @@ tableau-dashboard-creator-skill/
 │           └── validate_twb_xsd.py              # lxml-based XSD validator against the vendored 2026.1 schema
 └── demo/
     ├── input/                                   ← What YOU provide (example files)
-    │   ├── SalesPerformance-PDR.md              # Completed dashboard request
-    │   ├── EXAMPLE-PDR.md                       # Blank template for your own PDR
+    │   ├── SalesPerformance-PRD.md              # Completed dashboard request
+    │   ├── EXAMPLE-PRD.md                       # Blank template for your own PRD
     │   ├── QUERIES.md                           # SQL query template
     │   ├── .env.example                         # Database credentials template
     │   ├── branding/
@@ -180,9 +180,9 @@ The skill will use default Tableau styling (Open Sans, standard colors).
 
 ### 4. Write your dashboard request
 
-Create a `<YOUR-NAME>-PDR.md` file describing what you want. Use `demo/input/EXAMPLE-PDR.md` as a template, or look at `demo/input/SalesPerformance-PDR.md` for a completed example.
+Create a `<YOUR-NAME>-PRD.md` file describing what you want. Use `demo/input/EXAMPLE-PRD.md` as a template, or look at `demo/input/SalesPerformance-PRD.md` for a completed example.
 
-A good PDR includes:
+A good PRD includes:
 - **Overview** — Purpose, audience, update frequency
 - **KPIs** — Metrics to track (with formulas if specific)
 - **Visualizations** — Chart types and what they show
@@ -209,10 +209,10 @@ These are the files a user provides before running the skill:
 
 | File | Purpose |
 |------|---------|
-| `SalesPerformance-PDR.md` | Dashboard request: 4 KPIs, 4 charts, 3 filters |
+| `SalesPerformance-PRD.md` | Dashboard request: 4 KPIs, 4 charts, 3 filters |
 | `sample-data/*.csv` | Three CSV files with sales, customer, and target data |
 | `branding/branding.md` | Corporate colors, typography, spacing, and sizing |
-| `EXAMPLE-PDR.md` | Blank template you can copy for your own project |
+| `EXAMPLE-PRD.md` | Blank template you can copy for your own project |
 | `QUERIES.md` | SQL query template (not used in this demo — uses CSVs) |
 | `.env.example` | DB credentials template (not used in this demo) |
 
@@ -253,7 +253,7 @@ When you run the skill on your own project, it generates files in this structure
 
 ```
 your-project/
-├── <YOUR-NAME>-PDR.md          # (you provide)
+├── <YOUR-NAME>-PRD.md          # (you provide)
 ├── sample-data/ or QUERIES.md  # (you provide)
 ├── branding/ or template.twb   # (you provide)
 ├── design-tokens.md            # Generated — Step 0

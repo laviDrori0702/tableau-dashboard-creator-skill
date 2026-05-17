@@ -693,7 +693,7 @@ function updateRevenueVsTarget(filtered, filteredTargets) {
   const actualByRegion = REGIONS.map(function(r) { return filtered.filter(function(o) { return o.region === r; }).reduce(function(s, o) { return s + o.revenue; }, 0); });
   const targetByRegion = REGIONS.map(function(r) { return filteredTargets.filter(function(t) { return t.region === r; }).reduce(function(s, t) { return s + t.revenue_target; }, 0); });
 
-  // Determine bar colors: red if below target — per PDR requirement
+  // Determine bar colors: red if below target — per PRD requirement
   const barColors = REGIONS.map(function(_, i) { return actualByRegion[i] < targetByRegion[i] ? COLORS.belowTarget : COLORS.series[0]; });
 
   if (revenueVsTargetChart) revenueVsTargetChart.destroy();
