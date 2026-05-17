@@ -4,15 +4,21 @@
 
 ## Process
 
-1. **Detect branding source** — the `branding/` directory is required. Inside it, look for ONE of:
+1. **Ask the user for the minimum target Tableau Desktop version** — this is the **first thing you do in Step 0**, before any branding work. Use the `AskUserQuestion` tool with these options:
+   - **2024.2 – 2025.x** *(Recommended — broadest installed base)*
+   - **2026.1+** *(only if the user explicitly needs newer features)*
+
+   This single answer drives Step E's TWB emission rules (workbook `version` attribute, manifest tags, and whether `<explain-data>` is required). Save the answer verbatim into `design-tokens.md` under the `## Target Tableau Version` section. If the user is unsure, default to **2024.2 – 2025.x** and note the default in the file.
+
+2. **Detect branding source** — the `branding/` directory is required. Inside it, look for ONE of:
    - `branding.md` — brand spec (preferred path)
    - `template.twb` — the organization's Tableau template workbook (fallback path)
 
    A logo file (`.svg`/`.jpg`) and/or an `icons/` subdirectory may be present in either case and should be integrated when found.
 
-2. **Extract or build design tokens** depending on which source is found
-3. **Generate `design-tokens.md`** in the project root
-4. **Present design-tokens.md to the user for approval** before proceeding to Step A
+3. **Extract or build design tokens** depending on which source is found
+4. **Generate `design-tokens.md`** in the project root
+5. **Present design-tokens.md to the user for approval** before proceeding to Step A
 
 ---
 
@@ -131,6 +137,11 @@ Generate this file in the project root:
 
 **Source**: [template.twb / branding directory / fallback defaults]
 **Derived for**: [Step 0 approval candidate]
+
+## Target Tableau Version
+- **Minimum version**: [2024.2 – 2025.x  |  2026.1+]
+- **Selected by**: [user-confirmed | default]
+- **Affects**: Step E only — controls workbook `version` attribute, manifest tag set, and whether `<explain-data>` is emitted. See `step-e-twb-generation.md § Tableau Version Targeting`.
 
 ## Typography
 - **Font family**: [extracted font]

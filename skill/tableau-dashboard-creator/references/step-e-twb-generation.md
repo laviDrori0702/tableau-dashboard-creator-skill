@@ -2,9 +2,22 @@
 
 **Identity**: You are a Tableau XML engineer. Your goal is to generate a valid `.twbx` packaged workbook that can be opened directly in Tableau Desktop, fully implementing the dashboard from Step D's specification.
 
-**Target Version**: `source-build='2025.1.10 (20251.25.1121.1650)'`
+**Default scaffold build string**: `source-build='2025.1.10 (20251.25.1121.1650)'`. All snippets are authored against this build. The actual emitted `version` and content model depend on the user's **Target Tableau Version** (set in Step 0 — see *Tableau Version Targeting* below).
 
 > **Experimental**: This step generates Tableau XML programmatically. The output should be a functional starting point, though minor adjustments in Tableau Desktop may be needed.
+
+---
+
+## Tableau Version Targeting
+
+Read `## Target Tableau Version` from `design-tokens.md` (set in Step 0). Apply the matching emission rules below. Do **not** ask the user again — Step 0 already collected this.
+
+| Target version | Workbook attribute | `<explain-data>` element | Notes |
+|----------------|--------------------|--------------------------|-------|
+| **2024.2 – 2025.x** *(default)* | `version='18.1'` | **Do NOT emit** — Tableau 2025.x rejects this element with error code `D2E8DA72` (`no declaration found for element 'explain-data'`) | Use the scaffold as-is. The 2025.x content model ends with `..., windows, thumbnails?, external?` — anything after `<thumbnails />` other than `<external>` breaks the load. |
+| **2026.1+** | `version='26.1'` | **Required** — emit immediately after `<thumbnails />`:<br>`<explain-data enabled-for-viewer='false' extreme-values-enabled-for-all='false'><explanation-types /></explain-data>` | The official `twb_2026.1.0.xsd` declares `<explain-data>` as a required workbook child. |
+
+If `design-tokens.md` does not have a `## Target Tableau Version` section, default to **2024.2 – 2025.x** and add a `MANUAL_STEPS.md` note that the user should confirm the target.
 
 ## Process
 
@@ -14,8 +27,9 @@
 4. **Locate sample data CSVs** from Step A (in the project root or `sample-data/` directory)
 5. **Read the relevant snippet files and companion docs** (see Assembly Workflow below)
 6. **Assemble `dashboard.twb`** from validated snippet patterns
-7. **Package as `dashboard.twbx`** — a ZIP archive bundling the `.twb` with all sample CSV data files
-8. **Save to** `mock-version/v_N/` (both `.twb` and `.twbx`)
+7. **Run both validators** on the assembled `.twb` (see *Validation* below) — `validate_twb.py` and `validate_twb_xsd.py`. Resolve any failures before continuing.
+8. **Package as `dashboard.twbx`** — a ZIP archive bundling the `.twb` with all sample CSV data files
+9. **Save to** `mock-version/v_N/` (both `.twb` and `.twbx`)
 
 ---
 
@@ -227,7 +241,7 @@ These rules are derived from real Tableau Desktop validation failures.
 
 ### Datasource Structure
 4. **`<relation>` must be plain** — never wrap with FCP wrappers
-5. **`<layout>` requires `dim-percentage` and `measure-percentage`** — always include `dim-percentage='0.5' measure-percentage='0.4'`
+5. **`<layout>` percentages — omit them.** Do NOT include `dim-percentage` / `measure-percentage` attributes on `<layout>`. Tableau 2025.x loads fine without them; the 2026.1 XSD renamed them to `dim-percentage-v2` / `measure-percentage-v2` and rejects the un-suffixed names. Emit only `dim-ordering`, `measure-ordering`, `show-structure`. *(This rule changed — older guidance said these were required. They are not.)*
 6. **`directory='.'` always** — never use subdirectory paths in connections
 7. **Generate as live connection only** — no `<extract>` sections
 8. **4-way column redundancy** — every column must be defined in: `relation > columns`, `metadata-records`, `object-graph > properties > relation > columns`, AND `datasource > column` direct children (see SCAFFOLD.md)
@@ -258,16 +272,51 @@ These rules are derived from real Tableau Desktop validation failures.
 
 ---
 
+## Validation
+
+**Always run BOTH validators on every generated `.twb` before packaging the `.twbx`.** They are complementary, not redundant — the XSD covers structural correctness (element nesting, attribute names, value enums, child ordering), and `validate_twb.py` covers cross-section semantic integrity (datasource refs, column-instance refs, filter↔slices, worksheet↔window) that the XSD explicitly skips via `processContents="skip"`.
+
+### Commands
+
+From the project root (replace `v_N` with the actual version dir):
+
+```bash
+# Semantic validation
+python <skill-root>/scripts/validate_twb.py mock-version/v_N/dashboard.twb
+
+# Structural validation against official Tableau XSD
+python <skill-root>/scripts/validate_twb_xsd.py mock-version/v_N/dashboard.twb
+```
+
+`<skill-root>` is `skill/tableau-dashboard-creator/` inside the installed skill. The XSD validator requires `lxml` (in `requirements.txt`).
+
+### Interpreting XSD output
+
+The XSD is the official 2026.1 schema (`references/xsd/twb_2026.1.0.xsd`). When the target is **2024.2 – 2025.x**, expect a small set of version-shifted false positives. Bucket every error you see:
+
+| Bucket | Examples | What to do |
+|---|---|---|
+| **1. Real structural bug** *(most errors fall here)* | Misspelled element, wrong nesting order, missing required attribute, invalid enum value (e.g., `param='vertical'` instead of `'vert'`/`'horz'`), `<zone-style>` not last child of zone, attribute on wrong element | **Fix the workbook.** These would break 2025.x too. |
+| **2. Known 2026.1-only requirement** *(safe to ignore for 2025.x target)* | `Element 'workbook': Missing child element(s). Expected is one of ( external, referenced-extensions, explain-data )` <br><br> `Element 'layout', attribute 'dim-percentage': The attribute 'dim-percentage' is not allowed.` <br><br> `Element 'layout', attribute 'measure-percentage': The attribute 'measure-percentage' is not allowed.` | **Ignore — these are the documented 2026.1 deltas.** A clean 2025.x-targeted workbook will produce exactly **one** such error: the missing `explain-data`/`referenced-extensions`/`external` child. The `dim-percentage` errors should not appear in your output because rule #5 (Datasource Structure) tells you not to emit them. |
+| **3. Unknown 2026.1-only difference** | Anything not in bucket 2 that you suspect is version-related | Investigate: confirm the element/attribute exists in the 2026.1 XSD definition. If the schema has it as required-only-in-26.1 and your target is 2025.x, treat as bucket 2 (ignore, but **add it to bucket 2 in this doc** so future runs don't re-investigate). Otherwise treat as bucket 1. |
+
+> **Pass criterion**: `validate_twb.py` must report **all checks passed**. `validate_twb_xsd.py` may report at most the **single known 2025.x bucket-2 error** above; any additional XSD errors must be resolved or escalated to bucket 3 before approval.
+
+---
+
 ## Validation Checklist
 
 Before saving the `.twb`, verify:
 
+- [ ] `validate_twb.py` reports all checks passed
+- [ ] `validate_twb_xsd.py` reports only the known bucket-2 error (or PASS for a 2026.1+ target)
 - [ ] XML is well-formed (all tags properly closed)
 - [ ] `source-build` is `2025.1.10 (20251.25.1121.1650)`
 - [ ] Manifest tags copied from scaffold (simple names, no FCP prefixes)
 - [ ] All datasource connections use `directory='.'`
 - [ ] All columns defined in all 4 redundancy locations
-- [ ] All `<layout>` elements include `dim-percentage` and `measure-percentage`
+- [ ] `<layout>` elements do NOT contain `dim-percentage` / `measure-percentage` (see Datasource Structure rule #5)
+- [ ] Workbook `version` attribute and `<explain-data>` emission match the *Tableau Version Targeting* table
 - [ ] All `<relation>` elements are plain (no FCP wrappers)
 - [ ] No `<extract>` sections present
 - [ ] All field names match DS-ARCHITECTURE.md
