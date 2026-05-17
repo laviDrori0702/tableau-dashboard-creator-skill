@@ -94,11 +94,12 @@ Step D: Implementation Spec ──[user approval]──> Step E: TWB Generation 
 Read [references/step-0-brand-setup.md](references/step-0-brand-setup.md) for detailed instructions.
 
 Summary:
-1. Detect branding source: `branding/` directory (preferred) OR `template.twb` in project root
-2. Extract design tokens from `branding.md` + logo, or from `.twb` XML
-3. If fallback defaults are used for any missing brand decision, call out each fallback decision explicitly in `design-tokens.md`
-4. Generate `design-tokens.md` in the project root
-5. Present `design-tokens.md` to the user for approval
+1. **Ask the user for the minimum target Tableau Desktop version first** (`2024.2 – 2025.x` default, or `2026.1+`). Record the answer in `design-tokens.md` — it controls Step E's XML emission.
+2. Detect branding source: `branding/` directory (preferred) OR `template.twb` in project root
+3. Extract design tokens from `branding.md` + logo, or from `.twb` XML
+4. If fallback defaults are used for any missing brand decision, call out each fallback decision explicitly in `design-tokens.md`
+5. Generate `design-tokens.md` in the project root
+6. Present `design-tokens.md` to the user for approval
 
 ## Step A: Data Exploration
 
@@ -159,7 +160,7 @@ Summary:
 
 ## Step E: TWB Workbook Generation (Experimental)
 
-**Target Tableau Version**: `2025.1.10 (20251.25.1121.1650)` — all snippets are validated against this version.
+**Scaffold build string**: `2025.1.10 (20251.25.1121.1650)` — all snippets are authored against this build. The emitted workbook `version` attribute and the inclusion of `<explain-data>` are driven by the **Target Tableau Version** captured in Step 0. See `references/step-e-twb-generation.md § Tableau Version Targeting`.
 
 Read [references/step-e-twb-generation.md](references/step-e-twb-generation.md) for detailed instructions.
 

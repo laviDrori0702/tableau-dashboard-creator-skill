@@ -2,9 +2,22 @@
 
 **Identity**: You are a Tableau XML engineer. Your goal is to generate a valid `.twbx` packaged workbook that can be opened directly in Tableau Desktop, fully implementing the dashboard from Step D's specification.
 
-**Target Version**: `source-build='2025.1.10 (20251.25.1121.1650)'`
+**Default scaffold build string**: `source-build='2025.1.10 (20251.25.1121.1650)'`. All snippets are authored against this build. The actual emitted `version` and content model depend on the user's **Target Tableau Version** (set in Step 0 — see *Tableau Version Targeting* below).
 
 > **Experimental**: This step generates Tableau XML programmatically. The output should be a functional starting point, though minor adjustments in Tableau Desktop may be needed.
+
+---
+
+## Tableau Version Targeting
+
+Read `## Target Tableau Version` from `design-tokens.md` (set in Step 0). Apply the matching emission rules below. Do **not** ask the user again — Step 0 already collected this.
+
+| Target version | Workbook attribute | `<explain-data>` element | Notes |
+|----------------|--------------------|--------------------------|-------|
+| **2024.2 – 2025.x** *(default)* | `version='18.1'` | **Do NOT emit** — Tableau 2025.x rejects this element with error code `D2E8DA72` (`no declaration found for element 'explain-data'`) | Use the scaffold as-is. The 2025.x content model ends with `..., windows, thumbnails?, external?` — anything after `<thumbnails />` other than `<external>` breaks the load. |
+| **2026.1+** | `version='26.1'` | **Required** — emit immediately after `<thumbnails />`:<br>`<explain-data enabled-for-viewer='false' extreme-values-enabled-for-all='false'><explanation-types /></explain-data>` | The official `twb_2026.1.0.xsd` declares `<explain-data>` as a required workbook child. |
+
+If `design-tokens.md` does not have a `## Target Tableau Version` section, default to **2024.2 – 2025.x** and add a `MANUAL_STEPS.md` note that the user should confirm the target.
 
 ## Process
 
@@ -227,7 +240,7 @@ These rules are derived from real Tableau Desktop validation failures.
 
 ### Datasource Structure
 4. **`<relation>` must be plain** — never wrap with FCP wrappers
-5. **`<layout>` requires `dim-percentage` and `measure-percentage`** — always include `dim-percentage='0.5' measure-percentage='0.4'`
+5. **`<layout>` percentages — omit them.** Do NOT include `dim-percentage` / `measure-percentage` attributes on `<layout>`. Tableau 2025.x loads fine without them; the 2026.1 XSD renamed them to `dim-percentage-v2` / `measure-percentage-v2` and rejects the un-suffixed names. Emit only `dim-ordering`, `measure-ordering`, `show-structure`. *(This rule changed — older guidance said these were required. They are not.)*
 6. **`directory='.'` always** — never use subdirectory paths in connections
 7. **Generate as live connection only** — no `<extract>` sections
 8. **4-way column redundancy** — every column must be defined in: `relation > columns`, `metadata-records`, `object-graph > properties > relation > columns`, AND `datasource > column` direct children (see SCAFFOLD.md)
@@ -267,7 +280,8 @@ Before saving the `.twb`, verify:
 - [ ] Manifest tags copied from scaffold (simple names, no FCP prefixes)
 - [ ] All datasource connections use `directory='.'`
 - [ ] All columns defined in all 4 redundancy locations
-- [ ] All `<layout>` elements include `dim-percentage` and `measure-percentage`
+- [ ] `<layout>` elements do NOT contain `dim-percentage` / `measure-percentage` (see Datasource Structure rule #5)
+- [ ] Workbook `version` attribute and `<explain-data>` emission match the *Tableau Version Targeting* table
 - [ ] All `<relation>` elements are plain (no FCP wrappers)
 - [ ] No `<extract>` sections present
 - [ ] All field names match DS-ARCHITECTURE.md
