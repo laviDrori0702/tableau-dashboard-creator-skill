@@ -25,12 +25,12 @@ Works with **Claude Code**, **Cursor**, and any other agentic AI coding tool tha
 The skill guides you through **6 steps**, each requiring your approval before proceeding:
 
 ```
-Step 0: Brand Setup         → Extracts design tokens from your branding/template
+Step 0: Brand Setup         → Asks for target Tableau version, extracts design tokens from your branding/template
 Step A: Data Exploration    → Analyzes your data sources, builds a data dictionary
 Step B: Dashboard Planning  → Plans KPIs, charts, filters, and layout
 Step C: HTML Mock           → Generates an interactive HTML prototype (Chart.js)
 Step D: Implementation Spec → Creates a detailed Tableau build blueprint
-Step E: TWB Generation      → Produces a .twbx workbook file (experimental)
+Step E: TWB Generation      → Produces a version-aware .twbx workbook, validated against the official Tableau XSD (experimental)
 ```
 
 Each step outputs a versioned artifact. You review, request changes, or approve — then move on.
@@ -60,11 +60,13 @@ tableau-dashboard-creator-skill/
 │       │   ├── step-d-implementation-spec.md    # Tableau spec instructions
 │       │   ├── step-e-twb-generation.md         # TWB XML generation instructions
 │       │   ├── tableau-design-tokens.md         # Canonical fallback design token reference
-│       │   └── snippets/                        # TWB XML snippet library (scaffold, data-model, worksheets, dashboard, features)
+│       │   ├── snippets/                        # TWB XML snippet library (scaffold, data-model, worksheets, dashboard, features)
+│       │   └── xsd/                             # Official Tableau 2026.1 XSD + namespace stubs (used by Step E validator)
 │       ├── skeleton/                            # Project scaffolding files copied into analyst projects
 │       └── scripts/
 │           ├── query_postgresql.py              # PostgreSQL SQL executor
-│           └── validate_twb.py                  # TWB validator utility
+│           ├── validate_twb.py                  # TWB structural validator (covers processContents="skip" regions)
+│           └── validate_twb_xsd.py              # lxml-based XSD validator against the vendored 2026.1 schema
 └── demo/
     ├── input/                                   ← What YOU provide (example files)
     │   ├── SalesPerformance-PDR.md              # Completed dashboard request
@@ -81,11 +83,14 @@ tableau-dashboard-creator-skill/
         ├── design-tokens.md                     # Step 0 output
         ├── DS-ARCHITECTURE.md                   # Step A output
         ├── DASHBOARD-PLAN.md                    # Step B output
-        └── mock-version/v_1/
-            ├── mock.html                        # Step C output (open in browser)
-            ├── TABLEAU-IMPLEMENTATION.md         # Step D output
-            ├── dashboard.twb                    # Step E output (raw XML)
-            └── dashboard.twbx                   # Step E output (packaged workbook)
+        ├── mock-version/v_1/
+        │   ├── mock.html                        # Step C output (open in browser)
+        │   ├── TABLEAU-IMPLEMENTATION.md         # Step D output
+        │   ├── dashboard.twb                    # Step E output (raw XML)
+        │   └── dashboard.twbx                   # Step E output (packaged workbook)
+        └── mock-version/v_2/
+            ├── dashboard.twb                    # Step E re-run (raw XML)
+            └── dashboard.twbx                   # Step E re-run (packaged workbook)
 ```
 
 ---
@@ -120,11 +125,13 @@ The skill is defined in `skill/tableau-dashboard-creator/SKILL.md`. Copy the ent
 
 ### Python Dependencies (optional)
 
-Only needed if you use SQL database queries in Step A:
+Needed if you use SQL database queries in Step A, **or** if you want Step E to run the official Tableau XSD validator against generated `.twb` files (recommended):
 
 ```bash
 pip install -r requirements.txt
 ```
+
+`requirements.txt` includes `pandas`, `python-dotenv`, `psycopg2-binary` (Step A — PostgreSQL) and `lxml` (Step E — XSD validation).
 
 ---
 
@@ -266,7 +273,7 @@ Revisions increment the version: `v_2/`, `v_3/`, etc. Each version is a complete
 
 ## Key Constraints
 
-- **No rounded corners by default** — keep the mock Tableau-faithful unless the user explicitly accepts otherwise
+- **No rounded corners below Tableau 2026.1** — `border-radius` only renders in Tableau 2026.1+; for older target versions, keep the mock Tableau-faithful with square corners unless the user explicitly accepts the divergence
 - **No box shadows** — Not natively supported in Tableau
 - **Container hierarchy** must follow Tableau's zone model (layout-basic → layout-flow → sheets)
 - **Fallback-driven design choices must be disclosed** — when the skill uses Tableau defaults for missing branding input, it should say so
