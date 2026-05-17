@@ -13,14 +13,20 @@ A multi-step workflow that transforms a human-language dashboard request into an
 Before starting, scan the user's project root for:
 
 ```
-Checklist:
+Checklist (all paths are inside the project directory the skill is executed in, except `.env` — see note below):
 - [ ] QUERIES.md — SQL queries grouped under database type headings (e.g., PostgreSQL)
       OR sample-data/ directory with CSV files
 - [ ] <DASHBOARD-NAME>-PDR.md — Human-language dashboard request
-- [ ] .env — Database credentials (skip if using sample-data/)
-- [ ] ONE of the following for branding:
-      - branding/ directory containing: branding.md (palette, fonts, padding, sizing) and optionally a logo (.svg or .jpg)
-      - template.twb — Organization's Tableau template workbook (in project root)
+- [ ] .env — Database credentials (skip if using sample-data/). Does **not** need to live
+      inside the project directory — `load_dotenv()` walks upward from the current
+      working directory and picks up the closest `.env` it finds, so the user can keep
+      credentials in a parent directory and avoid copying secrets into the project.
+      Required variables (PostgreSQL): `PG_HOST`, `PG_DATABASE`, `PG_USER`, `PG_PASSWORD`,
+      and optionally `PG_PORT` (defaults to `5432`).
+- [ ] branding/ directory (required) containing ONE of:
+      - branding.md — brand spec (palette, fonts, padding, sizing)
+      - template.twb — Organization's Tableau template workbook
+      Optionally, a logo (.svg or .jpg) can be added to branding/ in either case.
 ```
 
 **If any are missing, immediately run Project Scaffolding (below) before doing anything else.** Do NOT ask the user to manually provide files — scaffold first, then let them customize.
@@ -95,8 +101,8 @@ Read [references/step-0-brand-setup.md](references/step-0-brand-setup.md) for de
 
 Summary:
 1. **Ask the user for the minimum target Tableau Desktop version first** (`2024.2 – 2025.x` default, or `2026.1+`). Record the answer in `design-tokens.md` — it controls Step E's XML emission.
-2. Detect branding source: `branding/` directory (preferred) OR `template.twb` in project root
-3. Extract design tokens from `branding.md` + logo, or from `.twb` XML
+2. Detect branding source inside `branding/`: `branding.md` OR `template.twb`
+3. Extract design tokens from `branding.md` (or from the `.twb` XML), plus optional logo if present
 4. If fallback defaults are used for any missing brand decision, call out each fallback decision explicitly in `design-tokens.md`
 5. Generate `design-tokens.md` in the project root
 6. Present `design-tokens.md` to the user for approval
@@ -141,11 +147,12 @@ Read [references/step-c-mock-creation.md](references/step-c-mock-creation.md) fo
 Summary:
 1. Read `design-tokens.md` (generated in Step 0)
 2. Select appropriate template layout based on design tokens
-3. Create interactive HTML mock with Chart.js and sample data using a strict minimum dashboard frame of `800px` height by `1100px` width
-4. Save to `mock-version/v_N/mock.html`
-5. Prevent empty-space-heavy, compressed, or out-of-bounds chart layouts by enforcing explicit slot sizes and readable chart occupancy
-6. Present the mock to the user for approval
-7. If approved, update `DASHBOARD-PLAN.md` and `design-tokens.md` if the mock diverged from them
+3. Ask the user for their target screen size: **Standard Laptop** (1100×800) for portable devices, **Home Screen** (2100×1000) for wide external displays, or **Custom** dimensions. Defaults to Standard Laptop if skipped.
+4. Create interactive HTML mock with Chart.js and sample data using the chosen screen dimensions as the dashboard frame
+5. Save to `mock-version/v_N/mock.html`
+6. Prevent empty-space-heavy, compressed, or out-of-bounds chart layouts by enforcing explicit slot sizes and readable chart occupancy
+7. Present the mock to the user for approval
+8. If approved, update `DASHBOARD-PLAN.md` and `design-tokens.md` if the mock diverged from them
 
 ## Step D: Tableau Implementation Spec
 
@@ -208,11 +215,11 @@ project-root/
 ├── QUERIES.md                      (user input — with DB type headings)
 ├── <DASHBOARD-NAME>-PDR.md         (user input)
 ├── .env                            (user input — DB credentials)
-├── template.twb                    (user input — option B: org template)
-├── branding/                       (user input — option A: branding spec + optional logo/icons)
-│   ├── logo.svg / logo.jpg         (optional)
-│   ├── icons/                      (optional)
-│   └── branding.md
+├── branding/                       (user input — required; contains brand source)
+│   ├── branding.md                 (option A: brand spec)
+│   ├── template.twb                (option B: org Tableau template)
+│   ├── logo.svg / logo.jpg         (optional, either case)
+│   └── icons/                      (optional)
 ├── sample-data/                    (user input — optional, skip DB queries)
 │   └── *.csv
 ├── design-tokens.md                (generated - step 0)

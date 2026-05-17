@@ -101,7 +101,7 @@ git clone https://github.com/laviDrori0702/tableau-dashboard-creator-skill.git
 cp -r tableau-dashboard-creator-skill/skill/tableau-dashboard-creator ~/.claude/skills/
 ```
 
-Verify by running `/skill tableau-dashboard-creator` in Claude Code.
+Verify by running `/tableau-dashboard-creator` in Claude Code.
 
 ### Cursor
 
@@ -185,7 +185,7 @@ A good PDR includes:
 ### 5. Run the skill
 
 ```
-/skill tableau-dashboard-creator
+/tableau-dashboard-creator
 ```
 
 The skill will walk you through each step, presenting results for your approval.

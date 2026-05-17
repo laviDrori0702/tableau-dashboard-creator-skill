@@ -36,6 +36,7 @@ Thumbs.db
 !skill/tableau-dashboard-creator/references/**
 !skill/tableau-dashboard-creator/scripts/
 !skill/tableau-dashboard-creator/scripts/**
+skill/tableau-dashboard-creator/scripts/__pycache__/
 !skill/tableau-dashboard-creator/skeleton/
 !skill/tableau-dashboard-creator/skeleton/**
 

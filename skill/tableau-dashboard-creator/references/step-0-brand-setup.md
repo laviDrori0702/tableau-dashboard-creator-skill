@@ -10,9 +10,11 @@
 
    This single answer drives Step E's TWB emission rules (workbook `version` attribute, manifest tags, and whether `<explain-data>` is required). Save the answer verbatim into `design-tokens.md` under the `## Target Tableau Version` section. If the user is unsure, default to **2024.2 – 2025.x** and note the default in the file.
 
-2. **Detect branding source** — check the user's project root for one of:
-   - `branding/` directory — containing `branding.md` and optionally a logo file or `icons/` directory (preferred)
-   - `template.twb` — the organization's Tableau template workbook (fallback)
+2. **Detect branding source** — the `branding/` directory is required. Inside it, look for ONE of:
+   - `branding.md` — brand spec (preferred path)
+   - `template.twb` — the organization's Tableau template workbook (fallback path)
+
+   A logo file (`.svg`/`.jpg`) and/or an `icons/` subdirectory may be present in either case and should be integrated when found.
 
 3. **Extract or build design tokens** depending on which source is found
 4. **Generate `design-tokens.md`** in the project root
@@ -23,8 +25,8 @@
 ## Entry Requirements
 
 Before generating `design-tokens.md`, verify:
-- a branding source exists, or the user explicitly approves fallback defaults
-- the brand source is unambiguous (`branding/` takes precedence over `template.twb`)
+- a branding source exists inside `branding/`, or the user explicitly approves fallback defaults
+- the brand source is unambiguous (`branding/branding.md` takes precedence over `branding/template.twb` if both are present)
 - you know which values are extracted vs assumed
 
 If any fallback values are used, list them explicitly in the output under a dedicated section so the user knows why the design was shaped that way.
@@ -33,7 +35,7 @@ If any fallback values are used, list them explicitly in the output under a dedi
 
 ## Path A: Extract from `.twb` Template
 
-If no `branding/` directory is found, but `template.twb` exists in the project root:
+If `branding/template.twb` exists (and no `branding/branding.md` is present):
 
 1. **Read the TWB XML** — it is standard XML. Parse it to extract:
    - **Typography**: font family, sizes for titles/labels/tooltips, weights, colors
@@ -63,9 +65,9 @@ If no `branding/` directory is found, but `template.twb` exists in the project r
 
 ## Path B: Build from Logo + Branding Spec
 
-If a `branding/` directory is found (checked **before** `template.twb`), look for:
-- **Logo**: `.svg` or `.jpg` file (e.g., `logo.svg`, `logo.jpg`)
+If `branding/branding.md` exists (checked **before** `branding/template.twb`), look inside `branding/` for:
 - **Branding spec**: `branding.md` — a markdown file describing the desired palette, fonts, padding, and dashboard sizing
+- **Logo** (optional): `.svg` or `.jpg` file (e.g., `logo.svg`, `logo.jpg`)
 - **Icons** (optional): `icons/` subdirectory containing 40x40 `.svg` files for chart title-bar enrichment (e.g., `bar-chart.svg`, `trend.svg`, `funnel.svg`). If provided, list them in the design-tokens.md output under an `## Icons` section mapping icon names to file paths.
 
 ### Expected `branding.md` format:
@@ -118,7 +120,7 @@ For every value you infer from fallback defaults rather than the user's files, r
 
 ## Path C: No Branding Provided
 
-If neither `branding/` directory nor `template.twb` exists:
+If `branding/` exists but contains neither `branding.md` nor `template.twb` (or `branding/` itself is missing):
 1. Confirm that the user wants to proceed with fallback defaults
 2. Use the fallback tokens from `references/tableau-design-tokens.md` as a starting point
 3. Warn the user that the mock will use generic Tableau defaults
