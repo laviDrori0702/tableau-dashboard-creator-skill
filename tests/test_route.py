@@ -81,6 +81,70 @@ def test_blocked_points_at_the_missing_artifacts_producer():
     assert "DATA-MODEL.md" in result.reason
 
 
+def _write_pre_mock_project(tmp_path, data_csv_dir):
+    """Write a project where everything up to (not incl.) mock is approved.
+
+    Args:
+        tmp_path: The project directory to populate.
+        data_csv_dir: Project-relative dir to drop a CSV in (``"data"`` or
+            ``"scaffold/sample-data"``), or ``None`` to create no CSV at all.
+    """
+    state = (
+        "# Project State\n\n"
+        "## Metadata\n"
+        "- target_tableau_version: 2024.2-2025.x\n"
+        "- data_mode: csv\n"
+        "- current_version: v_1\n\n"
+        "## Steps\n"
+        "| order | step   | skill          | status   |\n"
+        "|-------|--------|----------------|----------|\n"
+        "| 1     | init   | tableau-init   | approved |\n"
+        "| 2     | intake | tableau-intake | approved |\n"
+        "| 3     | data   | tableau-data   | approved |\n"
+        "| 4     | brand  | tableau-brand  | approved |\n"
+        "| 5     | plan   | tableau-plan   | approved |\n"
+        "| 6     | mock   | tableau-mock   | pending  |\n"
+        "| 7     | spec   | tableau-spec   | pending  |\n"
+        "| 8     | build  | tableau-build  | pending  |\n"
+    )
+    (tmp_path / "STATE.md").write_text(state, encoding="utf-8")
+    (tmp_path / "DASHBOARD-PLAN.md").write_text("plan", encoding="utf-8")
+    if data_csv_dir is not None:
+        csv_dir = tmp_path / data_csv_dir
+        csv_dir.mkdir(parents=True)
+        (csv_dir / "orders.csv").write_text("a,b\n1,2\n", encoding="utf-8")
+
+
+def test_data_gate_accepts_production_data_dir(tmp_path):
+    """The data gate is satisfied by production data/*.csv (CONTRACT.md §3.1)."""
+    _write_pre_mock_project(tmp_path, data_csv_dir="data")
+
+    result = route.compute_next_step(tmp_path)
+
+    assert result.kind == "ready"
+    assert result.next_step == "mock"
+
+
+def test_data_gate_accepts_scaffold_sample_data_fallback(tmp_path):
+    """The data gate falls back to scaffold/sample-data/*.csv so a demo never blocks (§3.1)."""
+    _write_pre_mock_project(tmp_path, data_csv_dir="scaffold/sample-data")
+
+    result = route.compute_next_step(tmp_path)
+
+    assert result.kind == "ready"
+    assert result.next_step == "mock"
+
+
+def test_data_gate_blocks_when_no_csvs_anywhere(tmp_path):
+    """With neither data/ nor scaffold/sample-data/ CSVs, mock is blocked on data."""
+    _write_pre_mock_project(tmp_path, data_csv_dir=None)
+
+    result = route.compute_next_step(tmp_path)
+
+    assert result.kind == "blocked"
+    assert result.next_step == "data"
+
+
 def test_accepts_direct_state_file_path():
     """compute_next_step accepts a STATE.md path directly, not only a directory."""
     result = route.compute_next_step(FIXTURES / "mid-pipeline" / "STATE.md")
