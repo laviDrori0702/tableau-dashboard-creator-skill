@@ -20,14 +20,14 @@ a known set of artifacts, and writes exactly one primary artifact.
 
 | # | step     | skill            | required reads (producer step)                                                   | primary write                                  | skippable |
 |---|----------|------------------|----------------------------------------------------------------------------------|------------------------------------------------|-----------|
-| 1 | `init`   | `tableau-init`   | —                                                                                | `STATE.md` + skeleton (incl. `DASHBOARD-REQUEST.md`, templates) | no  |
-| 2 | `intake` | `tableau-intake` | — *(uses the `DASHBOARD-REQUEST.md` input file **or** free text pasted into the terminal)* | `PRD.md`                              | yes |
-| 3 | `data`   | `tableau-data`   | — *(uses `sample-data/` or `QUERIES.md` + `.env` inputs)*                        | `DATA-MODEL.md` + `sample-data/*.csv`          | no  |
-| 4 | `brand`  | `tableau-brand`  | — *(uses `branding/` input)*                                                     | `DESIGN-TOKENS.md`                             | yes |
+| 1 | `init`   | `tableau-init`   | —                                                                                | `STATE.md` + `scaffold/` demo examples (see §3.1)              | no  |
+| 2 | `intake` | `tableau-intake` | — *(prefers root `DASHBOARD-REQUEST.md` or pasted text; demo fallback `scaffold/` — §3.1)* | `PRD.md`                    | yes |
+| 3 | `data`   | `tableau-data`   | — *(csv route: `data/*.csv`; published-ds route: `datasources.json` + `.env` via VDS; demo fallback `scaffold/sample-data/` — §3.1/§3.2)* | `DATA-MODEL.md` + `data/*.csv` | no  |
+| 4 | `brand`  | `tableau-brand`  | — *(prefers `branding/`; demo fallback `scaffold/branding/` — §3.1)*             | `DESIGN-TOKENS.md`                             | yes |
 | 5 | `plan`   | `tableau-plan`   | `DATA-MODEL.md` (`data`)                                                          | `DASHBOARD-PLAN.md`                            | no  |
-| 6 | `mock`   | `tableau-mock`   | `DASHBOARD-PLAN.md` (`plan`), `sample-data/*.csv` (`data`)                        | `mock-version/v_N/mock.html`                   | no  |
+| 6 | `mock`   | `tableau-mock`   | `DASHBOARD-PLAN.md` (`plan`), `data/*.csv` (`data`)                               | `mock-version/v_N/mock.html`                   | no  |
 | 7 | `spec`   | `tableau-spec`   | `DASHBOARD-PLAN.md` (`plan`), `mock-version/v_N/mock.html` (`mock`)               | `mock-version/v_N/IMPLEMENTATION-SPEC.md`      | no  |
-| 8 | `build`  | `tableau-build`  | `IMPLEMENTATION-SPEC.md` (`spec`), `DATA-MODEL.md` (`data`), `sample-data/*.csv` (`data`) | `mock-version/v_N/dashboard.twbx`     | no  |
+| 8 | `build`  | `tableau-build`  | `IMPLEMENTATION-SPEC.md` (`spec`), `DATA-MODEL.md` (`data`), `data/*.csv` (`data`) | `mock-version/v_N/dashboard.twbx`     | no  |
 
 ### Required vs. optional reads
 
@@ -36,9 +36,10 @@ step. It is the only thing that gates ordering (§4.1). Steps whose input is an 
 **input** (not produced by a step) have no required read and are never blocked on it:
 
 - `intake` reads the `DASHBOARD-REQUEST.md` input file **or** free text the analyst pastes directly
-  into the terminal — whichever is present. Because the request can be pasted, `intake` has **no**
-  required read and never refuses to run for a "missing" request file. (`data` and `brand` are
-  likewise input-driven: `sample-data/`/`QUERIES.md` and `branding/` respectively.)
+  into the terminal — whichever is present (and, failing both, the `scaffold/` demo example, §3.1).
+  Because the request can be pasted, `intake` has **no** required read and never refuses to run for a
+  "missing" request file. (`data` and `brand` are likewise input-driven: `data/`/`datasources.json` and
+  `branding/` respectively, each with a `scaffold/` demo fallback — §3.1.)
 
 A step may also have *optional reads* that enrich its output but never block it:
 
@@ -67,7 +68,7 @@ analyst is in the workflow.
 
 ## Metadata
 - target_tableau_version: 2024.2-2025.x   # 2024.2-2025.x | 2026.1+
-- data_mode: csv                          # csv | database | published-ds
+- data_mode: csv                          # csv | published-ds
 - current_version: v_1                    # v_1, v_2, ...
 
 ## Steps
@@ -88,7 +89,7 @@ analyst is in the workflow.
 | field                   | location           | allowed values                                  | meaning |
 |-------------------------|--------------------|-------------------------------------------------|---------|
 | `target_tableau_version`| Metadata           | `2024.2-2025.x` \| `2026.1+`                     | Captured at `init`; drives `tableau-build`'s workbook `version` attribute and version-specific XML (e.g. `<explain-data>`). Never re-asked downstream. |
-| `data_mode`             | Metadata           | `csv` \| `database` \| `published-ds`           | How `tableau-data` acquires rows. `csv` is the default, zero-credential path. |
+| `data_mode`             | Metadata           | `csv` \| `published-ds`                          | How `tableau-data` acquires rows (§3.2). `csv` is the default, zero-credential path (analyst-provided CSVs); `published-ds` queries a published source via the VizQL Data Service. There is **no** direct-database mode. |
 | `current_version`       | Metadata           | `v_1`, `v_2`, …                                 | The active deliverable version directory under `mock-version/`. Bumped when a deliverable skill re-runs after approval (§4.3). |
 | `status` (per step)     | Steps table, 1/row | `pending` \| `approved` \| `skipped` \| `stale` | Lifecycle of each step. |
 
@@ -114,9 +115,76 @@ The case of a filename encodes its role, so a skill can tell handoff artifacts f
   `PRD.md`, `DATA-MODEL.md`, `DESIGN-TOKENS.md`, `DASHBOARD-PLAN.md`, `IMPLEMENTATION-SPEC.md`.
   (`STATE.md` is the manifest and also uses this casing.)
 - **lowercase ⇒ input or config**, owned by the analyst, never produced as a handoff:
-  `.env`, `branding/`, `sample-data/`, `QUERIES.md`, `DASHBOARD-REQUEST.md`.
+  `.env`, `branding/`, `data/`, `datasources.json`, `DASHBOARD-REQUEST.md`. Their demo counterparts live
+  under `scaffold/` (see §3.1).
 
 New artifacts MUST follow this rule. Do not introduce a lowercase handoff or an UPPER-KEBAB input.
+
+### 3.1 Scaffold examples vs. production inputs
+
+`tableau-init` does not create the analyst's input files directly. It writes a single `scaffold/`
+folder of **demo examples** so the workflow can be trialed end-to-end before any real input exists:
+
+| production input (preferred, project root) | `scaffold/` demo fallback                                    |
+|---------------------------------------------|--------------------------------------------------------------|
+| `DASHBOARD-REQUEST.md`                      | `scaffold/EXAMPLE-DASHBOARD-REQUEST.md`                      |
+| `datasources.json` + `.env` *(published-ds)* | `scaffold/EXAMPLE-datasources.json` + `scaffold/.env.example` |
+| `branding/` (e.g. `branding/branding.md`)   | `scaffold/branding/EXAMPLE-branding.md`                     |
+| `data/*.csv` *(csv route)*                  | `scaffold/sample-data/*.csv`                                |
+
+**Preference rule.** Every skill that consumes one of these inputs MUST prefer the production
+file/folder at the project root and fall back to the matching `scaffold/` example **only** when the
+production input is absent. A skill that falls back to a `scaffold/` example MUST say so — it is
+demoing the workflow, not using real input.
+
+This keeps "real vs. demo" unambiguous and makes the *absence* of a production file the signal of
+what the analyst still owes. `init` creates only `scaffold/` (and `STATE.md`); the production files
+are created by the analyst or written by the step that owns them — notably `tableau-data` writes the
+real samples to `data/` (CONTRACT.md §1 step 3), never to `scaffold/`.
+
+> **Ordering-gate note (§4.1):** for the `data`-produced sample that gates `mock` and `build`, the
+> artifact-existence check is satisfied by **either** `data/*.csv` **or** `scaffold/sample-data/*.csv`,
+> so a demo run is never wrongly blocked. The producer-status check still applies as normal.
+
+### 3.2 Data acquisition routes (`tableau-data`)
+
+There are exactly **two** routes by which `tableau-data` obtains the mimicking CSVs under `data/`.
+There is deliberately **no** direct-database route: connecting to arbitrary databases would expose
+credentials, run uncapped queries that cost money, and force a per-database connector to be built and
+maintained. Both routes below avoid all three.
+
+Whatever the route, the output is identical — `DATA-MODEL.md` plus mimicking CSVs in `data/` whose
+headers and types match the real source exactly, so **Replace Data Source** swaps in live data later.
+**A `data/` CSV stands in for its data source** ("csv = datasource").
+
+**Route 1 — `data_mode: csv` (default, zero-credential).** The analyst drops CSV file(s) in `data/`.
+**Each CSV file is one data source.** (Joining several into a single composed source relies on
+Tableau's *composable data sources*, which is newer — Tableau 2026.2+ — and untested; it is opt-in and
+out of scope until proven. Until then, multiple CSVs stay as multiple data sources.)
+
+**Route 2 — `data_mode: published-ds` (VizQL Data Service).** The analyst lists published data
+source(s) in `datasources.json` (one entry each, keyed by id, with `ds_name` + `project_name`) and
+supplies a Tableau connection in `.env`. `tableau-data` samples them
+through the **VizQL Data Service (VDS)** — Tableau's official, governed query API — in two stages:
+
+1. **`POST /api/v1/vizql-data-service/read-metadata`** — returns the queryable fields (names, types,
+   descriptions) so the CSV schema mirrors the source.
+2. **`POST /api/v1/vizql-data-service/query-datasource`** — pulls a capped sample. The request body is
+   `{"datasource": {"datasourceLuid": …}, "query": {"fields": [{"fieldCaption": …}, …]},
+   "options": {"rowLimit": 1000}}`. **`rowLimit` caps the rows returned to us (default 1000)** — note it
+   bounds the response, not what VDS reads from the underlying source.
+
+Auth is a Tableau REST **Personal Access Token** sign-in (`.env`); the returned credentials token is
+reused for VDS, and the data source must have the **API Access** capability enabled. VDS requires
+**Tableau Cloud, or Tableau Server 2025.1+**.
+
+> **Published only — not embedded.** VDS queries *published* data sources only; it does not expose
+> **embedded** data sources (those bundled inside a workbook), in line with Tableau's VDS-centric
+> headless/GenAI direction. `tableau-data` MUST tell the analyst this and steer an embedded-source user
+> to **export the data to CSV from Tableau** and use Route 1 instead.
+
+> The endpoint/JSON details above are the *ground* for the `tableau-data` skill; the live VDS calls are
+> implemented and tested there, not here. They are recorded so that skill starts from verified facts.
 
 ---
 
@@ -208,6 +276,7 @@ intent and Tableau construct) before using it in any skill — that keeps plan, 
 ## 7. Self-containment
 
 Each skill owns only the resources it uses; there is no shared resource pool. For example
-`tableau-build` owns its snippet library, `xsd/`, validators, and `examples/`; `tableau-data` owns
-`query_<dbtype>.py`; `tableau-init` owns the `skeleton/` templates. A skill can be edited and
-reasoned about independently as long as it continues to honor this contract.
+`tableau-build` owns its snippet library, `xsd/`, validators, and `examples/`; `tableau-data` owns its
+VizQL Data Service client (the published-ds route, §3.2); `tableau-init` owns the `skeleton/`
+templates. A skill can be edited and reasoned about independently as long as it continues to honor
+this contract.

@@ -44,11 +44,17 @@ class RequiredRead:
         producer_step: The step name (e.g. ``"data"``) that produces the artifact.
         artifact: Path to the artifact relative to the project root. May contain
             ``{version}``, substituted with ``current_version`` from STATE.md, and
-            may end in a glob (``sample-data/*.csv``) meaning "at least one match".
+            may end in a glob (``data/*.csv``) meaning "at least one match".
+        alt_artifacts: Acceptable fallback locations for the same artifact; the
+            existence gate is satisfied if the primary **or** any alternative is
+            present. Used for the production-vs-`scaffold/` demo fallback
+            (CONTRACT.md §3.1): e.g. ``data/*.csv`` falls back to
+            ``scaffold/sample-data/*.csv`` so a demo run is never wrongly blocked.
     """
 
     producer_step: str
     artifact: str
+    alt_artifacts: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -81,7 +87,7 @@ STEPS: tuple[Step, ...] = (
     )),
     Step(6, "mock", "tableau-mock", (
         RequiredRead("plan", "DASHBOARD-PLAN.md"),
-        RequiredRead("data", "sample-data/*.csv"),
+        RequiredRead("data", "data/*.csv", ("scaffold/sample-data/*.csv",)),
     )),
     Step(7, "spec", "tableau-spec", (
         RequiredRead("plan", "DASHBOARD-PLAN.md"),
@@ -90,7 +96,7 @@ STEPS: tuple[Step, ...] = (
     Step(8, "build", "tableau-build", (
         RequiredRead("spec", "mock-version/{version}/IMPLEMENTATION-SPEC.md"),
         RequiredRead("data", "DATA-MODEL.md"),
-        RequiredRead("data", "sample-data/*.csv"),
+        RequiredRead("data", "data/*.csv", ("scaffold/sample-data/*.csv",)),
     )),
 )
 
@@ -258,6 +264,25 @@ def _artifact_exists(project_root: Path, artifact: str, version: str) -> bool:
     return (project_root / relative).exists()
 
 
+def _any_artifact_exists(project_root: Path, read: "RequiredRead", version: str) -> bool:
+    """Check whether a required read is satisfied by its primary or any fallback.
+
+    Implements the production-vs-``scaffold/`` demo fallback (CONTRACT.md §3.1):
+    the gate passes if the primary artifact **or** any of ``read.alt_artifacts``
+    is present on disk.
+
+    Args:
+        project_root: The project directory that holds the artifacts.
+        read: The required read (primary ``artifact`` plus optional fallbacks).
+        version: The ``current_version`` value used to fill ``{version}``.
+
+    Returns:
+        True if the primary or any fallback artifact exists.
+    """
+    candidates = (read.artifact, *read.alt_artifacts)
+    return any(_artifact_exists(project_root, candidate, version) for candidate in candidates)
+
+
 def _gate_blocker(step: Step, state: ProjectState, project_root: Path) -> Optional[RouteResult]:
     """Return a "blocked" result if any required read of ``step`` is unmet.
 
@@ -289,7 +314,7 @@ def _gate_blocker(step: Step, state: ProjectState, project_root: Path) -> Option
                 ),
             )
 
-        if not _artifact_exists(project_root, read.artifact, state.current_version):
+        if not _any_artifact_exists(project_root, read, state.current_version):
             return RouteResult(
                 kind="blocked",
                 next_skill=producer.skill,
