@@ -1,0 +1,21 @@
+{
+  "name": "tableau-dashboard-plugin",
+  "displayName": "Tableau Dashboard Plugin",
+  "version": "0.1.0",
+  "description": "Turn a free-text dashboard request into an interactive HTML demo and a Replace-Data-Source-ready Tableau .twbx, via 8 single-job skills that hand off through files on disk. See CONTRACT.md for the inter-skill API.",
+  "author": {
+    "name": "Lavi Drori",
+    "email": "lavi.drori@g-stat.com",
+    "url": "https://github.com/laviDrori0702"
+  },
+  "homepage": "https://github.com/laviDrori0702/tableau-dashboard-plugin",
+  "repository": "https://github.com/laviDrori0702/tableau-dashboard-plugin",
+  "license": "MIT",
+  "keywords": [
+    "tableau",
+    "dashboard",
+    "twbx",
+    "data-visualization",
+    "workflow"
+  ]
+}

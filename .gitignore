@@ -46,3 +46,24 @@ skill/tableau-dashboard-creator/scripts/__pycache__/
 !demo/input/**
 !demo/output/
 !demo/output/**
+
+# --- v2 plugin (dev/v2-plugin) ---
+# Allow plugin manifest
+!.claude-plugin/
+!.claude-plugin/**
+
+# Allow the inter-skill contract
+!CONTRACT.md
+
+# Allow skills/ tree (the 8 v2 skills + tableau-route router)
+!skills/
+!skills/**
+
+# Allow tests/ tree (contract + helper-script tests)
+!tests/
+!tests/**
+
+# Re-ignore Python caches inside the allowed trees above
+**/__pycache__/
+*.pyc
+*.pyo
