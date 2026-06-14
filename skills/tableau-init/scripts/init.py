@@ -164,7 +164,8 @@ class ScaffoldResult:
 
 def _default_skeleton_dir() -> Path:
     """Path: the ``skeleton/`` directory this skill ships with."""
-    return Path(__file__).resolve().parent / "skeleton"
+    # This script lives in ``<skill>/scripts/``; the skeleton sits at the skill root.
+    return Path(__file__).resolve().parent.parent / "skeleton"
 
 
 def scaffold_project(

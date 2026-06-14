@@ -50,7 +50,7 @@ A step may also have *optional reads* that enrich its output but never block it:
 - `build` optionally reads `DESIGN-TOKENS.md` and the target version (always present, see §2).
 
 > **Maintainer rule:** when you add or change a skill's dependencies, update **both** the table above
-> and the `STEPS` definition in `skills/tableau-route/route.py`. They are the prose and the
+> and the `STEPS` definition in `skills/tableau-route/scripts/route.py`. They are the prose and the
 > executable copy of the same graph and must stay identical.
 
 ---
@@ -199,7 +199,7 @@ the **API Access** capability enabled. VDS requires **Tableau Cloud, or Tableau 
 > analyst to **export the data to CSV from Tableau** and use Route 1 instead.
 
 > **Executable spec.** The exact VDS endpoints, request/response JSON, `.env` variable names, and the
-> slug/type mapping are implemented and tested in `skills/tableau-data/vds.py` (+ `tests/test_vds.py`).
+> slug/type mapping are implemented and tested in `skills/tableau-data/scripts/vds.py` (+ `tests/test_vds.py`).
 > That code is the source of truth for the *mechanics*; this section is the source of truth for the
 > *guarantees*. Keep them consistent.
 
@@ -247,7 +247,7 @@ Two kinds of outputs, two storage strategies:
 ## 5. The router (`tableau-route`)
 
 `tableau-route` is a **skill** (not a slash command), explicit-invocation only. It is a thin wrapper
-over `skills/tableau-route/route.py`, which reads `STATE.md` and reports the single next skill the
+over `skills/tableau-route/scripts/route.py`, which reads `STATE.md` and reports the single next skill the
 analyst should run, honoring §4.1.
 
 **It is a router only — it never invokes a skill inline.** Inline execution would share context and
