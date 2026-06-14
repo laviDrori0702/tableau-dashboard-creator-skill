@@ -24,18 +24,22 @@ model prose:
    so the pipeline can never silently disagree with changed data.
 
 There are exactly **two** data-acquisition routes (CONTRACT.md §3.2): Route 1 -
-``data_mode: csv`` (the default, implemented here) and Route 2 - ``published-ds``
-(VizQL Data Service). This module implements Route 1 fully and only *detects* Route 2
-inputs (``datasources.json`` + ``.env``), deferring the VDS query itself to the
-published-ds work. There is deliberately **no** synthesized/random data path: the
+``data_mode: csv`` (the default) and Route 2 - ``published-ds`` (VizQL Data Service).
+This module implements **both**: Route 1 by profiling analyst-provided CSVs
+(``profile``), and Route 2 by sampling published sources through the VizQL Data Service
+(``pull``), with the network half delegated to the sibling :mod:`vds` module
+(CONTRACT.md §7). There is deliberately **no** synthesized/random data path: the
 guaranteed floor is the ``scaffold/sample-data/`` demo CSVs (CONTRACT.md §3.1),
 surfaced as a clearly-labelled demo - never invented rows.
 
-The module is intentionally pure and stdlib-only (it does **not** import the router)
-so the contract test can call its functions directly, exactly like ``init.py`` /
-``intake.py``. The CLI exposes three subcommands the skill runs at three moments -
-``precheck`` (before authoring), ``profile`` (generate the field tables), and
-``commit`` (after approval). What the CLI prints to stdout is the program's *output*;
+The module's stdlib-only core (gate, profiling, validation, STATE.md rewriting) is kept
+importable without third-party packages so the contract test can call those functions
+directly, exactly like ``init.py`` / ``intake.py``. The published-ds ``pull`` path needs
+``requests`` (via :mod:`vds`), so :mod:`vds` is imported **locally inside** :func:`pull`
+rather than at module top - importing ``data`` never requires ``requests``. The CLI
+exposes four subcommands the skill runs at four moments - ``precheck`` (before
+authoring), ``profile`` (csv route field tables), ``pull`` (published-ds route sample),
+and ``commit`` (after approval). What the CLI prints to stdout is the program's *output*;
 diagnostics go through ``logging``.
 
 Keep ``STEP_ORDER`` below in lock-step with the ordered step list in CONTRACT.md §1.
@@ -73,10 +77,19 @@ STEP_ORDER: tuple[str, ...] = (
 DATA_DIR = "data"
 SCAFFOLD_DATA_DIR = "scaffold/sample-data"
 
-#: Route 2 (published-ds): the inputs whose presence we *detect* and defer to the
-#: VizQL Data Service work (CONTRACT.md §3.2). Not queried here.
+#: Route 2 (published-ds): the inputs the VDS pull reads (CONTRACT.md §3.2).
 DATASOURCES_FILENAME = "datasources.json"
 ENV_FILENAME = ".env"
+
+#: STATE.md ``data_mode`` metadata values (CONTRACT.md §2). A successful ``pull`` flips
+#: the recorded mode to ``published-ds``; ``profile`` leaves the default ``csv``.
+DATA_MODE_CSV = "csv"
+DATA_MODE_PUBLISHED_DS = "published-ds"
+
+#: Row-limit policy for the VDS sample (CONTRACT.md §3.2): default 100, silent up to
+#: 1000, and a value above 1000 needs explicit analyst confirmation before the pull.
+DEFAULT_ROW_LIMIT = 100
+MAX_SILENT_ROW_LIMIT = 1000
 
 #: The Tableau-friendly column types ``profile`` infers and ``DATA-MODEL.md`` records.
 #: Ordered narrowest-first; that order is the inference precedence in ``infer_type``.
@@ -90,10 +103,11 @@ TYPES: tuple[str, ...] = (
     TYPE_BOOLEAN, TYPE_INTEGER, TYPE_REAL, TYPE_DATE, TYPE_DATETIME, TYPE_STRING,
 )
 
-#: Acquisition tiers recorded in DATA-MODEL.md (CONTRACT.md §3.2). The published-ds
-#: tier is added by the VDS work; csv mode produces one of the two below.
+#: Acquisition tiers recorded in DATA-MODEL.md (CONTRACT.md §3.2). The csv route
+#: produces one of the first two; the published-ds route (``pull``) records the third.
 TIER_CSV_PROVIDED = "csv (provided in data/)"
 TIER_CSV_DEMO = "csv (demo - scaffold/sample-data/)"
+TIER_PUBLISHED_DS = "published-ds (VDS query)"
 
 #: How many data rows ``profile`` reads to infer types and gather sample values.
 PROFILE_SAMPLE_ROWS = 200
@@ -236,12 +250,16 @@ class FieldProfile:
         role: A suggested Tableau role (``Measure`` for numeric, else ``Dimension``);
             a starting point the model may refine.
         samples: A few distinct example values, for the analyst's eyes.
+        description: A field description. Blank (``""``) for the csv route - the model
+            fills it in. For the published-ds route it is pre-filled from authoritative
+            VDS metadata where available (CONTRACT.md §3.2).
     """
 
     name: str
     type: str
     role: str
     samples: list[str]
+    description: str = ""
 
 
 @dataclass(frozen=True)
@@ -338,6 +356,28 @@ def profile_csv(csv_path: Path | str) -> CsvProfile:
 
 # --- DATA-MODEL.md rendering -------------------------------------------------
 
+def _md_table_cell(text: str) -> str:
+    """Make free-text safe for a single GitHub-flavored-markdown table cell.
+
+    Real data (especially VDS field descriptions and sample values) can contain
+    newlines and ``|`` pipes - both of which corrupt a markdown table: a newline splits
+    the row across physical lines, and a pipe is read as a column separator. Newlines
+    (and carriage returns) are collapsed to spaces and pipes are backslash-escaped so
+    the value stays in one cell on one row.
+
+    This is applied to the Sample-values and Description cells only - never to the
+    Field name (which :func:`parse_data_model` reads back and validates against the CSV
+    header verbatim).
+
+    Args:
+        text: The raw cell text.
+
+    Returns:
+        The text rendered safe for one markdown table cell.
+    """
+    return text.replace("\r", " ").replace("\n", " ").replace("|", "\\|").strip()
+
+
 def render_data_model(profiles: list[CsvProfile], tier: str) -> str:
     """Render the DATA-MODEL.md handoff artifact from profiled CSVs.
 
@@ -382,10 +422,11 @@ def render_data_model(profiles: list[CsvProfile], tier: str) -> str:
             "|-------|------|------|---------------|-------------|",
         ]
         for field_profile in profile.fields:
-            samples = ", ".join(field_profile.samples)
+            samples = _md_table_cell(", ".join(field_profile.samples))
+            description = _md_table_cell(field_profile.description)
             lines.append(
                 f"| {field_profile.name} | {field_profile.type} | "
-                f"{field_profile.role} | {samples} |  |"
+                f"{field_profile.role} | {samples} | {description} |"
             )
 
     return "\n".join(lines) + "\n"
@@ -605,6 +646,33 @@ def apply_status_updates(text: str, updates: dict[str, str]) -> str:
 
         out_lines.append(raw_line)
 
+    result = "\n".join(out_lines)
+    if text.endswith("\n"):
+        result += "\n"
+    return result
+
+
+def set_data_mode(text: str, mode: str) -> str:
+    """Rewrite the ``- data_mode: ...`` metadata line in a STATE.md manifest.
+
+    Only the metadata line is touched; any trailing inline comment (e.g.
+    ``# csv | published-ds``) and every other line are preserved. If no ``data_mode``
+    line exists the text is returned unchanged (older manifests stay valid).
+
+    Args:
+        text: The full ``STATE.md`` contents.
+        mode: The new mode to record (e.g. :data:`DATA_MODE_PUBLISHED_DS`).
+
+    Returns:
+        The updated ``STATE.md`` contents (trailing newline preserved).
+    """
+    out_lines: list[str] = []
+    for raw_line in text.splitlines():
+        match = re.match(r"^(\s*-\s*data_mode\s*:\s*)(\S+)(.*)$", raw_line)
+        if match:
+            out_lines.append(f"{match.group(1)}{mode}{match.group(3)}")
+        else:
+            out_lines.append(raw_line)
     result = "\n".join(out_lines)
     if text.endswith("\n"):
         result += "\n"
@@ -982,6 +1050,248 @@ def _format_mismatch_message(mismatches: dict[str, HeaderCheck]) -> str:
     return "\n".join(parts)
 
 
+# --- pull (Route 2: published-ds via VizQL Data Service, CONTRACT.md §3.2) ----
+
+@dataclass
+class PullResult:
+    """Outcome of sampling published sources via VDS into data/ + DATA-MODEL.md.
+
+    Attributes:
+        ok: True when the CSVs and DATA-MODEL.md were written; False when refused or
+            the pull failed (in which case nothing was written - STATE.md untouched).
+        message: Human-readable explanation (the refusal/failure reason when not ``ok``).
+        tier: The acquisition tier recorded, when written (:data:`TIER_PUBLISHED_DS`).
+        written: Base names of the ``data/<slug>.csv`` files written.
+        row_counts: ``{csv_filename: rows_pulled}`` for each written source.
+        row_limit: The row cap applied to the sample.
+    """
+
+    ok: bool
+    message: str
+    tier: Optional[str] = None
+    written: list[str] = field(default_factory=list)
+    row_counts: dict[str, int] = field(default_factory=dict)
+    row_limit: int = 0
+
+
+def _csv_cell(value) -> str:
+    """Serialize a VDS cell value for the pulled CSV.
+
+    Booleans are lower-cased (``true``/``false``) so the written CSV round-trips through
+    type inference consistently; ``None`` becomes empty; everything else is ``str()``.
+
+    Args:
+        value: A JSON value from a VDS query row.
+
+    Returns:
+        The cell's string form for the CSV.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _profile_pulled_source(slug: str, fields, rows: list[dict]) -> CsvProfile:
+    """Build a :class:`CsvProfile` from VDS metadata + sampled rows.
+
+    Types and descriptions come from the authoritative VDS metadata (CONTRACT.md §3.2);
+    only the sample values are derived from the pulled rows. The result renders through
+    the same :func:`render_data_model` the csv route uses.
+
+    Args:
+        slug: The data-source slug (the CSV base name without extension).
+        fields: The ``vds.FieldMeta`` list for this source (metadata order).
+        rows: The sampled rows (dicts keyed by field caption).
+
+    Returns:
+        A :class:`CsvProfile` for the source.
+    """
+    field_profiles: list[FieldProfile] = []
+    for meta in fields:
+        column = [_csv_cell(row.get(meta.caption)) for row in rows]
+        field_profiles.append(FieldProfile(
+            name=meta.caption,
+            type=meta.model_type,
+            role=_suggest_role(meta.model_type),
+            samples=_distinct_samples(column, SAMPLE_VALUES_SHOWN),
+            description=meta.description,
+        ))
+    return CsvProfile(filename=f"{slug}.csv", row_count=len(rows), fields=field_profiles)
+
+
+def _write_pulled_csv(csv_path: Path, captions: list[str], rows: list[dict]) -> None:
+    """Write a pulled sample to ``data/<slug>.csv`` (headers = field captions).
+
+    Args:
+        csv_path: Destination path (its parent ``data/`` is created if needed).
+        captions: The field captions, in metadata order (the CSV header).
+        rows: The sampled rows (dicts keyed by caption).
+    """
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    with csv_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(captions)
+        for row in rows:
+            writer.writerow([_csv_cell(row.get(caption)) for caption in captions])
+
+
+def pull(project_dir: Path | str, row_limit: int = DEFAULT_ROW_LIMIT,
+         confirm_large: bool = False, force: bool = False, session=None) -> PullResult:
+    """Sample published data sources via the VizQL Data Service (CONTRACT.md §3.2).
+
+    Route 2 of the two acquisition routes. Reads ``datasources.json`` + the nearest
+    ``.env``, signs in with a Personal Access Token, and for each listed source pulls a
+    capped sample through VDS (``read-metadata`` then ``query-datasource``). On full
+    success it writes one ``data/<slug>.csv`` per source and a ``DATA-MODEL.md`` whose
+    types/descriptions come from the authoritative VDS metadata, and records
+    ``data_mode: published-ds`` in STATE.md.
+
+    The pull is **atomic**: every network call runs before any file is written, so a
+    failure on any source leaves ``data/``, ``DATA-MODEL.md``, and STATE.md untouched -
+    there is no partial or synthesized fallback (CONTRACT.md §3.2).
+
+    Args:
+        project_dir: The analyst's project directory.
+        row_limit: Rows to cap the sample at (default 100, silent up to 1000).
+        confirm_large: Required to be True when ``row_limit`` exceeds 1000.
+        force: Re-pull over a prior pull's output - overwrites an existing DATA-MODEL.md
+            and re-samples the CSVs. It will **not** overwrite an analyst's own dropped
+            CSVs (only data/ that a prior published-ds pull wrote, identified by tier).
+        session: An HTTP session to use (injected by tests); a real one is created
+            when ``None``.
+
+    Returns:
+        A :class:`PullResult`. ``ok`` is False (nothing written) when the gate is
+        closed, production CSVs already exist (that is Route 1), DATA-MODEL.md exists
+        without ``force``, the row limit is too large unconfirmed, or any VDS call fails.
+    """
+    project_root = Path(project_dir)
+    data_model_path = project_root / DATA_MODEL_FILENAME
+
+    blocker = entry_gate_blocker(project_root)
+    if blocker is not None:
+        return PullResult(False, blocker)
+
+    # Real CSVs in data/ always win (CONTRACT.md §3.1/§3.2) - that is the csv route.
+    # The one exception: --force re-pulls over data/ that a *prior published-ds pull*
+    # wrote (identified by the recorded tier), so re-pulling never clobbers an analyst's
+    # own dropped CSVs.
+    source, _csv_paths = resolve_csv_source(project_root)
+    if source == "data":
+        prior_tier = (
+            parse_acquisition_tier(data_model_path.read_text(encoding="utf-8-sig"))
+            if data_model_path.exists() else None
+        )
+        from_prior_pull = force and prior_tier == TIER_PUBLISHED_DS
+        if not from_prior_pull:
+            hint = (
+                "Run 'profile' instead"
+                if prior_tier != TIER_PUBLISHED_DS
+                else "re-run with '--force' to re-pull over them"
+            )
+            return PullResult(
+                False,
+                f"Production CSV(s) already exist in 'data/' - that is the csv route "
+                f"(Route 1). {hint}. The published-ds pull only fills an empty data/ "
+                f"(or re-pulls its own prior output with --force).",
+            )
+
+    if not (project_root / DATASOURCES_FILENAME).exists():
+        return PullResult(
+            False,
+            f"No '{DATASOURCES_FILENAME}' found. The published-ds route needs it (one "
+            f"entry per published source); copy scaffold/EXAMPLE-datasources.json to the "
+            f"project root, or drop CSV(s) in data/ for the csv route.",
+        )
+
+    if data_model_path.exists() and not force:
+        return PullResult(
+            False,
+            f"'{DATA_MODEL_FILENAME}' already exists. Edit it in place to refine, or "
+            f"re-run 'pull --force' to re-sample from VDS (this overwrites the pulled "
+            f"CSVs and discards prior field descriptions).",
+        )
+
+    if row_limit > MAX_SILENT_ROW_LIMIT and not confirm_large:
+        return PullResult(
+            False,
+            f"row_limit {row_limit} exceeds {MAX_SILENT_ROW_LIMIT}. Confirm the larger "
+            f"sample with the analyst, then re-run 'pull --row-limit {row_limit} "
+            f"--confirm-large' (CONTRACT.md §3.2).",
+            row_limit=row_limit,
+        )
+
+    # The network half lives in vds (requests-backed); import it lazily so importing
+    # 'data' never requires requests (the stdlib-only contract test imports 'data').
+    import vds
+
+    if session is None:
+        session = vds.make_session()
+
+    try:
+        refs = vds.parse_datasources_json(project_root / DATASOURCES_FILENAME)
+        conn = vds.load_connection(project_root)
+        token, site_id = vds.sign_in(conn, session)
+
+        # Pull everything into memory first; only write once all sources succeed.
+        pulled: list[tuple[str, list, list[dict]]] = []
+        slug_owner: dict[str, str] = {}
+        for ref in refs:
+            slug = vds.slugify(ref.ds_name)
+            if slug in slug_owner:
+                raise vds.VdsError(
+                    f"Data sources '{slug_owner[slug]}' and '{ref.ds_name}' both map to "
+                    f"'{slug}.csv'. Rename one source so each gets a distinct CSV."
+                )
+            slug_owner[slug] = ref.ds_name
+            luid = vds.resolve_luid(
+                conn, token, site_id, ref.ds_name, ref.project_name, session
+            )
+            fields = vds.read_metadata(conn, token, luid, session)
+            rows = vds.query_rows(
+                conn, token, luid, [meta.caption for meta in fields], row_limit, session
+            )
+            pulled.append((slug, fields, rows))
+    except vds.VdsError as error:
+        logger.error(f"Published-ds pull failed: {error}")
+        return PullResult(False, str(error), row_limit=row_limit)
+
+    # All sources succeeded - write the CSVs and DATA-MODEL.md, then flip data_mode.
+    profiles: list[CsvProfile] = []
+    row_counts: dict[str, int] = {}
+    for slug, fields, rows in pulled:
+        csv_path = project_root / DATA_DIR / f"{slug}.csv"
+        _write_pulled_csv(csv_path, [meta.caption for meta in fields], rows)
+        profiles.append(_profile_pulled_source(slug, fields, rows))
+        row_counts[f"{slug}.csv"] = len(rows)
+
+    data_model_path.write_text(
+        render_data_model(profiles, TIER_PUBLISHED_DS), encoding="utf-8"
+    )
+
+    state_path = project_root / STATE_FILENAME
+    state_path.write_text(
+        set_data_mode(state_path.read_text(encoding="utf-8-sig"), DATA_MODE_PUBLISHED_DS),
+        encoding="utf-8",
+    )
+
+    written = [profile.filename for profile in profiles]
+    logger.info(
+        f"Pulled {len(written)} published source(s) via VDS (rowLimit={row_limit}); "
+        f"wrote {DATA_MODEL_FILENAME} and set data_mode=published-ds."
+    )
+    return PullResult(
+        ok=True,
+        message=f"pulled {len(written)} published source(s) via VDS",
+        tier=TIER_PUBLISHED_DS,
+        written=written,
+        row_counts=row_counts,
+        row_limit=row_limit,
+    )
+
+
 # --- CLI ---------------------------------------------------------------------
 
 def format_precheck(result: PrecheckResult) -> str:
@@ -1025,8 +1335,14 @@ def format_precheck(result: PrecheckResult) -> str:
         lines.append("  -> Route 1 (CSV). Run 'profile' to write DATA-MODEL.md, then enrich + commit.")
     elif result.has_datasources_json and result.has_env:
         lines.append(
-            "  -> Route 2 (published-ds) detected. VDS extraction lands in the "
-            "published-ds work; not run here. Provide CSVs in data/ to use Route 1 now."
+            "  -> Route 2 (published-ds) detected. Run 'pull' to sample each source via "
+            "the VizQL Data Service into data/ + DATA-MODEL.md, then enrich + commit. "
+            "(Drop CSVs in data/ instead to use Route 1.)"
+        )
+    elif result.has_datasources_json:
+        lines.append(
+            "  -> Route 2 (published-ds) inputs incomplete: datasources.json present but "
+            "no .env creds. Copy scaffold/.env.example to .env and fill it, then 'pull'."
         )
     else:
         action = "  -> No data available. Either drop CSV(s) in data/, or add datasources.json + .env "
@@ -1067,6 +1383,33 @@ def format_profile(result: ProfileResult) -> str:
     return "\n".join(lines)
 
 
+def format_pull(result: PullResult) -> str:
+    """Render a :class:`PullResult` as a human-readable block.
+
+    Args:
+        result: The pull result to render.
+
+    Returns:
+        A multi-line, plain-ASCII string suitable for printing to the analyst.
+    """
+    if not result.ok:
+        return f"[REFUSED] {result.message}"
+
+    lines = [f"[DATA] {result.message}."]
+    lines.append(f"  tier          : {result.tier}")
+    lines.append(f"  row limit     : {result.row_limit}")
+    sources = ", ".join(
+        f"{name} ({result.row_counts.get(name, 0)} rows)" for name in result.written
+    )
+    lines.append(f"  data sources  : {sources}")
+    lines.append("  data_mode set to 'published-ds' in STATE.md.")
+    lines.append(
+        "  next: enrich/refine each field's Description in DATA-MODEL.md (types and any "
+        "VDS descriptions are pre-filled), present it for approval, then run 'commit'."
+    )
+    return "\n".join(lines)
+
+
 def format_commit(result: CommitResult) -> str:
     """Render a :class:`CommitResult` as a human-readable block.
 
@@ -1092,7 +1435,7 @@ def format_commit(result: CommitResult) -> str:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    """CLI entry point: run ``precheck``, ``profile``, or ``commit``.
+    """CLI entry point: run ``precheck``, ``profile``, ``pull``, or ``commit``.
 
     Args:
         argv: Argument list (defaults to ``sys.argv[1:]``).
@@ -1104,7 +1447,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     import sys
 
     parser = argparse.ArgumentParser(
-        description="Gate, profile, validate, and commit the tableau-data step.",
+        description="Gate, profile, pull, validate, and commit the tableau-data step.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -1116,7 +1459,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
 
     profile_parser = subparsers.add_parser(
-        "profile", help="Profile the resolved CSVs into DATA-MODEL.md."
+        "profile", help="Profile the resolved CSVs into DATA-MODEL.md (csv route)."
     )
     profile_parser.add_argument(
         "project_dir", nargs="?", default=".", help="Project directory (default: cwd)."
@@ -1124,6 +1467,27 @@ def main(argv: Optional[list[str]] = None) -> int:
     profile_parser.add_argument(
         "--force", action="store_true",
         help="Overwrite an existing DATA-MODEL.md (discards prior descriptions).",
+    )
+
+    pull_parser = subparsers.add_parser(
+        "pull",
+        help="Sample published sources via the VizQL Data Service (published-ds route).",
+    )
+    pull_parser.add_argument(
+        "project_dir", nargs="?", default=".", help="Project directory (default: cwd)."
+    )
+    pull_parser.add_argument(
+        "--row-limit", type=int, default=DEFAULT_ROW_LIMIT,
+        help=f"Max rows to sample per source (default {DEFAULT_ROW_LIMIT}; silent up to "
+             f"{MAX_SILENT_ROW_LIMIT}).",
+    )
+    pull_parser.add_argument(
+        "--confirm-large", action="store_true",
+        help=f"Required when --row-limit exceeds {MAX_SILENT_ROW_LIMIT} (analyst-confirmed).",
+    )
+    pull_parser.add_argument(
+        "--force", action="store_true",
+        help="Overwrite an existing DATA-MODEL.md and re-sample the CSVs from VDS.",
     )
 
     commit_parser = subparsers.add_parser(
@@ -1144,6 +1508,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         profile_result = profile(args.project_dir, force=args.force)
         print(format_profile(profile_result))
         return 0 if profile_result.ok else 2
+
+    if args.command == "pull":
+        pull_result = pull(
+            args.project_dir,
+            row_limit=args.row_limit,
+            confirm_large=args.confirm_large,
+            force=args.force,
+        )
+        print(format_pull(pull_result))
+        return 0 if pull_result.ok else 2
 
     commit_result = commit(args.project_dir)
     print(format_commit(commit_result))

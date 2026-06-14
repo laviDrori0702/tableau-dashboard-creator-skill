@@ -25,6 +25,7 @@ import pytest
 import data   # the skill under test (on sys.path via conftest.py)
 import init   # builds a realistic STATE.md the same way a real project would
 import route  # the router parses/routes the STATE.md data writes
+from tests.test_vds import FakeSession, _datasources_payload  # shared fake VDS transport
 
 TARGET_VERSION = "2024.2-2025.x"
 
@@ -164,6 +165,35 @@ def test_render_then_parse_recovers_fields(tmp_path):
     assert by_name["order_date"] == data.TYPE_DATE
     assert by_name["is_paid"] == data.TYPE_BOOLEAN
     assert data.parse_acquisition_tier(text) == data.TIER_CSV_PROVIDED
+
+
+def test_render_sanitizes_newlines_and_pipes_in_cells():
+    """Newlines/pipes in samples or descriptions stay in one table row/cell.
+
+    Real VDS data can carry both (e.g. a multi-line field description, or pipe-laden
+    category values). They must not corrupt the markdown table, and the field name +
+    type must still round-trip through parse_data_model.
+    """
+    messy = data.CsvProfile(filename="messy.csv", row_count=1, fields=[
+        data.FieldProfile(
+            name="Category", type="string", role="Dimension",
+            samples=["Electronics|Audio|Headphones", "Home|Kitchen"],
+            description="The product's rating (e.g. 4.2).\nNote: aggregate, not per-row.",
+        ),
+    ])
+
+    text = data.render_data_model([messy], data.TIER_PUBLISHED_DS)
+
+    # Exactly one physical line carries the Category row (no split on the newline).
+    category_rows = [ln for ln in text.splitlines() if ln.startswith("| Category |")]
+    assert len(category_rows) == 1
+    row = category_rows[0]
+    assert "\n" not in row and "Note: aggregate" in row   # description folded onto one line
+    assert "Electronics\\|Audio" in row                    # data pipes escaped, not bare
+
+    # Field name + type still recover cleanly for header validation.
+    recovered = data.parse_data_model(text)["messy.csv"]
+    assert recovered == [("Category", "string")]
 
 
 # --- Header <-> model validator (AC: match + mismatch) -----------------------
@@ -339,3 +369,220 @@ def test_first_run_marks_nothing_stale(tmp_path):
     result = data.commit(tmp_path)
 
     assert result.ok is True and result.staled_steps == []
+
+
+# --- pull: published-ds route via VDS (CONTRACT.md §3.2) ---------------------
+
+def _write_env(project_dir: Path) -> None:
+    """Write a full, valid Tableau connection .env at the project root."""
+    (project_dir / ".env").write_text(
+        "TABLEAU_SERVER=https://pod.online.tableau.com\n"
+        "TABLEAU_SITE=mysite\n"
+        "TABLEAU_PAT_NAME=tok\n"
+        "TABLEAU_PAT_SECRET=secret\n",
+        encoding="utf-8",
+    )
+
+
+def _write_datasources(project_dir: Path, *entries: tuple[str, str]) -> None:
+    """Write datasources.json from (ds_name, project_name) pairs (keyed ds_1, ds_2…)."""
+    import json
+    body = {"_comment": "test"}
+    for index, (ds_name, project_name) in enumerate(entries, start=1):
+        body[f"ds_{index}"] = {"ds_name": ds_name, "project_name": project_name}
+    (project_dir / "datasources.json").write_text(json.dumps(body), encoding="utf-8")
+
+
+def _vds_session(*, luid="luid-1", ds_name="Superstore", project="Samples",
+                 metadata=None, rows=None) -> FakeSession:
+    """A FakeSession primed for one source's full sign-in -> metadata -> query flow."""
+    metadata = metadata if metadata is not None else {"data": [
+        {"fieldCaption": "Order ID", "dataType": "STRING", "description": "Unique order id"},
+        {"fieldCaption": "Revenue", "dataType": "REAL"},
+        {"fieldCaption": "Paid", "dataType": "BOOLEAN"},
+    ]}
+    rows = rows if rows is not None else {"data": [
+        {"Order ID": "ORD-1", "Revenue": 10.5, "Paid": True},
+        {"Order ID": "ORD-2", "Revenue": 20.0, "Paid": False},
+    ]}
+    return FakeSession(
+        signin={"credentials": {"token": "auth-tok", "site": {"id": "site-1"}}},
+        datasources=_datasources_payload((luid, ds_name, project)),
+        metadata=metadata,
+        query=rows,
+    )
+
+
+def test_pull_writes_csv_and_data_model_with_published_tier(tmp_path):
+    """A successful pull writes data/<slug>.csv + DATA-MODEL.md and flips data_mode."""
+    _write_state(tmp_path)
+    _write_datasources(tmp_path, ("Superstore", "Samples"))
+    _write_env(tmp_path)
+
+    result = data.pull(tmp_path, session=_vds_session())
+
+    assert result.ok is True
+    assert result.tier == data.TIER_PUBLISHED_DS
+    assert result.written == ["superstore.csv"]
+    assert result.row_counts == {"superstore.csv": 2}
+
+    # The CSV header mirrors the field captions; booleans are lower-cased.
+    csv_text = (tmp_path / "data" / "superstore.csv").read_text(encoding="utf-8")
+    assert csv_text.splitlines()[0] == "Order ID,Revenue,Paid"
+    assert "ORD-1,10.5,true" in csv_text
+
+    # DATA-MODEL.md carries the published-ds tier, the metadata types, and the
+    # metadata-provided description (pre-filled, not blank).
+    model_text = (tmp_path / "DATA-MODEL.md").read_text(encoding="utf-8")
+    assert data.parse_acquisition_tier(model_text) == data.TIER_PUBLISHED_DS
+    documented = data.parse_data_model(model_text)["superstore.csv"]
+    assert dict(documented) == {"Order ID": "string", "Revenue": "real", "Paid": "boolean"}
+    assert "Unique order id" in model_text
+
+    # data_mode flipped in STATE.md.
+    assert "data_mode: published-ds" in (tmp_path / "STATE.md").read_text(encoding="utf-8")
+
+
+def test_pull_then_commit_validates_cleanly(tmp_path):
+    """The pulled CSV headers match the documented fields, so commit approves."""
+    _write_state(tmp_path)
+    _write_datasources(tmp_path, ("Superstore", "Samples"))
+    _write_env(tmp_path)
+    data.pull(tmp_path, session=_vds_session())
+
+    result = data.commit(tmp_path)
+
+    assert result.ok is True and result.validated == ["superstore.csv"]
+    assert route.parse_state(tmp_path / "STATE.md").statuses["data"] == "approved"
+
+
+def test_pull_refuses_when_production_csv_exists(tmp_path):
+    """Real CSVs in data/ win (Route 1); pull refuses rather than overwrite them."""
+    _write_state(tmp_path)
+    _write_datasources(tmp_path, ("Superstore", "Samples"))
+    _write_env(tmp_path)
+    _write_csv(tmp_path, "data/sales.csv")
+
+    result = data.pull(tmp_path, session=_vds_session())
+
+    assert result.ok is False and "Route 1" in result.message
+
+
+def test_pull_force_does_not_clobber_analyst_csvs(tmp_path):
+    """--force must NOT overwrite the analyst's own dropped CSVs (csv-tier model)."""
+    _write_state(tmp_path)
+    _write_datasources(tmp_path, ("Superstore", "Samples"))
+    _write_env(tmp_path)
+    _write_csv(tmp_path, "data/sales.csv")
+    data.profile(tmp_path)   # writes a csv-tier DATA-MODEL.md for the dropped CSV
+
+    result = data.pull(tmp_path, force=True, session=_vds_session())
+
+    assert result.ok is False and "Route 1" in result.message
+    assert (tmp_path / "data" / "sales.csv").exists()   # untouched
+
+
+def test_pull_force_repulls_prior_published_output(tmp_path):
+    """--force re-pulls over data/ that a prior published-ds pull wrote (its own output)."""
+    _write_state(tmp_path)
+    _write_datasources(tmp_path, ("Superstore", "Samples"))
+    _write_env(tmp_path)
+    first = data.pull(tmp_path, session=_vds_session())
+    assert first.ok is True   # data/superstore.csv + published-ds-tier DATA-MODEL.md
+
+    # A plain re-pull is refused (DATA-MODEL.md exists); --force re-pulls cleanly.
+    assert data.pull(tmp_path, session=_vds_session()).ok is False
+    forced = data.pull(tmp_path, force=True, session=_vds_session())
+
+    assert forced.ok is True and forced.written == ["superstore.csv"]
+
+
+def test_pull_refuses_when_data_model_exists_without_force(tmp_path):
+    """An existing DATA-MODEL.md is preserved unless --force (like profile)."""
+    _write_state(tmp_path)
+    _write_datasources(tmp_path, ("Superstore", "Samples"))
+    _write_env(tmp_path)
+    (tmp_path / "DATA-MODEL.md").write_text("# pre-existing\n", encoding="utf-8")
+
+    result = data.pull(tmp_path, session=_vds_session())
+
+    assert result.ok is False and "already exists" in result.message
+
+
+def test_pull_refuses_when_no_datasources_json(tmp_path):
+    """The published-ds route needs datasources.json; absent => actionable refusal."""
+    _write_state(tmp_path)
+    _write_env(tmp_path)
+
+    result = data.pull(tmp_path, session=_vds_session())
+
+    assert result.ok is False and "datasources.json" in result.message
+
+
+def test_pull_refuses_large_row_limit_until_confirmed(tmp_path):
+    """row_limit > 1000 is refused unless confirm_large is set (CONTRACT.md §3.2)."""
+    _write_state(tmp_path)
+    _write_datasources(tmp_path, ("Superstore", "Samples"))
+    _write_env(tmp_path)
+
+    refused = data.pull(tmp_path, row_limit=2000, session=_vds_session())
+    assert refused.ok is False and "confirm" in refused.message.lower()
+    assert not (tmp_path / "DATA-MODEL.md").exists()   # nothing written
+
+    confirmed = data.pull(
+        tmp_path, row_limit=2000, confirm_large=True, session=_vds_session()
+    )
+    assert confirmed.ok is True and confirmed.row_limit == 2000
+
+
+def test_pull_is_atomic_on_vds_failure(tmp_path):
+    """A VDS failure writes no artifact and leaves STATE.md untouched (§3.2)."""
+    _write_state(tmp_path)
+    _write_datasources(tmp_path, ("Superstore", "Samples"))
+    _write_env(tmp_path)
+    # Zero-row query is a hard failure (no synthesized fallback).
+    failing = _vds_session(rows={"data": []})
+
+    result = data.pull(tmp_path, session=failing)
+
+    assert result.ok is False and "zero rows" in result.message
+    assert not (tmp_path / "DATA-MODEL.md").exists()
+    assert not (tmp_path / "data").exists()
+    state_text = (tmp_path / "STATE.md").read_text(encoding="utf-8")
+    assert "data_mode: csv" in state_text   # not flipped
+    assert route.parse_state(tmp_path / "STATE.md").statuses["data"] == "pending"
+
+
+def test_pull_refuses_when_init_not_approved(tmp_path):
+    """The entry gate guards pull too (§4.1)."""
+    _write_state(tmp_path, init="pending")
+    _write_datasources(tmp_path, ("Superstore", "Samples"))
+    _write_env(tmp_path)
+
+    result = data.pull(tmp_path, session=_vds_session())
+
+    assert result.ok is False and "init" in result.message
+
+
+def test_pull_multiple_sources_one_csv_each(tmp_path):
+    """Each listed source becomes its own data/<slug>.csv ('csv = datasource')."""
+    _write_state(tmp_path)
+    _write_datasources(tmp_path, ("Superstore", "Samples"), ("Regional Sales", "Samples"))
+    _write_env(tmp_path)
+    # The fake's datasources payload must resolve BOTH names in project 'Samples'.
+    session = FakeSession(
+        signin={"credentials": {"token": "auth-tok", "site": {"id": "site-1"}}},
+        datasources=_datasources_payload(
+            ("luid-1", "Superstore", "Samples"),
+            ("luid-2", "Regional Sales", "Samples"),
+        ),
+        metadata={"data": [{"fieldCaption": "Order ID", "dataType": "STRING"}]},
+        query={"data": [{"Order ID": "ORD-1"}]},
+    )
+
+    result = data.pull(tmp_path, session=session)
+
+    assert result.ok is True
+    assert sorted(result.written) == ["regional_sales.csv", "superstore.csv"]
+    assert (tmp_path / "data" / "regional_sales.csv").exists()
+    assert (tmp_path / "data" / "superstore.csv").exists()
