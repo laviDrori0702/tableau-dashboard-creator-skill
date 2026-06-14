@@ -165,47 +165,43 @@ out of scope until proven. Until then, multiple CSVs stay as multiple data sourc
 **Route 2 — `data_mode: published-ds` (VizQL Data Service).** The analyst lists published data
 source(s) in `datasources.json` (one entry each, keyed by id, with `ds_name` + `project_name`) and
 supplies a Tableau connection in `.env`. This route is a **pure pull** that *fills* an empty `data/`:
-it fires only when `data/` holds no production CSVs (per §3.1, real CSVs in `data/` always win — the
-analyst already has the data). `tableau-data` samples each listed source through the **VizQL Data
-Service (VDS)** — Tableau's official, governed query API — in exactly **two stages, and nothing else**
-(no synthesized rows, no `.tdsx`/`.hyper` extract download, no embedded-source reading, no GraphQL):
+it fires only when `data/` holds no production CSVs (per §3.1, real CSVs always win — the analyst
+already has the data). `tableau-data` samples each source through the **VizQL Data Service (VDS)** —
+Tableau's official, governed query API — and **nothing else** (no synthesized rows, no `.tdsx`/`.hyper`
+extract download, no embedded-source reading, no GraphQL). Two operations, in order:
 
-1. **`POST /api/v1/vizql-data-service/read-metadata`** — returns the **queryable** fields (names,
-   types, descriptions). These are **authoritative**: the pulled CSV schema and `DATA-MODEL.md` take
-   their field types and descriptions straight from here rather than inferring them. Where a field has
-   no description in the metadata, the model fills it in (as it does for the csv route).
-2. **`POST /api/v1/vizql-data-service/query-datasource`** — pulls a capped sample of **all queryable
-   fields** (hidden / non-queryable fields are skipped). The request body is
-   `{"datasource": {"datasourceLuid": …}, "query": {"fields": [{"fieldCaption": …}, …]},
-   "options": {"rowLimit": 100}}`. **`rowLimit` caps the rows returned to us — default `100`, silent up
-   to `1000`; a value above `1000` requires explicit analyst confirmation** before the pull. The cap
-   bounds the response, not what VDS reads from the underlying source.
+1. **read-metadata** — the **queryable** fields (names, types, descriptions). These are
+   **authoritative**: the pulled CSV schema and `DATA-MODEL.md` take their types and descriptions from
+   here rather than inferring them; where a field has no description, the model fills it in (as for the
+   csv route).
+2. **query-datasource** — a capped sample of **all queryable** fields (hidden / non-queryable fields
+   are skipped). **`rowLimit` caps the rows returned to us — default `100`, silent up to `1000`; above
+   `1000` requires explicit analyst confirmation** before the pull. The cap bounds the response, not
+   what VDS reads from the underlying source.
 
-**Each listed data source becomes one `data/<slug>.csv`** ("csv = datasource"), where `<slug>` is the
+**Each listed source becomes one `data/<slug>.csv`** ("csv = datasource"), where `<slug>` is the
 lowercased `ds_name` with non-alphanumeric runs collapsed to `_` (e.g. `Regional Sales` →
-`regional_sales.csv`). The pulled CSV headers mirror the datasource field names, so **Replace Data
-Source** swaps in live data cleanly later. The acquisition tier recorded in `DATA-MODEL.md` is
-**`published-ds (VDS query)`**.
+`regional_sales.csv`). The acquisition tier recorded in `DATA-MODEL.md` is **`published-ds (VDS query)`**.
 
-If the pull cannot deliver rows — sign-in/connection failure, the source's **API Access** capability is
-off, the named source does not resolve as a *published* source, or the query returns zero rows —
-`tableau-data` **fails with an actionable error and writes no artifact** (`STATE.md` is left
-untouched). There is **no** silent fallback to demo or synthesized data: the analyst fixes the
-credentials/permission and re-runs, or drops CSV(s) in `data/` to use Route 1.
+The pull is **all-or-nothing**: if it cannot deliver rows for every source — sign-in/connection
+failure, the source's **API Access** capability off, the named source not resolving as a *published*
+source, or zero rows — `tableau-data` **fails with an actionable error and writes no artifact**
+(`STATE.md` untouched). There is **no** silent fallback to demo or synthesized data: the analyst fixes
+the credentials/permission and re-runs, or drops CSV(s) in `data/` to use Route 1.
 
 Auth is a Tableau REST **Personal Access Token** sign-in (`.env`, discovered by walking up from the
-project directory — nearest wins); the returned credentials token is reused for VDS, and the data
-source must have the **API Access** capability enabled. VDS requires **Tableau Cloud, or Tableau
-Server 2025.1+**.
+project directory — nearest wins); the credentials token is reused for VDS, and the source must have
+the **API Access** capability enabled. VDS requires **Tableau Cloud, or Tableau Server 2025.1+**.
 
-> **Published only — not embedded.** VDS queries *published* data sources only; it does not expose
-> **embedded** data sources (those bundled inside a workbook), in line with Tableau's VDS-centric
-> headless/GenAI direction. Because VDS cannot *see* an embedded source, a named source that is in fact
-> embedded simply fails to resolve — so `tableau-data`'s not-found error MUST name this possibility and
-> steer the analyst to **export the data to CSV from Tableau** and use Route 1 instead.
+> **Published only — not embedded.** VDS queries *published* data sources only; it cannot see
+> **embedded** sources (bundled inside a workbook). A named source that is in fact embedded simply
+> fails to resolve — so `tableau-data`'s not-found error MUST name this possibility and steer the
+> analyst to **export the data to CSV from Tableau** and use Route 1 instead.
 
-> The endpoint/JSON details above are the *ground* for the `tableau-data` skill; the live VDS calls are
-> implemented and tested there, not here. They are recorded so that skill starts from verified facts.
+> **Executable spec.** The exact VDS endpoints, request/response JSON, `.env` variable names, and the
+> slug/type mapping are implemented and tested in `skills/tableau-data/vds.py` (+ `tests/test_vds.py`).
+> That code is the source of truth for the *mechanics*; this section is the source of truth for the
+> *guarantees*. Keep them consistent.
 
 ---
 
