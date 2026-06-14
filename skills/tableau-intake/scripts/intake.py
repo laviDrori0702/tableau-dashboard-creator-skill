@@ -192,7 +192,8 @@ def render_prd_template() -> str:
     Raises:
         FileNotFoundError: If the bundled template is missing.
     """
-    template_path = Path(__file__).resolve().parent / "references" / "PRD-TEMPLATE.md"
+    # This script lives in ``<skill>/scripts/``; references/ sits at the skill root.
+    template_path = Path(__file__).resolve().parent.parent / "references" / "PRD-TEMPLATE.md"
     if not template_path.is_file():
         raise FileNotFoundError(f"PRD template not found: {template_path}")
     return template_path.read_text(encoding="utf-8-sig")

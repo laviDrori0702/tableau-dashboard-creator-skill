@@ -58,7 +58,7 @@ rule.
 3. **Run the scaffolder**, passing the chosen version:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/init.py" --target-version "<version>" "<project-dir>"
+   python "${CLAUDE_SKILL_DIR}/scripts/init.py" --target-version "<version>" "<project-dir>"
    ```
 
    (Use `python3` if `python` is unavailable.) The script copies this skill's

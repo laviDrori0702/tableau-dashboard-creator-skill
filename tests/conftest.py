@@ -1,6 +1,6 @@
 """Shared pytest setup for the plugin's contract tests.
 
-Each skill's helper script lives under ``skills/<skill>/``. Because those
+Each skill's helper script lives under ``skills/<skill>/scripts/``. Because those
 directory names contain a hyphen they are not importable packages, so we add
 each one to ``sys.path`` here, letting tests do a plain ``import route`` /
 ``import init``.
@@ -11,10 +11,10 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SKILL_SCRIPT_DIRS = (
-    _REPO_ROOT / "skills" / "tableau-route",
-    _REPO_ROOT / "skills" / "tableau-init",
-    _REPO_ROOT / "skills" / "tableau-intake",
-    _REPO_ROOT / "skills" / "tableau-data",
+    _REPO_ROOT / "skills" / "tableau-route" / "scripts",
+    _REPO_ROOT / "skills" / "tableau-init" / "scripts",
+    _REPO_ROOT / "skills" / "tableau-intake" / "scripts",
+    _REPO_ROOT / "skills" / "tableau-data" / "scripts",
 )
 
 for _script_dir in _SKILL_SCRIPT_DIRS:

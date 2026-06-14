@@ -36,7 +36,7 @@ not hand-edit `STATE.md` yourself.
 1. **Precheck.** From the project directory, run:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/intake.py" precheck "<project-dir>"
+   python "${CLAUDE_SKILL_DIR}/scripts/intake.py" precheck "<project-dir>"
    ```
 
    (Use `python3` if `python` is unavailable.) If it prints `[BLOCKED]`, relay the
@@ -67,9 +67,9 @@ not hand-edit `STATE.md` yourself.
 5. **Commit** — only after the analyst approves (or chooses to skip):
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/intake.py" commit "<project-dir>" --status approved
+   python "${CLAUDE_SKILL_DIR}/scripts/intake.py" commit "<project-dir>" --status approved
    # or, to skip the step:
-   python "${CLAUDE_SKILL_DIR}/intake.py" commit "<project-dir>" --status skipped
+   python "${CLAUDE_SKILL_DIR}/scripts/intake.py" commit "<project-dir>" --status skipped
    ```
 
    On `--status approved` the script validates `PRD.md` has the required core; if

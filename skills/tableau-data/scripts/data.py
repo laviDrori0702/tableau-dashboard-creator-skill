@@ -1,48 +1,41 @@
 """Gate, profile, validate, and commit the ``data`` step of tableau-dashboard-plugin.
 
-This is the executable core of the ``tableau-data`` skill (CONTRACT.md step 3),
-the non-skippable step that turns analyst-provided data into the canonical handoff
-artifact ``DATA-MODEL.md``. The CSVs under ``data/`` are the single source of truth
-for the field names that ``tableau-mock`` and ``tableau-build`` consume, so this
-script owns the things that must be **mechanically guaranteed** rather than left to
-model prose:
+This is the command layer of the ``tableau-data`` skill (CONTRACT.md step 3), the
+non-skippable step that turns analyst-provided data into the canonical handoff artifact
+``DATA-MODEL.md``. The CSVs under ``data/`` are the single source of truth for the field
+names that ``tableau-mock`` and ``tableau-build`` consume, so this step owns the things
+that must be **mechanically guaranteed** rather than left to model prose:
 
-1. **Entry gate** - data refuses to run until ``init`` is ``approved`` in
-   ``STATE.md`` (and ``STATE.md`` exists at all). This mirrors the ordering rule in
-   CONTRACT.md §4.1: a step does not run before its prerequisites are resolved.
-   ``data`` has no producer-gated *required reads* (CONTRACT.md §1), so init-approved
-   is its only precondition.
-2. **CSV profiling** - reading the provided CSVs and inferring a Tableau-friendly
-   type per column is deterministic work, so the script does it (``profile`` writes a
-   schema-complete ``DATA-MODEL.md`` field table the model then enriches with prose).
+1. **Entry gate** - data refuses to run until ``init`` is ``approved`` in ``STATE.md``
+   (and ``STATE.md`` exists at all), mirroring the ordering rule in CONTRACT.md §4.1.
+2. **CSV profiling** - reading the provided CSVs and inferring a Tableau-friendly type
+   per column is deterministic, so ``profile`` does it and writes a schema-complete
+   ``DATA-MODEL.md`` field table the model then enriches with prose.
 3. **Header <-> model validation** - on approval the documented field names in
    ``DATA-MODEL.md`` must match the real CSV headers on disk **exactly** (case
-   included). A typo or casing drift is *reported, never silently accepted*, because
-   a mismatch here would break Replace Data Source downstream (CONTRACT.md §3.2).
+   included); a typo or casing drift is *reported, never silently accepted* (§3.2).
 4. **STATE.md transition** - committing flips ``data`` to ``approved`` and propagates
-   staleness (CONTRACT.md §4.2): every downstream ``approved`` step becomes ``stale``
-   so the pipeline can never silently disagree with changed data.
+   staleness (CONTRACT.md §4.2) to every downstream ``approved`` step.
 
 There are exactly **two** data-acquisition routes (CONTRACT.md §3.2): Route 1 -
 ``data_mode: csv`` (the default) and Route 2 - ``published-ds`` (VizQL Data Service).
-This module implements **both**: Route 1 by profiling analyst-provided CSVs
-(``profile``), and Route 2 by sampling published sources through the VizQL Data Service
-(``pull``), with the network half delegated to the sibling :mod:`vds` module
-(CONTRACT.md §7). There is deliberately **no** synthesized/random data path: the
-guaranteed floor is the ``scaffold/sample-data/`` demo CSVs (CONTRACT.md §3.1),
-surfaced as a clearly-labelled demo - never invented rows.
+This step implements **both**: Route 1 by profiling analyst-provided CSVs (``profile``),
+and Route 2 by sampling published sources through the VizQL Data Service (``pull``).
+There is deliberately **no** synthesized/random data path: the guaranteed floor is the
+``scaffold/sample-data/`` demo CSVs (CONTRACT.md §3.1), surfaced as a clearly-labelled
+demo - never invented rows.
 
-The module's stdlib-only core (gate, profiling, validation, STATE.md rewriting) is kept
-importable without third-party packages so the contract test can call those functions
-directly, exactly like ``init.py`` / ``intake.py``. The published-ds ``pull`` path needs
-``requests`` (via :mod:`vds`), so :mod:`vds` is imported **locally inside** :func:`pull`
-rather than at module top - importing ``data`` never requires ``requests``. The CLI
-exposes four subcommands the skill runs at four moments - ``precheck`` (before
-authoring), ``profile`` (csv route field tables), ``pull`` (published-ds route sample),
-and ``commit`` (after approval). What the CLI prints to stdout is the program's *output*;
-diagnostics go through ``logging``.
-
-Keep ``STEP_ORDER`` below in lock-step with the ordered step list in CONTRACT.md §1.
+**Module layout.** The mechanically-guaranteed core is split across three sibling
+modules so each stays focused: :mod:`constants` (the CONTRACT.md mirror),
+:mod:`datamodel` (type inference, CSV profiling, DATA-MODEL.md render/parse, header
+validation), and :mod:`state` (STATE.md parsing/rewriting + the entry gate). This module
+is the command orchestration (``precheck`` / ``profile`` / ``pull`` / ``commit``) and the
+CLI over them; it re-exports the names the contract test exercises so ``import data``
+keeps a stable surface. All four modules are stdlib-only and importable without
+third-party packages. The published-ds ``pull`` path needs ``requests`` (via :mod:`vds`),
+so :mod:`vds` is imported **locally inside** :func:`pull` rather than at module top -
+importing ``data`` never requires ``requests``. What the CLI prints to stdout is the
+program's *output*; diagnostics go through ``logging``.
 """
 
 from __future__ import annotations
@@ -50,685 +43,57 @@ from __future__ import annotations
 import argparse
 import csv
 import logging
-import re
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from constants import (
+    DATA_DIR,
+    DATA_MODE_PUBLISHED_DS,
+    DATA_MODEL_FILENAME,
+    DATA_STEP,
+    DATASOURCES_FILENAME,
+    DEFAULT_ROW_LIMIT,
+    ENV_FILENAME,
+    MAX_SILENT_ROW_LIMIT,
+    SAMPLE_VALUES_SHOWN,
+    SCAFFOLD_DATA_DIR,
+    STATE_FILENAME,
+    STEP_ORDER,
+    TIER_CSV_DEMO,
+    TIER_CSV_PROVIDED,
+    TIER_PUBLISHED_DS,
+    # Re-exported for the contract test's stable ``data.*`` surface:
+    TYPE_BOOLEAN,  # noqa: F401
+    TYPE_DATE,  # noqa: F401
+    TYPE_DATETIME,  # noqa: F401
+    TYPE_INTEGER,  # noqa: F401
+    TYPE_REAL,  # noqa: F401
+    TYPE_STRING,  # noqa: F401
+)
+from datamodel import (
+    CsvProfile,
+    FieldProfile,
+    HeaderCheck,
+    distinct_samples,
+    parse_acquisition_tier,
+    parse_data_model,
+    profile_csv,
+    render_data_model,
+    suggest_role,
+    validate_headers,
+    read_csv_header,
+    infer_type,  # noqa: F401  (re-exported for the contract test)
+)
+from state import (
+    apply_status_updates,
+    downstream_stale_updates,
+    entry_gate_blocker,
+    parse_statuses,
+    set_data_mode,
+)
+
 logger = logging.getLogger(__name__)
-
-# --- Canonical constants (mirror of CONTRACT.md §1 / §2 / §3) ----------------
-
-STATE_FILENAME = "STATE.md"
-DATA_MODEL_FILENAME = "DATA-MODEL.md"
-
-#: This step, and the upstream step whose approval gates it (CONTRACT.md §4.1).
-DATA_STEP = "data"
-INIT_STEP = "init"
-
-#: The 8 step names in canonical order (mirror of CONTRACT.md §1). Used to decide
-#: which steps are "downstream of data" for staleness propagation (§4.2).
-STEP_ORDER: tuple[str, ...] = (
-    "init", "intake", "data", "brand", "plan", "mock", "spec", "build",
-)
-
-#: Route 1 (csv): production CSVs (preferred) and the scaffold/ demo fallback (§3.1).
-DATA_DIR = "data"
-SCAFFOLD_DATA_DIR = "scaffold/sample-data"
-
-#: Route 2 (published-ds): the inputs the VDS pull reads (CONTRACT.md §3.2).
-DATASOURCES_FILENAME = "datasources.json"
-ENV_FILENAME = ".env"
-
-#: STATE.md ``data_mode`` metadata values (CONTRACT.md §2). A successful ``pull`` flips
-#: the recorded mode to ``published-ds``; ``profile`` leaves the default ``csv``.
-DATA_MODE_CSV = "csv"
-DATA_MODE_PUBLISHED_DS = "published-ds"
-
-#: Row-limit policy for the VDS sample (CONTRACT.md §3.2): default 100, silent up to
-#: 1000, and a value above 1000 needs explicit analyst confirmation before the pull.
-DEFAULT_ROW_LIMIT = 100
-MAX_SILENT_ROW_LIMIT = 1000
-
-#: The Tableau-friendly column types ``profile`` infers and ``DATA-MODEL.md`` records.
-#: Ordered narrowest-first; that order is the inference precedence in ``infer_type``.
-TYPE_BOOLEAN = "boolean"
-TYPE_INTEGER = "integer"
-TYPE_REAL = "real"
-TYPE_DATE = "date"
-TYPE_DATETIME = "datetime"
-TYPE_STRING = "string"
-TYPES: tuple[str, ...] = (
-    TYPE_BOOLEAN, TYPE_INTEGER, TYPE_REAL, TYPE_DATE, TYPE_DATETIME, TYPE_STRING,
-)
-
-#: Acquisition tiers recorded in DATA-MODEL.md (CONTRACT.md §3.2). The csv route
-#: produces one of the first two; the published-ds route (``pull``) records the third.
-TIER_CSV_PROVIDED = "csv (provided in data/)"
-TIER_CSV_DEMO = "csv (demo - scaffold/sample-data/)"
-TIER_PUBLISHED_DS = "published-ds (VDS query)"
-
-#: How many data rows ``profile`` reads to infer types and gather sample values.
-PROFILE_SAMPLE_ROWS = 200
-#: How many distinct sample values to show per field in DATA-MODEL.md.
-SAMPLE_VALUES_SHOWN = 3
-
-#: Accepted strict date / datetime formats for type inference (no locale guessing).
-_DATE_FORMATS: tuple[str, ...] = ("%Y-%m-%d", "%Y/%m/%d")
-_DATETIME_FORMATS: tuple[str, ...] = (
-    "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M",
-)
-#: Literal tokens (lower-cased) that count as boolean values.
-_BOOLEAN_TOKENS = frozenset({"true", "false"})
-
-
-# --- STATE.md reading (shared shape with intake.py / route.py) ---------------
-
-def parse_statuses(text: str) -> dict[str, str]:
-    """Parse the per-step statuses out of a STATE.md manifest.
-
-    Parsing is tolerant (matching the router's parser): only genuine
-    ``| order | step | skill | status |`` rows whose step name is known
-    contribute; header, separator, and stray rows are ignored.
-
-    Args:
-        text: The full contents of a ``STATE.md`` file.
-
-    Returns:
-        A ``{step_name: status}`` mapping (both lower-cased).
-    """
-    statuses: dict[str, str] = {}
-    in_steps = False
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-
-        # Section headers toggle which parser applies.
-        if line.lower().startswith("## steps"):
-            in_steps = True
-            continue
-        if line.startswith("## "):  # any other section ends the Steps table
-            in_steps = False
-
-        if in_steps and line.startswith("|"):
-            cells = [cell.strip() for cell in line.strip("|").split("|")]
-            if len(cells) < 4:
-                continue
-            step_name, status = cells[1].lower(), cells[3].lower()
-            if step_name in STEP_ORDER:
-                statuses[step_name] = status
-    return statuses
-
-
-# --- Type inference ----------------------------------------------------------
-
-def _all_match(values: list[str], predicate) -> bool:
-    """Return True if ``predicate`` holds for every non-empty value.
-
-    Empty/whitespace-only cells are treated as missing and never veto a type, so a
-    column with a few blanks still infers its real type. An all-empty column has no
-    evidence for any narrow type and is handled by the caller (falls through to
-    string).
-
-    Args:
-        values: The raw cell strings for one column.
-        predicate: A ``str -> bool`` test for a single non-empty value.
-
-    Returns:
-        True iff at least one non-empty value exists and all satisfy ``predicate``.
-    """
-    non_empty = [value for value in values if value.strip() != ""]
-    return bool(non_empty) and all(predicate(value.strip()) for value in non_empty)
-
-
-def _is_integer(value: str) -> bool:
-    """bool: True if ``value`` is a base-10 integer (optionally signed)."""
-    text = value.lstrip("+-")
-    return text.isdigit() and text != ""
-
-
-def _is_real(value: str) -> bool:
-    """bool: True if ``value`` parses as a float (covers ints, decimals, exp)."""
-    try:
-        float(value)
-        return True
-    except ValueError:
-        return False
-
-
-def _matches_any_format(value: str, formats: tuple[str, ...]) -> bool:
-    """bool: True if ``value`` parses under at least one ``strptime`` format."""
-    for fmt in formats:
-        try:
-            datetime.strptime(value, fmt)
-            return True
-        except ValueError:
-            continue
-    return False
-
-
-def infer_type(values: list[str]) -> str:
-    """Infer the Tableau-friendly type of a column from its values.
-
-    Inference is conservative and narrowest-first: a column is only given a narrow
-    type when **every** non-empty value fits it. The order (boolean, integer, real,
-    date, datetime) means ``1``/``0`` columns become integers (not booleans) and
-    whole-number columns become integers (not reals). Anything that does not fit a
-    narrow type - or an all-empty column - is ``string``.
-
-    Args:
-        values: The raw cell strings for one column (header excluded).
-
-    Returns:
-        One of :data:`TYPES`.
-    """
-    if _all_match(values, lambda value: value.lower() in _BOOLEAN_TOKENS):
-        return TYPE_BOOLEAN
-    if _all_match(values, _is_integer):
-        return TYPE_INTEGER
-    if _all_match(values, _is_real):
-        return TYPE_REAL
-    if _all_match(values, lambda value: _matches_any_format(value, _DATE_FORMATS)):
-        return TYPE_DATE
-    if _all_match(values, lambda value: _matches_any_format(value, _DATETIME_FORMATS)):
-        return TYPE_DATETIME
-    return TYPE_STRING
-
-
-# --- CSV profiling -----------------------------------------------------------
-
-@dataclass(frozen=True)
-class FieldProfile:
-    """One column of a profiled CSV.
-
-    Attributes:
-        name: The column header exactly as it appears in the CSV (the documented
-            field name; case is significant).
-        type: The inferred type, one of :data:`TYPES`.
-        role: A suggested Tableau role (``Measure`` for numeric, else ``Dimension``);
-            a starting point the model may refine.
-        samples: A few distinct example values, for the analyst's eyes.
-        description: A field description. Blank (``""``) for the csv route - the model
-            fills it in. For the published-ds route it is pre-filled from authoritative
-            VDS metadata where available (CONTRACT.md §3.2).
-    """
-
-    name: str
-    type: str
-    role: str
-    samples: list[str]
-    description: str = ""
-
-
-@dataclass(frozen=True)
-class CsvProfile:
-    """A profiled CSV file (one data source - CONTRACT.md §3.2 "csv = datasource").
-
-    Attributes:
-        filename: The CSV's base name (e.g. ``sales_orders.csv``); the data-source key.
-        row_count: Number of data rows read (capped at :data:`PROFILE_SAMPLE_ROWS`).
-        fields: One :class:`FieldProfile` per column, in file order.
-    """
-
-    filename: str
-    row_count: int
-    fields: list[FieldProfile]
-
-
-def _suggest_role(column_type: str) -> str:
-    """str: Suggest a Tableau role from a column type (numeric -> Measure)."""
-    return "Measure" if column_type in (TYPE_INTEGER, TYPE_REAL) else "Dimension"
-
-
-def _distinct_samples(values: list[str], limit: int) -> list[str]:
-    """Return up to ``limit`` distinct non-empty values, preserving first-seen order.
-
-    Args:
-        values: The raw cell strings for one column.
-        limit: Maximum number of samples to return.
-
-    Returns:
-        Distinct, non-empty sample values (order-preserving), at most ``limit``.
-    """
-    seen: list[str] = []
-    for value in values:
-        stripped = value.strip()
-        if stripped and stripped not in seen:
-            seen.append(stripped)
-            if len(seen) >= limit:
-                break
-    return seen
-
-
-def profile_csv(csv_path: Path | str) -> CsvProfile:
-    """Read a CSV and profile each column's type, role, and sample values.
-
-    Only the first :data:`PROFILE_SAMPLE_ROWS` data rows are read - enough to infer
-    types reliably without loading large files. The header row supplies the field
-    names exactly (case preserved), since those names are the contract downstream
-    steps build against.
-
-    Args:
-        csv_path: Path to the CSV file to profile.
-
-    Returns:
-        A :class:`CsvProfile`.
-
-    Raises:
-        FileNotFoundError: If ``csv_path`` does not exist.
-        ValueError: If the file has no header row.
-    """
-    path = Path(csv_path)
-    if not path.is_file():
-        raise FileNotFoundError(f"CSV not found: {path}")
-
-    # utf-8-sig tolerates an Excel-exported BOM on the first header cell.
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = csv.reader(handle)
-        try:
-            header = next(reader)
-        except StopIteration:
-            raise ValueError(f"CSV '{path.name}' is empty (no header row).")
-
-        columns: list[list[str]] = [[] for _ in header]
-        row_count = 0
-        for row in reader:
-            if row_count >= PROFILE_SAMPLE_ROWS:
-                break
-            row_count += 1
-            for index in range(len(header)):
-                # A short row leaves trailing columns missing; treat as empty.
-                columns[index].append(row[index] if index < len(row) else "")
-
-    fields = []
-    for name, cells in zip(header, columns):
-        column_type = infer_type(cells)
-        fields.append(FieldProfile(
-            name=name,
-            type=column_type,
-            role=_suggest_role(column_type),
-            samples=_distinct_samples(cells, SAMPLE_VALUES_SHOWN),
-        ))
-    return CsvProfile(filename=path.name, row_count=row_count, fields=fields)
-
-
-# --- DATA-MODEL.md rendering -------------------------------------------------
-
-def _md_table_cell(text: str) -> str:
-    """Make free-text safe for a single GitHub-flavored-markdown table cell.
-
-    Real data (especially VDS field descriptions and sample values) can contain
-    newlines and ``|`` pipes - both of which corrupt a markdown table: a newline splits
-    the row across physical lines, and a pipe is read as a column separator. Newlines
-    (and carriage returns) are collapsed to spaces and pipes are backslash-escaped so
-    the value stays in one cell on one row.
-
-    This is applied to the Sample-values and Description cells only - never to the
-    Field name (which :func:`parse_data_model` reads back and validates against the CSV
-    header verbatim).
-
-    Args:
-        text: The raw cell text.
-
-    Returns:
-        The text rendered safe for one markdown table cell.
-    """
-    return text.replace("\r", " ").replace("\n", " ").replace("|", "\\|").strip()
-
-
-def render_data_model(profiles: list[CsvProfile], tier: str) -> str:
-    """Render the DATA-MODEL.md handoff artifact from profiled CSVs.
-
-    The output is schema-complete and machine-re-parseable (:func:`parse_data_model`
-    recovers the field names + types): a top section recording the acquisition tier
-    (CONTRACT.md §3.2) followed by one section per data source, each with a field
-    table. The Description column is left blank for the model to fill with judgment
-    (what each field means); everything else is mechanically derived.
-
-    Args:
-        profiles: The profiled CSVs to document, in presentation order.
-        tier: The acquisition tier to record (e.g. :data:`TIER_CSV_PROVIDED`).
-
-    Returns:
-        The complete DATA-MODEL.md contents, terminated by a trailing newline.
-    """
-    # Build line-by-line so each table (header + separator + rows) stays contiguous:
-    # a blank line between the separator and the rows would split the table in
-    # GitHub-flavored markdown.
-    lines = [
-        "# Data Model",
-        "",
-        "> Managed by tableau-dashboard-plugin (tableau-data). "
-        "See CONTRACT.md before hand-editing.",
-        "",
-        "## Acquisition",
-        "",
-        f"- tier: {tier}",
-        "- Each CSV under `data/` is one data source (CONTRACT.md §3.2). "
-        "Documented field names below must match the CSV headers exactly so "
-        "**Replace Data Source** can swap in live data later.",
-    ]
-
-    for profile in profiles:
-        lines += [
-            "",
-            f"## Data source: `{profile.filename}`",
-            "",
-            f"- rows profiled: {profile.row_count}",
-            "",
-            "| Field | Type | Role | Sample values | Description |",
-            "|-------|------|------|---------------|-------------|",
-        ]
-        for field_profile in profile.fields:
-            samples = _md_table_cell(", ".join(field_profile.samples))
-            description = _md_table_cell(field_profile.description)
-            lines.append(
-                f"| {field_profile.name} | {field_profile.type} | "
-                f"{field_profile.role} | {samples} | {description} |"
-            )
-
-    return "\n".join(lines) + "\n"
-
-
-# --- DATA-MODEL.md parsing (the validator's other half) ----------------------
-
-# A data-source section heading, capturing the CSV filename token inside backticks
-# or bare: "## Data source: `sales.csv`" -> "sales.csv".
-_DATASOURCE_HEADING = re.compile(
-    r"^#{1,6}\s+data source:\s*`?([^`\s|]+\.csv)`?\s*$", re.IGNORECASE
-)
-# The acquisition tier line: "- tier: csv (provided in data/)".
-_TIER_LINE = re.compile(r"^-\s*tier\s*:\s*(.+?)\s*$", re.IGNORECASE)
-
-
-def _looks_like_field_header(cells: list[str]) -> bool:
-    """bool: True if a table row is the ``| Field | Type | ... |`` header."""
-    return (
-        len(cells) >= 2
-        and cells[0].lower() == "field"
-        and cells[1].lower() == "type"
-    )
-
-
-def _is_separator_row(cells: list[str]) -> bool:
-    """bool: True if a table row is the ``|---|---|`` separator."""
-    return all(set(cell) <= set("-: ") and cell for cell in cells)
-
-
-def parse_data_model(text: str) -> dict[str, list[tuple[str, str]]]:
-    """Recover the documented (field name, type) pairs per data source.
-
-    Scans for ``## Data source: `name.csv``` headings and, within each, reads the
-    field table's first two columns (Field, Type), skipping the header and separator
-    rows. This is the inverse of :func:`render_data_model`; it is also what
-    :func:`validate_headers` checks the real CSV headers against, so it must keep
-    working even after the model edits the Description/Role columns.
-
-    Args:
-        text: The contents of a ``DATA-MODEL.md`` file.
-
-    Returns:
-        ``{csv_filename: [(field_name, type), ...]}`` in document order. Field names
-        keep their exact case (the comparison downstream is case-sensitive).
-    """
-    documented: dict[str, list[tuple[str, str]]] = {}
-    current: Optional[str] = None
-    in_field_table = False
-
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-
-        heading_match = _DATASOURCE_HEADING.match(line)
-        if heading_match:
-            current = heading_match.group(1)
-            documented.setdefault(current, [])
-            in_field_table = False
-            continue
-
-        if line.startswith("## "):  # a non-data-source section ends the current one
-            current = None
-            in_field_table = False
-            continue
-
-        if current is None or not line.startswith("|"):
-            continue
-
-        cells = [cell.strip() for cell in line.strip("|").split("|")]
-        if _looks_like_field_header(cells):
-            in_field_table = True
-            continue
-        if not in_field_table or _is_separator_row(cells):
-            continue
-        if len(cells) >= 2 and cells[0]:
-            documented[current].append((cells[0], cells[1].lower()))
-
-    return documented
-
-
-def parse_acquisition_tier(text: str) -> Optional[str]:
-    """Return the acquisition tier recorded in a DATA-MODEL.md, or None if absent.
-
-    Args:
-        text: The contents of a ``DATA-MODEL.md`` file.
-
-    Returns:
-        The tier string (e.g. ``"csv (provided in data/)"``) or ``None``.
-    """
-    for raw_line in text.splitlines():
-        match = _TIER_LINE.match(raw_line.strip())
-        if match:
-            return match.group(1)
-    return None
-
-
-# --- Header <-> model validation ---------------------------------------------
-
-@dataclass(frozen=True)
-class HeaderCheck:
-    """The result of comparing a CSV's real headers to its documented field names.
-
-    Attributes:
-        ok: True iff the documented field names match the CSV headers exactly
-            (same names, same case; order is not enforced).
-        missing: Field names documented in DATA-MODEL.md but absent from the CSV
-            header (a deletion or a typo/casing drift in the doc).
-        extra: Headers present in the CSV but not documented (an undocumented
-            column, or the other side of a typo/casing drift).
-    """
-
-    ok: bool
-    missing: list[str]
-    extra: list[str]
-
-
-def validate_headers(actual: list[str], documented: list[str]) -> HeaderCheck:
-    """Compare a CSV's real headers to its documented field names, case-sensitively.
-
-    The match is **exact**: ``Region`` and ``region`` are different fields, so a
-    casing drift or a typo surfaces as a ``missing``/``extra`` pair rather than being
-    silently accepted (CONTRACT.md §3.2 - the names are the Replace-Data-Source
-    contract). Order is not enforced; duplicates are de-duplicated for reporting.
-
-    Args:
-        actual: The header cells read from the CSV file.
-        documented: The field names recorded in DATA-MODEL.md.
-
-    Returns:
-        A :class:`HeaderCheck`. ``ok`` is True iff both ``missing`` and ``extra``
-        are empty.
-    """
-    actual_set = set(actual)
-    documented_set = set(documented)
-    missing = [name for name in documented if name not in actual_set]
-    extra = [name for name in actual if name not in documented_set]
-    # De-duplicate while preserving order (a column could legitimately repeat).
-    missing = list(dict.fromkeys(missing))
-    extra = list(dict.fromkeys(extra))
-    return HeaderCheck(ok=(not missing and not extra), missing=missing, extra=extra)
-
-
-def read_csv_header(csv_path: Path | str) -> list[str]:
-    """Read just the header row of a CSV file.
-
-    Args:
-        csv_path: Path to the CSV file.
-
-    Returns:
-        The header cells (case preserved).
-
-    Raises:
-        FileNotFoundError: If ``csv_path`` does not exist.
-        ValueError: If the file has no header row.
-    """
-    path = Path(csv_path)
-    if not path.is_file():
-        raise FileNotFoundError(f"CSV not found: {path}")
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        try:
-            return next(csv.reader(handle))
-        except StopIteration:
-            raise ValueError(f"CSV '{path.name}' is empty (no header row).")
-
-
-# --- STATE.md rewriting (shared shape with intake.py) ------------------------
-
-def _format_step_row(cells: list[str]) -> str:
-    """Render a Steps-table row with the canonical column widths.
-
-    Matches the alignment ``init.render_state_md`` produces (``order<5 | step<6 |
-    skill<14 | status<8``) so a rewritten row stays visually consistent.
-
-    Args:
-        cells: The four cell values ``[order, step, skill, status]``.
-
-    Returns:
-        The formatted ``| ... |`` table row (no trailing newline).
-    """
-    order, step, skill, status = cells[0], cells[1], cells[2], cells[3]
-    return f"| {order:<5} | {step:<6} | {skill:<14} | {status:<8} |"
-
-
-def apply_status_updates(text: str, updates: dict[str, str]) -> str:
-    """Rewrite the status cell of one or more Steps-table rows.
-
-    Only rows inside the ``## Steps`` table whose step name is a key in ``updates``
-    are touched; every other line (metadata, prose, untouched rows) is preserved
-    byte-for-byte. The trailing newline of the input is preserved.
-
-    Args:
-        text: The full ``STATE.md`` contents.
-        updates: ``{step_name: new_status}`` for the rows to rewrite (step names
-            lower-cased).
-
-    Returns:
-        The updated ``STATE.md`` contents.
-    """
-    out_lines: list[str] = []
-    in_steps = False
-    for raw_line in text.splitlines():
-        stripped = raw_line.strip()
-
-        if stripped.lower().startswith("## steps"):
-            in_steps = True
-            out_lines.append(raw_line)
-            continue
-        if stripped.startswith("## "):  # any other section ends the Steps table
-            in_steps = False
-
-        if in_steps and stripped.startswith("|"):
-            cells = [cell.strip() for cell in stripped.strip("|").split("|")]
-            if len(cells) >= 4 and cells[1].lower() in updates:
-                cells[3] = updates[cells[1].lower()]
-                out_lines.append(_format_step_row(cells))
-                continue
-
-        out_lines.append(raw_line)
-
-    result = "\n".join(out_lines)
-    if text.endswith("\n"):
-        result += "\n"
-    return result
-
-
-def set_data_mode(text: str, mode: str) -> str:
-    """Rewrite the ``- data_mode: ...`` metadata line in a STATE.md manifest.
-
-    Only the metadata line is touched; any trailing inline comment (e.g.
-    ``# csv | published-ds``) and every other line are preserved. If no ``data_mode``
-    line exists the text is returned unchanged (older manifests stay valid).
-
-    Args:
-        text: The full ``STATE.md`` contents.
-        mode: The new mode to record (e.g. :data:`DATA_MODE_PUBLISHED_DS`).
-
-    Returns:
-        The updated ``STATE.md`` contents (trailing newline preserved).
-    """
-    out_lines: list[str] = []
-    for raw_line in text.splitlines():
-        match = re.match(r"^(\s*-\s*data_mode\s*:\s*)(\S+)(.*)$", raw_line)
-        if match:
-            out_lines.append(f"{match.group(1)}{mode}{match.group(3)}")
-        else:
-            out_lines.append(raw_line)
-    result = "\n".join(out_lines)
-    if text.endswith("\n"):
-        result += "\n"
-    return result
-
-
-def _downstream_stale_updates(statuses: dict[str, str]) -> dict[str, str]:
-    """Compute which downstream steps must flip to ``stale`` (CONTRACT.md §4.2).
-
-    Every step ordered after ``data`` that is currently ``approved`` becomes
-    ``stale``; steps already ``pending`` / ``skipped`` / ``stale`` are left as-is.
-
-    Args:
-        statuses: The current ``{step_name: status}`` mapping.
-
-    Returns:
-        ``{step_name: "stale"}`` for each downstream step that was ``approved``.
-    """
-    data_index = STEP_ORDER.index(DATA_STEP)
-    return {
-        step: "stale"
-        for step in STEP_ORDER[data_index + 1:]
-        if statuses.get(step) == "approved"
-    }
-
-
-# --- Entry gate (CONTRACT.md §4.1) -------------------------------------------
-
-def entry_gate_blocker(project_root: Path) -> Optional[str]:
-    """Return why data may not run yet, or ``None`` if it may.
-
-    Data refuses to run unless ``STATE.md`` exists and ``init`` is ``approved``. It
-    has no producer-gated required reads (CONTRACT.md §1), so this is its only gate.
-
-    Args:
-        project_root: The analyst's project directory.
-
-    Returns:
-        A human-readable blocker message, or ``None`` when the gate is open.
-    """
-    state_path = project_root / STATE_FILENAME
-    if not state_path.exists():
-        return (
-            "No STATE.md found. Run 'tableau-init' first to scaffold the project "
-            "and initialize STATE.md before running 'tableau-data'."
-        )
-
-    init_status = parse_statuses(state_path.read_text(encoding="utf-8-sig")).get(
-        INIT_STEP, "pending"
-    )
-    if init_status != "approved":
-        return (
-            f"Step 'init' is '{init_status}', not 'approved'. Run 'tableau-init' "
-            f"first; 'tableau-data' cannot run until init is approved."
-        )
-    return None
 
 
 # --- Data-source resolution (CONTRACT.md §3.1 / §3.2) ------------------------
@@ -1013,7 +378,7 @@ def commit(project_dir: Path | str) -> CommitResult:
     state_path = project_root / STATE_FILENAME
     text = state_path.read_text(encoding="utf-8-sig")
     statuses = parse_statuses(text)
-    stale_updates = _downstream_stale_updates(statuses)
+    stale_updates = downstream_stale_updates(statuses)
     updates = {DATA_STEP: "approved", **stale_updates}
     state_path.write_text(apply_status_updates(text, updates), encoding="utf-8")
 
@@ -1060,7 +425,7 @@ class PullResult:
         ok: True when the CSVs and DATA-MODEL.md were written; False when refused or
             the pull failed (in which case nothing was written - STATE.md untouched).
         message: Human-readable explanation (the refusal/failure reason when not ``ok``).
-        tier: The acquisition tier recorded, when written (:data:`TIER_PUBLISHED_DS`).
+        tier: The acquisition tier recorded, when written (:data:`constants.TIER_PUBLISHED_DS`).
         written: Base names of the ``data/<slug>.csv`` files written.
         row_counts: ``{csv_filename: rows_pulled}`` for each written source.
         row_limit: The row cap applied to the sample.
@@ -1098,7 +463,7 @@ def _profile_pulled_source(slug: str, fields, rows: list[dict]) -> CsvProfile:
 
     Types and descriptions come from the authoritative VDS metadata (CONTRACT.md §3.2);
     only the sample values are derived from the pulled rows. The result renders through
-    the same :func:`render_data_model` the csv route uses.
+    the same :func:`datamodel.render_data_model` the csv route uses.
 
     Args:
         slug: The data-source slug (the CSV base name without extension).
@@ -1114,8 +479,8 @@ def _profile_pulled_source(slug: str, fields, rows: list[dict]) -> CsvProfile:
         field_profiles.append(FieldProfile(
             name=meta.caption,
             type=meta.model_type,
-            role=_suggest_role(meta.model_type),
-            samples=_distinct_samples(column, SAMPLE_VALUES_SHOWN),
+            role=suggest_role(meta.model_type),
+            samples=distinct_samples(column, SAMPLE_VALUES_SHOWN),
             description=meta.description,
         ))
     return CsvProfile(filename=f"{slug}.csv", row_count=len(rows), fields=field_profiles)
