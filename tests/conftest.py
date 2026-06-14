@@ -13,6 +13,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SKILL_SCRIPT_DIRS = (
     _REPO_ROOT / "skills" / "tableau-route",
     _REPO_ROOT / "skills" / "tableau-init",
+    _REPO_ROOT / "skills" / "tableau-intake",
 )
 
 for _script_dir in _SKILL_SCRIPT_DIRS:
