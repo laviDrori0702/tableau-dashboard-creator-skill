@@ -14,6 +14,7 @@ _SKILL_SCRIPT_DIRS = (
     _REPO_ROOT / "skills" / "tableau-route",
     _REPO_ROOT / "skills" / "tableau-init",
     _REPO_ROOT / "skills" / "tableau-intake",
+    _REPO_ROOT / "skills" / "tableau-data",
 )
 
 for _script_dir in _SKILL_SCRIPT_DIRS:
