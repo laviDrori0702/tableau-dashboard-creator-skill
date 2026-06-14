@@ -2,5 +2,8 @@
 pandas>=2.0,<3.0
 python-dotenv>=1.0,<2.0
 
+# Step 3 (tableau-data) — published-ds route: REST sign-in + VizQL Data Service calls
+requests>=2.31,<3.0
+
 # Step E — XSD validation of generated .twb files
 lxml>=5.0,<6.0
