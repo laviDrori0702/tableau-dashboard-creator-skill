@@ -105,6 +105,14 @@ analyst is in the workflow.
 > A step is **resolved** when its status is `approved` or `skipped`. Resolved is the condition the
 > ordering gate (§4.1) checks for and the condition the router (§5) treats as "done."
 
+> **Skip preconditions are skill-specific.** A skill may gate its own `skipped` transition behind a
+> minimal precondition when skipping blank would degrade the whole pipeline. `tableau-brand` (step 4)
+> only accepts `skipped` once `branding/branding.md` exists: branding drives how good the mock and the
+> Tableau spec can be, so the analyst must capture at least some brand intent (a spec, a scraped org
+> `.twb`, or the brand interview) before opting into neutral styling. `tableau-intake` (step 2) has no
+> such precondition — its request can be skipped outright. This narrows *when* a step may be skipped;
+> it never changes what `skipped` then means (a resolved step that produced no artifact).
+
 ---
 
 ## 3. The artifact-naming rule
