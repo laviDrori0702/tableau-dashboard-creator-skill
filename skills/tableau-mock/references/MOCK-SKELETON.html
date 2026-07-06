@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<!--
+  tableau-mock skeleton. This shows the two conventions mock.py's coverage checklist
+  and slot-sizing guard depend on - copy them, then build the real demo on top:
+
+    1. data-plan-id="<id>"  on every rendered KPI/chart/filter/interaction control.
+       The <id> must match the plan's Elements/Filters/Interactions tables exactly.
+       A plan id with no matching data-plan-id is a COVERAGE GAP and blocks approval.
+
+    2. A single <script type="application/json" id="mock-layout"> manifest declaring the
+       canvas size and a pixel box {id, x, y, width, height} for every ELEMENT id (the
+       KPIs/charts - not filters or interactions). The guard checks each box is in-bounds,
+       readable (>= 80x56px), and that boxes fill >= 45% of the canvas. The canvas
+       width/height MUST equal the plan's Screen Size dimensions.
+
+  The canvas size is NOT fixed by this skill - it comes from the plan's `## Screen Size`
+  section. The 1366x768 below is only the example the DASHBOARD-PLAN template ships with;
+  replace it with your plan's actual dimensions everywhere it appears.
+
+  Populate every chart from the REAL sample CSVs (read them; do not invent numbers).
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Dashboard Mock</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #f4f5f7; }
+    /* The canvas is the fixed design size from the plan's Screen Size section. */
+    .canvas { position: relative; width: 1366px; height: 768px; margin: 16px auto; background: #fff; }
+    .filter-bar { display: flex; gap: 12px; padding: 12px; height: 56px; box-sizing: border-box; }
+    .kpi-row { display: flex; gap: 12px; padding: 0 12px; }
+    .kpi { flex: 1; min-height: 120px; border: 1px solid #e1e4e8; border-radius: 6px; padding: 12px; }
+    .chart { border: 1px solid #e1e4e8; border-radius: 6px; margin: 12px; min-height: 360px; }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+
+    <!-- Filters: one control per plan Filters-row id. -->
+    <div class="filter-bar">
+      <select data-plan-id="flt-region"><option>All regions</option></select>
+      <input  data-plan-id="flt-date" type="month">
+    </div>
+
+    <!-- Elements: KPIs and charts, each tagged with its plan Elements-row id. -->
+    <div class="kpi-row">
+      <div class="kpi" data-plan-id="kpi-revenue"><div>Revenue</div><strong>$1.2M</strong></div>
+      <div class="kpi" data-plan-id="kpi-orders"><div>Orders</div><strong>3,418</strong></div>
+    </div>
+
+    <!-- Interactions: tag the control/handle that drives each plan Interactions-row id.
+         (e.g. clicking this chart cross-filters the others.) -->
+    <div class="chart" data-plan-id="chart-region" data-interaction="int-region-filter">
+      bar chart: revenue by region (from sample CSV)
+    </div>
+    <div class="chart" data-plan-id="chart-trend">line chart: revenue over time</div>
+
+    <!-- An interaction that has no element of its own still needs its id rendered,
+         e.g. on the control that triggers it: -->
+    <button data-plan-id="int-region-filter" hidden>region cross-filter</button>
+  </div>
+
+  <!-- Slot-sizing manifest: a box for every ELEMENT id. Canvas == plan Screen Size. -->
+  <script type="application/json" id="mock-layout">
+  {
+    "canvas": { "width": 1366, "height": 768 },
+    "elements": [
+      { "id": "kpi-revenue",  "x": 12,  "y": 68,  "width": 665, "height": 120 },
+      { "id": "kpi-orders",   "x": 689, "y": 68,  "width": 665, "height": 120 },
+      { "id": "chart-region", "x": 12,  "y": 200, "width": 665, "height": 360 },
+      { "id": "chart-trend",  "x": 689, "y": 200, "width": 665, "height": 360 }
+    ]
+  }
+  </script>
+</body>
+</html>
