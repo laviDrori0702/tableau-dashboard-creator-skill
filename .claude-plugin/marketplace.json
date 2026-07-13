@@ -1,0 +1,15 @@
+{
+  "name": "dashboard-creation-tool",
+  "owner": {
+    "name": "Lavi Drori",
+    "email": "lavi.drori@g-stat.com",
+    "url": "https://github.com/laviDrori0702"
+  },
+  "plugins": [
+    {
+      "name": "tableau-dashboard-plugin",
+      "source": "./",
+      "description": "Turn a free-text dashboard request into an interactive HTML demo and a Replace-Data-Source-ready Tableau .twbx, via 8 single-job skills that hand off through files on disk."
+    }
+  ]
+}
