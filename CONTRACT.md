@@ -246,9 +246,18 @@ Two kinds of outputs, two storage strategies:
   current copy. Re-running one of these skills updates the root file and triggers staleness (§4.2);
   it does **not** create a new version directory.
 - **Deliverables = standalone versioned copies.** `mock.html`, `IMPLEMENTATION-SPEC.md`, and
-  `dashboard.twbx` are written under `mock-version/v_N/`. Re-running a deliverable skill **after its
-  step was approved** bumps `current_version` to a new `v_N` and writes a full standalone copy there,
-  preserving prior versions. (Re-running before approval overwrites the current `v_N`.)
+  `dashboard.twbx` are written under `mock-version/v_N/`, all three sharing the **same** `v_N`
+  directory. A version is anchored by its **mock**: `mock.html` is the leading deliverable, and
+  **only `tableau-mock` bumps `current_version`**. Re-running `tableau-mock` after its step was
+  approved bumps to a new `v_N`, writes the fresh `mock.html` there, and stales `spec`/`build`
+  (§4.2) so they re-run into that new version — producing a full standalone copy, prior versions
+  preserved. (Re-running mock before approval overwrites the current `v_N`.)
+- **`spec` and `build` never bump `current_version`.** They are downstream deliverables that write
+  into the mock's current `v_N`, always beside the `mock.html` they were derived from, and
+  **overwrite in place** on a re-run (whether the step was `approved` or `stale`). A new *spec* or
+  *build* version is created only by re-running the mock (which bumps and stales them); this keeps
+  each `v_N` internally coherent (one mock + its spec + its workbook) and avoids a bumped version
+  dir that is missing the mock it depends on.
 
 ---
 
