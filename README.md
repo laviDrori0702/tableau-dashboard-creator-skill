@@ -28,19 +28,19 @@ This plugin breaks that monolith into **8 independent skills**, each running in 
 Add this repo as a plugin marketplace, then install the plugin. Works straight from GitHub, no clone, and picks up updates:
 
 ```
-/plugin marketplace add laviDrori0702/tableau-dashboard-plugin
+/plugin marketplace add https://github.com/laviDrori0702/tableau-dashboard-creator-skill.git
 /plugin install tableau-dashboard-plugin@dashboard-creation-tool
 ```
 
-(If you cloned locally, point the marketplace at the checkout instead: `/plugin marketplace add ./path/to/tableau-dashboard-plugin`.)
+Use the **HTTPS URL** (as above), not the `owner/repo` shorthand — the shorthand clones over SSH and fails if you don't have GitHub SSH keys configured. (If you cloned locally, point the marketplace at the checkout instead: `/plugin marketplace add ./path/to/tableau-dashboard-creator-skill`.)
 
 ### Option 2 — Quick local test
 
 For hacking on the plugin itself, load it for the current session only:
 
 ```bash
-git clone https://github.com/laviDrori0702/tableau-dashboard-plugin.git
-cd tableau-dashboard-plugin
+git clone https://github.com/laviDrori0702/tableau-dashboard-creator-skill.git
+cd tableau-dashboard-creator-skill
 claude --plugin-dir .
 ```
 
