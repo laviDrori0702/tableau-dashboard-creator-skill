@@ -817,6 +817,59 @@ def test_column_types_come_from_the_data_model():
     assert by_name["[revenue]"].get("caption") == "Revenue"
 
 
+def test_every_documented_type_renders_a_complete_column():
+    """All six DATA-MODEL types must map - datetime and boolean are the least attested,
+    and a type the map misses would silently fall back to string."""
+    data_model = (
+        "# Data Model\n\n## Data source: `types.csv`\n\n"
+        "| Field | Type |\n|---|---|\n"
+        + "".join(f"| f_{name} | {name} |\n" for name in twb.TYPE_FACTS)
+    )
+    document = _manifest(
+        datasources=[{
+            "name": "types", "csv": "types.csv",
+            "fields": [{"name": f"f_{name}", "type": name} for name in twb.TYPE_FACTS],
+        }],
+        worksheets=[],
+        objects=[
+            {"element_id": "kpi-revenue", "kind": "text"},
+            {"element_id": "chart-trend", "kind": "image"},
+        ],
+    )
+    header = [f"f_{name}" for name in twb.TYPE_FACTS]
+
+    root = ET.fromstring(twb.render_workbook(document, data_model, {"types.csv": header}))
+    records = {
+        record.findtext("remote-name"): record
+        for record in root.iter("metadata-record")
+        if record.get("class") == "column"
+    }
+
+    assert set(records) == set(header)
+    for type_name, facts in twb.TYPE_FACTS.items():
+        record = records[f"f_{type_name}"]
+        assert record.findtext("local-type") == type_name
+        assert record.findtext("remote-type") == str(facts.remote_type)
+        assert record.findtext("aggregation") == facts.aggregation
+        # The string trio rides along with text-like types only.
+        assert (record.find("collation") is not None) == facts.text_like
+
+
+def test_an_undocumented_csv_column_still_reaches_the_physical_schema():
+    """A column the data model missed must not vanish: an incomplete relation is a schema
+    mismatch at load. It falls back to string rather than being dropped."""
+    root = ET.fromstring(
+        twb.render_workbook(
+            _manifest(), DATA_MODEL,
+            {"sales_orders.csv": ["order_date", "region", "revenue", "surprise"]},
+        )
+    )
+    columns = root.findall("datasources/datasource/connection/relation/columns/column")
+
+    assert [column.get("name") for column in columns][-1] == "surprise"
+    assert columns[-1].get("datatype") == twb.FALLBACK_TYPE
+
+
 def test_generated_ids_are_unique():
     """Every id in the workbook must be unique or Tableau cross-references the wrong thing."""
     root = _render()
@@ -830,6 +883,25 @@ def test_generated_ids_are_unique():
     )
 
     assert len(ids) == len(set(ids))
+
+
+def test_two_datasources_over_one_csv_still_get_unique_ids():
+    """Ids are seeded from the datasource *and* the csv: sharing a CSV must not collide."""
+    document = _manifest()
+    document["datasources"].append({
+        "name": "sales_orders_secondary",
+        "csv": "sales_orders.csv",
+        "fields": [{"name": "revenue", "type": "real"}],
+    })
+
+    root = _render(document)
+    connections = [
+        element.get("name") for element in root.iter("named-connection")
+    ]
+    objects = [element.get("id") for element in root.iter("object")]
+
+    assert len(connections) == len(set(connections)) == 2
+    assert len(objects) == len(set(objects)) == 2
 
 
 def test_no_snippet_ids_leak():
@@ -982,6 +1054,23 @@ def test_build_writes_a_validated_twb_and_twbx(tmp_path):
     assert (tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME).exists()
 
 
+def test_a_zero_worksheet_manifest_builds_and_packages(tmp_path):
+    """AC #1 literally: one CSV datasource, zero worksheets, one empty dashboard."""
+    _ready_project(tmp_path)
+    document = _manifest()
+    document["worksheets"] = []
+    document["objects"] = [
+        {"element_id": "kpi-revenue", "kind": "text"},
+        {"element_id": "chart-trend", "kind": "image"},
+    ]
+    _write_manifest(tmp_path, document)
+
+    result = build.build_workbook(tmp_path)
+
+    assert result.ok is True, result.errors
+    assert (tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME).exists()
+
+
 def test_twbx_contains_the_twb_and_every_csv(tmp_path):
     """Packaging is flat, so directory='.' resolves each CSV beside the .twb (AC #1)."""
     _built_project(tmp_path)
@@ -1067,6 +1156,31 @@ def test_build_refuses_a_csv_that_is_not_on_disk(tmp_path):
 
     assert result.ok is False
     assert any("sales_orders.csv" in error for error in result.errors)
+
+
+def test_a_failed_build_removes_the_previous_package(tmp_path):
+    """commit approves on the .twbx's existence, so a failed rebuild must not leave the
+    last good package behind for it to approve."""
+    _built_project(tmp_path)
+    (tmp_path / "data" / "sales_orders.csv").rename(tmp_path / "data" / "orders.csv")
+
+    assert build.build_workbook(tmp_path).ok is False
+    assert not (tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME).exists()
+    assert build.commit(tmp_path).ok is False
+
+
+def test_only_the_referenced_csvs_are_packaged(tmp_path):
+    """An unrelated CSV in data/ has no business inside the analyst's deliverable."""
+    _ready_project(tmp_path)
+    (tmp_path / "data" / "unrelated.csv").write_text("a\n1\n", encoding="utf-8")
+    _write_manifest(tmp_path, _manifest())
+
+    assert build.build_workbook(tmp_path).ok is True
+
+    with zipfile.ZipFile(
+        tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME
+    ) as archive:
+        assert "unrelated.csv" not in archive.namelist()
 
 
 # --- STATE.md transition (CONTRACT.md §4.3) ----------------------------------

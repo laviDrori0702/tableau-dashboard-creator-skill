@@ -638,14 +638,18 @@ def _xsd_errors(twb_path: Path, target_tableau_version: str) -> tuple[list[str],
     if target_tableau_version.strip() == twb.TARGET_2026:
         return messages, []
 
-    tolerated = [
-        message for message in messages
+    # At most *one* such error is the documented shift; a second is a real problem, so
+    # forgive by position rather than by message text.
+    forgiven = [
+        index for index, message in enumerate(messages)
         if all(marker in message for marker in _VERSION_SHIFT_MARKERS)
+    ][:1]
+    fatal = [
+        message for index, message in enumerate(messages) if index not in forgiven
     ]
-    fatal = [message for message in messages if message not in tolerated]
     warnings = [
-        f"XSD (expected for the {target_tableau_version} target): {message}"
-        for message in tolerated
+        f"XSD (expected for the {target_tableau_version} target): {messages[index]}"
+        for index in forgiven
     ]
     return fatal, warnings
 
@@ -672,15 +676,19 @@ def build_workbook(project_dir: Path | str) -> BuildResult:
     version_dir = project_root / VERSION_DIR / version
     document, _ = load_manifest(version_dir / MANIFEST_FILENAME)
 
-    csv_paths = [project_root / relative for relative in _sample_csvs(project_root)]
-    headers = {path.name: read_csv_header(path) for path in csv_paths}
-    missing = sorted(
-        {
-            str(source.get("csv", "")).strip()
-            for source in document.get("datasources", [])
-            if str(source.get("csv", "")).strip() not in headers
-        }
-    )
+    # Drop any previous package before anything else can fail: 'commit' approves on the
+    # .twbx's existence, so a stale one left behind by a failed build would be approved.
+    (version_dir / WORKBOOK_FILENAME).unlink(missing_ok=True)
+
+    on_disk = {
+        (project_root / relative).name: project_root / relative
+        for relative in _sample_csvs(project_root)
+    }
+    headers = {name: read_csv_header(path) for name, path in on_disk.items()}
+    wanted = [
+        str(source.get("csv", "")).strip() for source in document.get("datasources", [])
+    ]
+    missing = sorted({name for name in wanted if name not in headers})
     if missing:
         return BuildResult(
             False,
@@ -714,7 +722,9 @@ def build_workbook(project_dir: Path | str) -> BuildResult:
         # Leave the .twb for inspection, but never package a workbook that failed a check.
         return BuildResult(False, errors, version, twb_relative, warnings=warnings)
 
-    create_twbx(twb_path, csv_paths)
+    # Only the CSVs the manifest actually binds to: an unrelated file in data/ has no
+    # business shipping inside the analyst's deliverable.
+    create_twbx(twb_path, [on_disk[name] for name in dict.fromkeys(wanted)])
     logger.info(f"Built {twb_relative} and its .twbx from the validated manifest.")
     return BuildResult(
         ok=True,

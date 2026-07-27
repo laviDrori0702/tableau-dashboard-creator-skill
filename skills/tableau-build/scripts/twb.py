@@ -70,6 +70,17 @@ DASHBOARD_NAME = "Dashboard 1"
 #: Dashboard zones live in a 100,000 x 100,000 virtual coordinate space.
 ZONE_SPACE = "100000"
 
+#: The root zone's id. Zone ids are sequential integers from 1; with a single zone there is
+#: nothing to count yet.
+ROOT_ZONE_ID = "1"
+
+#: Margin (in the zone coordinate space) on the root zone, as Tableau writes it.
+ROOT_ZONE_MARGIN = "8"
+
+#: Dashboard size when the layout carries no canvas. ``manifest.validate_manifest`` requires
+#: numeric ``canvas.width``/``height``, so this only guards a direct call to the assembler.
+DEFAULT_CANVAS = {"width": 1000, "height": 800}
+
 
 # --- Column types -------------------------------------------------------------
 
@@ -149,14 +160,19 @@ def datasource_id(name: str) -> str:
     return f"federated.{_hashed(f'ds:{name}')}"
 
 
-def connection_id(csv_name: str) -> str:
-    """Return the ``textscan.*`` named-connection id for a CSV filename."""
-    return f"textscan.{_hashed(f'conn:{csv_name}')}"
+def connection_id(datasource_name: str, csv_name: str) -> str:
+    """Return the ``textscan.*`` named-connection id for one datasource's CSV.
+
+    The datasource name is part of the seed, not just the CSV: two datasources may read the
+    same CSV, and ids must stay unique across the whole workbook.
+    """
+    return f"textscan.{_hashed(f'conn:{datasource_name}:{csv_name}')}"
 
 
-def object_id(csv_name: str) -> str:
-    """Return the object-graph object id for a CSV filename."""
-    return f"{csv_name}_{_hashed(f'obj:{csv_name}').upper()}"
+def object_id(datasource_name: str, csv_name: str) -> str:
+    """Return the object-graph object id for one datasource's CSV (see
+    :func:`connection_id` on why the datasource name is in the seed)."""
+    return f"{csv_name}_{_hashed(f'obj:{datasource_name}:{csv_name}').upper()}"
 
 
 def simple_id(kind: str, name: str) -> str:
@@ -193,7 +209,9 @@ def _columns_for(header: list[str], field_types: dict[str, str]) -> list[Column]
     return columns
 
 
-def _render_relation(parent: ET.Element, csv_name: str, columns: list[Column]) -> ET.Element:
+def _render_relation(
+    parent: ET.Element, datasource_name: str, csv_name: str, columns: list[Column]
+) -> ET.Element:
     """Render a live ``<relation>`` over a local CSV, with its physical ``<columns>``.
 
     This is redundancy locations 1 and 3 (``connection > relation`` and
@@ -203,6 +221,7 @@ def _render_relation(parent: ET.Element, csv_name: str, columns: list[Column]) -
 
     Args:
         parent: The element to append the relation to.
+        datasource_name: The owning datasource (part of the connection id's seed).
         csv_name: The CSV filename.
         columns: The physical schema.
 
@@ -211,7 +230,7 @@ def _render_relation(parent: ET.Element, csv_name: str, columns: list[Column]) -
     """
     stem = csv_name.rsplit(".", 1)[0]
     relation = ET.SubElement(parent, "relation", {
-        "connection": connection_id(csv_name),
+        "connection": connection_id(datasource_name, csv_name),
         "name": csv_name,
         "table": f"[{stem}#csv]",
         "type": "table",
@@ -227,12 +246,13 @@ def _render_relation(parent: ET.Element, csv_name: str, columns: list[Column]) -
 
 
 def _render_metadata_records(
-    parent: ET.Element, csv_name: str, columns: list[Column]
+    parent: ET.Element, datasource_name: str, csv_name: str, columns: list[Column]
 ) -> None:
     """Render redundancy location 2: the capability record plus one record per column.
 
     Args:
         parent: The ``<connection class='federated'>`` element.
+        datasource_name: The owning datasource (part of the object id's seed).
         csv_name: The CSV filename (the records' ``parent-name``).
         columns: The physical schema.
     """
@@ -274,7 +294,9 @@ def _render_metadata_records(
             # Tableau rewrites the collation from the system locale on save; the value only
             # has to be a valid one.
             ET.SubElement(record, "collation", {"flag": "0", "name": "LEN_RUS"})
-        ET.SubElement(record, "object-id").text = f"[{object_id(csv_name)}]"
+        ET.SubElement(record, "object-id").text = (
+            f"[{object_id(datasource_name, csv_name)}]"
+        )
 
 
 def _render_datasource(
@@ -299,22 +321,22 @@ def _render_datasource(
     connection = ET.SubElement(datasource, "connection", {"class": "federated"})
     named_connections = ET.SubElement(connection, "named-connections")
     named_connection = ET.SubElement(named_connections, "named-connection", {
-        "caption": name, "name": connection_id(csv_name),
+        "caption": name, "name": connection_id(name, csv_name),
     })
     # directory='.' - the CSV sits beside the .twb inside the .twbx.
     ET.SubElement(named_connection, "connection", {
         "class": "textscan", "directory": ".", "filename": csv_name,
         "password": "", "server": "",
     })
-    _render_relation(connection, csv_name, columns)          # location 1
-    _render_metadata_records(connection, csv_name, columns)  # location 2
+    _render_relation(connection, name, csv_name, columns)          # location 1
+    _render_metadata_records(connection, name, csv_name, columns)  # location 2
 
     ET.SubElement(datasource, "aliases", {"enabled": "yes"})
     # location 4: the UI-level columns, led by the table's internal object-id column.
     ET.SubElement(datasource, "column", {
         "caption": csv_name,
         "datatype": "table",
-        "name": f"[__tableau_internal_object_id__].[{object_id(csv_name)}]",
+        "name": f"[__tableau_internal_object_id__].[{object_id(name, csv_name)}]",
         "role": "measure",
         "type": "quantitative",
     })
@@ -335,10 +357,10 @@ def _render_datasource(
     object_graph = ET.SubElement(datasource, "object-graph")
     objects = ET.SubElement(object_graph, "objects")
     graph_object = ET.SubElement(objects, "object", {
-        "caption": csv_name, "id": object_id(csv_name),
+        "caption": csv_name, "id": object_id(name, csv_name),
     })
     properties = ET.SubElement(graph_object, "properties", {"context": ""})
-    _render_relation(properties, csv_name, columns)          # location 3
+    _render_relation(properties, name, csv_name, columns)          # location 3
 
 
 # --- Worksheets, dashboard, windows --------------------------------------------
@@ -350,6 +372,8 @@ def _render_worksheet(parent: ET.Element, name: str) -> None:
         parent: The ``<worksheets>`` element.
         name: The sheet name, which its window must match exactly.
     """
+    # TODO(next ticket): fill the body from the manifest - datasource-dependencies, the
+    # column-instances, the mark class, and the rows/cols shelf text.
     worksheet = ET.SubElement(parent, "worksheet", {"name": name})
     table = ET.SubElement(worksheet, "table")
     view = ET.SubElement(table, "view")
@@ -392,8 +416,8 @@ def _render_dashboard(parent: ET.Element, canvas: dict, root_zone_id: str) -> No
         "enable-sort-zone-taborder": "true", "name": DASHBOARD_NAME,
     })
     ET.SubElement(dashboard, "style")
-    width = str(int(canvas.get("width", 1000)))
-    height = str(int(canvas.get("height", 800)))
+    width = str(int(canvas.get("width", DEFAULT_CANVAS["width"])))
+    height = str(int(canvas.get("height", DEFAULT_CANVAS["height"])))
     ET.SubElement(dashboard, "size", {
         "maxheight": height, "maxwidth": width, "minheight": height, "minwidth": width,
     })
@@ -402,7 +426,9 @@ def _render_dashboard(parent: ET.Element, canvas: dict, root_zone_id: str) -> No
         "h": ZONE_SPACE, "id": root_zone_id, "type-v2": "layout-basic",
         "w": ZONE_SPACE, "x": "0", "y": "0",
     })
-    _render_zone_style(root_zone, "8")  # zone-style is always the zone's last child
+    # TODO(next ticket): nest the manifest's layout.root tree inside this zone, one child
+    # zone per element id, with each worksheet zone naming its sheet.
+    _render_zone_style(root_zone, ROOT_ZONE_MARGIN)  # zone-style is the zone's last child
     ET.SubElement(dashboard, "simple-id", {"uuid": simple_id("dashboard", DASHBOARD_NAME)})
 
 
@@ -527,9 +553,8 @@ def render_workbook(
 
     layout = manifest_document.get("layout")
     canvas = layout.get("canvas", {}) if isinstance(layout, dict) else {}
-    root_zone_id = "1"  # zone ids are sequential from 1; the tree is the next ticket
-    _render_dashboard(ET.SubElement(workbook, "dashboards"), canvas, root_zone_id)
-    _render_windows(workbook, worksheet_names, root_zone_id)
+    _render_dashboard(ET.SubElement(workbook, "dashboards"), canvas, ROOT_ZONE_ID)
+    _render_windows(workbook, worksheet_names, ROOT_ZONE_ID)
 
     if target == TARGET_2026:
         explain_data = ET.SubElement(workbook, "explain-data", {
