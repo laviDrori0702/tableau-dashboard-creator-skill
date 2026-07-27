@@ -335,8 +335,9 @@ def commit(project_dir: Path | str) -> CommitResult:
 
     The spec is non-skippable, so commit only ever sets ``approved``. The
     ``mock-version/<current_version>/IMPLEMENTATION-SPEC.md`` must exist and pass
-    :func:`reconcile.reconcile` (every mock element mapped + every advanced-feature
-    escalation justified) or the commit is refused. On success ``spec`` is approved and
+    :func:`reconcile.reconcile` (every mock element mapped, every advanced-feature
+    escalation justified, and a consistent Layout container tree) or the commit is
+    refused. On success ``spec`` is approved and
     every downstream ``approved`` step (``build``) is flipped to ``stale`` (§4.2). Spec
     writes into the mock's ``current_version`` and never bumps it - only the leading
     deliverable (``mock``) does (§4.3), so a re-run overwrites the spec in place.
@@ -385,6 +386,8 @@ def commit(project_dir: Path | str) -> CommitResult:
                     for item in validation.unjustified
                 )
             )
+        if validation.layout_errors:
+            reasons.append("layout problem(s): " + "; ".join(validation.layout_errors))
         return CommitResult(
             False,
             f"'{SPEC_FILENAME}' does not fully reconcile with the mock - "
@@ -435,6 +438,10 @@ def format_precheck(result: PrecheckResult) -> str:
         "  default each element to the SIMPLEST sufficient Tableau primitive; justify any "
         "escalation to DZV / LOD / table calc / parameter action against the simpler option."
     )
+    lines.append(
+        "  the spec must also carry a '## Layout' fenced-JSON container tree derived from "
+        "the mock's geometry (canvas + nested vert/horz + % sizes; see the template)."
+    )
     return "\n".join(lines)
 
 
@@ -458,11 +465,18 @@ def format_validation(validation: SpecValidation) -> str:
         )
         lines.append(f"  [x] {item.id}: {item.construct}{note}")
 
+    lines.append("Layout container tree:")
+    if validation.layout_errors:
+        lines.extend(f"  [ ] {error}" for error in validation.layout_errors)
+    else:
+        lines.append("  [x] present and consistent with the Element Mapping")
+
     for note in validation.notes:
         lines.append(f"  note: {note}")
 
     lines.append(
-        "[OK] every mock element maps to a construct; escalations are justified."
+        "[OK] every mock element maps to a construct; escalations are justified; "
+        "the layout tree is consistent."
         if validation.ok
         else "[INVALID] spec does not fully reconcile with the mock - fix the items above and re-run."
     )

@@ -1,6 +1,6 @@
 ---
 name: tableau-spec
-description: Translates the approved HTML mock (mock.html) into an IMPLEMENTATION-SPEC.md for the tableau-dashboard-plugin workflow, mapping every mock element to a concrete Tableau construct so the build step never has to guess. Reconciles coverage the mirror of the mock's checklist so nothing is left unmapped, and applies a simplest-primitive guard defaulting each element to the simplest sufficient Tableau primitive and forcing an explicit justification for any escalation to an advanced feature (Dynamic Zone Visibility, LOD, table calculation, parameter action), so the workbook is not over-engineered. Reads the approved mock.html and DASHBOARD-PLAN.md. Use when the user wants to write the implementation spec, map the mock to Tableau, or when tableau-route reports spec is next. Step 7 of 8 in the workflow.
+description: Translates the approved HTML mock (mock.html) into an IMPLEMENTATION-SPEC.md for the tableau-dashboard-plugin workflow, mapping every mock element to a concrete Tableau construct so the build step never has to guess. Reconciles coverage the mirror of the mock's checklist so nothing is left unmapped, and applies a simplest-primitive guard defaulting each element to the simplest sufficient Tableau primitive and forcing an explicit justification for any escalation to an advanced feature (Dynamic Zone Visibility, LOD, table calculation, parameter action), so the workbook is not over-engineered. Emits a required Layout section (a fenced JSON container tree with canvas dimensions, nested vert/horz containers, and percentage sizes) so the build reproduces the mock's geometry instead of guessing it. Reads the approved mock.html and DASHBOARD-PLAN.md. Use when the user wants to write the implementation spec, map the mock to Tableau, or when tableau-route reports spec is next. Step 7 of 8 in the workflow.
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, AskUserQuestion, Bash(python *), Bash(python3 *)
 ---
@@ -29,10 +29,11 @@ carries a justification), the version bump, and the STATE.md transition — live
 judgment part: choosing the right, simplest Tableau construct for each element and
 justifying any escalation. Run the script at the points below; do not hand-edit `STATE.md`.
 
-## The one convention the reconciliation depends on
+## The two conventions the reconciliation depends on
 
-`reconcile.py` decides "mapped" mechanically, so the spec **must** carry a single
-**Element Mapping table** (see `references/IMPLEMENTATION-SPEC-TEMPLATE.md`):
+`reconcile.py` decides "mapped" and "laid out" mechanically, so the spec **must** carry a
+single **Element Mapping table** and a **Layout section** (see
+`references/IMPLEMENTATION-SPEC-TEMPLATE.md`):
 
 - The table's first column header is **`id`** and it has a column whose header contains
   **`construct`** and one whose header contains **`justif`**.
@@ -41,6 +42,12 @@ justifying any escalation. Run the script at the points below; do not hand-edit 
   is what makes "nothing unmapped" a guarantee.
 - The **construct** cell names the Tableau construct; the **justification** cell explains
   any escalation (leave it blank / `-` for a simple primitive).
+- The **`## Layout` section** holds a short summary and a fenced JSON **container tree**
+  derived from the approved mock: the mock's `canvas` dimensions, nested `vert`/`horz`
+  containers, and element-id leaves with percentage `size`s (siblings sum to ~100). Every
+  mapped **zone** id appears **exactly once**; interaction ids (`int-*`) are actions, not
+  zones, and never appear. This is how the mock's geometry reaches `tableau-build` — a
+  missing or inconsistent Layout blocks approval exactly like an unmapped element.
 
 ## The simplest-primitive guard
 
@@ -84,9 +91,12 @@ panel` / `parameter swap` → these legitimately need DZV / parameter — justif
 
 3. **Author `IMPLEMENTATION-SPEC.md`** at the precheck's **target path**. Fill the Element
    Mapping table with one row per mock element, defaulting to the simplest primitive and
-   justifying every escalation. Add the supporting detail the build needs (calculated
-   fields, data source / joins, actions, parameters) following the template. When
-   **refining** an existing spec at this version, `Edit` it in place.
+   justifying every escalation. Write the **`## Layout` section** by reading the mock's
+   actual geometry (its rows, columns, and nesting) into the JSON container tree — sizes
+   as percentages of the parent, canvas from the plan's Screen Size. Add the supporting
+   detail the build needs (calculated fields, data source / joins, actions, parameters)
+   following the template. When **refining** an existing spec at this version, `Edit` it
+   in place.
 
 4. **Self-check, then present.** Validate the draft before showing it:
 
@@ -95,8 +105,10 @@ panel` / `parameter swap` → these legitimately need DZV / parameter — justif
    ```
 
    It prints the **reconciliation checklist** (one line per mock element, each `[x]` mapped
-   or `[ ]` unmapped / unjustified-escalation) and the guard result. If it prints
-   `[INVALID]`, map the missing element(s) / add the missing justification(s) and re-run.
+   or `[ ]` unmapped / unjustified-escalation), the guard result, and the **layout check**
+   (the container tree present and consistent with the mapping). If it prints `[INVALID]`,
+   map the missing element(s) / add the missing justification(s) / fix the named layout
+   problem(s) and re-run.
    When it prints `[OK]`, **show the checklist to the analyst** (it's the proof nothing was
    dropped and nothing is over-engineered) and present the spec for approval.
 
