@@ -19,11 +19,21 @@ versioning / entry-gate plumbing and imports :func:`reconcile` from here. It own
 The concrete "what is the simplest primitive for X" knowledge lives in the validated snippet
 library and the SKILL.md's decision guidance; this module enforces only the mechanical rule
 "advanced feature present => a justification must be written".
+
+3. **Layout reconciliation** (issue #32) - the spec MUST carry a ``## Layout`` section
+   holding a fenced JSON container tree (canvas dimensions + nested ``vert``/``horz``
+   containers + element-id leaves with percentage sizes). This is how the mock's geometry
+   reaches ``tableau-build``; without it the workbook's layout is guesswork. The tree must
+   place every mapped *zone* id exactly once (interaction ids - ``int-*`` - are dashboard
+   actions, not zones, so they never appear in the tree), must not place unmapped ids, and
+   sibling sizes must sum to ~100%.
 """
 
 from __future__ import annotations
 
+import json
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -195,6 +205,195 @@ def parse_spec_mappings(spec_text: str) -> list[Mapping]:
     return []
 
 
+# --- Layout container tree (issue #32) ----------------------------------------
+
+#: Valid container orientations in the layout tree.
+CONTAINER_TYPES = frozenset({"vert", "horz"})
+
+#: Mapped ids with this prefix are dashboard *actions* (plan convention: ``int-region-filter``)
+#: - they occupy no zone, so the layout tree neither requires nor allows placing them.
+INTERACTION_PREFIX = "int-"
+
+#: How far sibling sizes may drift from 100% before they "don't sum sanely" (rounding slack).
+SIBLING_SIZE_TOLERANCE = 2.0
+
+# Exactly '## Layout' (the level the contract/template mandate) so the section reliably
+# ends at the next '## ' heading.
+_LAYOUT_HEADING = re.compile(r"^##\s+Layout\b.*$", re.MULTILINE)
+_NEXT_SECTION = re.compile(r"^##\s", re.MULTILINE)
+_FENCED_BLOCK = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)
+
+
+def extract_layout_block(spec_text: str) -> Optional[str]:
+    """Return the fenced JSON text under the spec's ``## Layout`` heading, or ``None``.
+
+    Args:
+        spec_text: The contents of an ``IMPLEMENTATION-SPEC.md`` file.
+
+    Returns:
+        The inner text of the first fenced code block between the ``## Layout`` heading
+        and the next ``## `` section, or ``None`` when the heading or block is absent.
+    """
+    heading = _LAYOUT_HEADING.search(spec_text)
+    if heading is None:
+        return None
+    section = spec_text[heading.end():]
+    next_section = _NEXT_SECTION.search(section)
+    if next_section is not None:
+        section = section[: next_section.start()]
+    block = _FENCED_BLOCK.search(section)
+    return block.group(1) if block else None
+
+
+def _is_number(value: object) -> bool:
+    """Return True for a real (non-bool) JSON number."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _walk_layout_node(
+    node: object, path: str, is_root: bool, placed: list[str], errors: list[str]
+) -> None:
+    """Validate one layout node (and recurse), appending placed ids and errors.
+
+    A node is a **container** (``type`` in vert/horz + non-empty ``children``), a **leaf**
+    (``id`` naming a mapped element), or both - a *mapped container* (e.g. a DZV panel
+    that is itself an element and holds further zones). Every non-root node needs a
+    positive numeric ``size`` (percent of its parent), and each container's children must
+    sum to ~100.
+
+    Args:
+        node: The JSON value at this position in the tree.
+        path: Human-readable position (e.g. ``root.children[1]``) for error messages.
+        is_root: True for the top-level container (which needs no ``size``).
+        placed: Accumulator for every placed id encountered.
+        errors: Accumulator for validation errors.
+    """
+    if not isinstance(node, dict):
+        errors.append(f"{path}: every layout node must be a JSON object")
+        return
+
+    has_id, is_container = "id" in node, "children" in node
+    if not has_id and not is_container:
+        errors.append(
+            f"{path}: a node needs an 'id' (leaf), 'children' (container), or both "
+            f"(a mapped container, e.g. a DZV panel)"
+        )
+        return
+
+    if not is_root and not (_is_number(node.get("size")) and node["size"] > 0):
+        errors.append(f"{path}: missing a positive numeric 'size' (percent of parent)")
+
+    if has_id:
+        element_id = node["id"]
+        if isinstance(element_id, str) and element_id.strip():
+            placed.append(element_id.strip())
+        else:
+            errors.append(f"{path}: 'id' must be a non-empty string")
+    if not is_container:
+        return
+
+    if node.get("type") not in CONTAINER_TYPES:
+        errors.append(
+            f"{path}: container 'type' must be 'vert' or 'horz' (got {node.get('type')!r})"
+        )
+    children = node["children"]
+    if not isinstance(children, list) or not children:
+        errors.append(f"{path}: 'children' must be a non-empty list")
+        return
+    for index, child in enumerate(children):
+        _walk_layout_node(child, f"{path}.children[{index}]", False, placed, errors)
+
+    sizes = [child.get("size") for child in children if isinstance(child, dict)]
+    if len(sizes) == len(children) and all(_is_number(size) for size in sizes):
+        total = sum(sizes)
+        if abs(total - 100) > SIBLING_SIZE_TOLERANCE:
+            errors.append(
+                f"{path}: sibling sizes sum to {total:g}, expected ~100 "
+                f"(each child's share of its parent)"
+            )
+
+
+def validate_layout(spec_text: str, mapped_ids: list[str]) -> list[str]:
+    """Validate the spec's Layout container tree against its Element Mapping ids.
+
+    The Layout section is **required** (it is how the mock's geometry reaches the build):
+    a missing section/block, unparseable JSON, a malformed tree, a mapped zone id absent or
+    placed more than once, an id in the tree with no mapping row, or siblings whose sizes
+    don't sum to ~100% each produce an actionable error.
+
+    Args:
+        spec_text: The contents of an ``IMPLEMENTATION-SPEC.md`` file.
+        mapped_ids: The ids of the spec's Element Mapping rows. Ids prefixed ``int-``
+            (interactions/actions) are exempt from placement - they occupy no zone.
+
+    Returns:
+        A list of error messages; empty when the layout is present and consistent.
+    """
+    block = extract_layout_block(spec_text)
+    if block is None:
+        return [
+            "Layout section missing: add a '## Layout' section with a fenced JSON "
+            "container tree (canvas + nested vert/horz containers + element-id leaves "
+            "with % sizes) - see IMPLEMENTATION-SPEC-TEMPLATE.md"
+        ]
+    try:
+        layout = json.loads(block)
+    except json.JSONDecodeError as exc:
+        return [f"Layout JSON does not parse: {exc}"]
+    if not isinstance(layout, dict):
+        return ["Layout JSON must be an object with 'canvas' and 'root' keys"]
+
+    errors: list[str] = []
+    canvas = layout.get("canvas")
+    if not (
+        isinstance(canvas, dict)
+        and _is_number(canvas.get("width")) and canvas["width"] > 0
+        and _is_number(canvas.get("height")) and canvas["height"] > 0
+    ):
+        errors.append(
+            "Layout 'canvas' must carry positive numeric 'width' and 'height' "
+            "(the mock's design dimensions in px)"
+        )
+
+    root = layout.get("root")
+    placed: list[str] = []
+    if isinstance(root, dict):
+        _walk_layout_node(root, "root", True, placed, errors)
+    else:
+        errors.append("Layout 'root' must be a container object ('type' + 'children')")
+
+    placement_counts = Counter(placed)
+    duplicates = sorted(pid for pid, count in placement_counts.items() if count > 1)
+    if duplicates:
+        errors.append(
+            "element id(s) placed more than once in the layout tree: "
+            + ", ".join(duplicates)
+        )
+
+    mapped_set = set(mapped_ids)
+    unknown = sorted(pid for pid in placement_counts if pid not in mapped_set)
+    if unknown:
+        errors.append(
+            "layout tree places id(s) with no Element Mapping row: " + ", ".join(unknown)
+        )
+
+    zone_ids = [pid for pid in mapped_ids if not pid.startswith(INTERACTION_PREFIX)]
+    unplaced = [pid for pid in zone_ids if pid not in placement_counts]
+    if unplaced:
+        errors.append(
+            "mapped element id(s) missing from the layout tree: " + ", ".join(unplaced)
+        )
+    misplaced_actions = sorted(
+        pid for pid in placement_counts if pid.startswith(INTERACTION_PREFIX)
+    )
+    if misplaced_actions:
+        errors.append(
+            "interaction id(s) placed in the layout tree (actions occupy no zone): "
+            + ", ".join(misplaced_actions)
+        )
+    return errors
+
+
 # --- Reconciliation result ---------------------------------------------------
 
 @dataclass(frozen=True)
@@ -222,17 +421,20 @@ class SpecValidation:
     """Result of reconciling an ``IMPLEMENTATION-SPEC.md`` against its ``mock.html``.
 
     Attributes:
-        ok: True iff every mock element is mapped and every advanced-feature escalation is
-            justified.
+        ok: True iff every mock element is mapped, every advanced-feature escalation is
+            justified, and the Layout container tree is present and consistent.
         items: The reconciliation checklist (one item per mock element).
         extra_ids: Ids mapped in the spec that do not exist in the mock (non-fatal note).
         notes: Non-fatal observations.
+        layout_errors: Layout-section problems (each blocks approval; empty when the
+            container tree is present and consistent with the Element Mapping).
     """
 
     ok: bool
     items: list[MappingItem]
     extra_ids: list[str]
     notes: list[str] = field(default_factory=list)
+    layout_errors: list[str] = field(default_factory=list)
 
     @property
     def unmapped(self) -> list[str]:
@@ -253,8 +455,10 @@ def reconcile(mock_html: str, spec_text: str) -> SpecValidation:
 
     Coverage: every ``data-plan-id`` in the mock must have an Element Mapping row.
     Guard: any mapping whose construct uses an advanced feature (DZV / LOD / table calc /
-    parameter action) must carry a non-empty justification. The spec is valid iff there
-    are no unmapped mock elements and no unjustified escalations.
+    parameter action) must carry a non-empty justification. Layout: the spec must carry a
+    ``## Layout`` container tree consistent with the mapping (:func:`validate_layout`).
+    The spec is valid iff there are no unmapped mock elements, no unjustified escalations,
+    and no layout errors.
 
     Args:
         mock_html: The contents of the approved ``mock.html``.
@@ -290,5 +494,6 @@ def reconcile(mock_html: str, spec_text: str) -> SpecValidation:
             + ", ".join(extra_ids)
         )
 
-    ok = all(item.mapped and item.justified for item in items)
-    return SpecValidation(ok, items, extra_ids, notes)
+    layout_errors = validate_layout(spec_text, list(mappings.keys()))
+    ok = all(item.mapped and item.justified for item in items) and not layout_errors
+    return SpecValidation(ok, items, extra_ids, notes, layout_errors)

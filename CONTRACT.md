@@ -53,6 +53,27 @@ A step may also have *optional reads* that enrich its output but never block it:
 > and the `STEPS` definition in `skills/tableau-route/scripts/route.py`. They are the prose and the
 > executable copy of the same graph and must stay identical.
 
+### 1.1 The `IMPLEMENTATION-SPEC.md` handoff (step 7 → step 8)
+
+`IMPLEMENTATION-SPEC.md` carries two machine-checked sections that `tableau-build` consumes; spec
+approval is blocked until both are present and consistent (enforced by `tableau-spec`'s
+`reconcile.py`):
+
+1. **The Element Mapping table** — one row per mock element (`data-plan-id`), mapping each to a
+   Tableau construct, with a justification for any advanced-feature escalation.
+2. **The Layout section** — a short human-readable summary followed by a **fenced JSON container
+   tree** derived from the approved `mock.html`, so layout truth reaches the build instead of being
+   guessed. The JSON carries:
+   - `canvas` — the mock's design dimensions in px (`{"width": ..., "height": ...}`);
+   - `root` — a container node (`type`: `vert` | `horz`, non-empty `children`), nesting further
+     containers and leaves (`{"id": ..., "size": ...}`);
+   - every non-root node has a numeric `size` — its **percentage of the parent** along the parent's
+     flow axis — and siblings sum to ~100.
+
+   Every Element Mapping **zone** id appears in the tree **exactly once**; ids in the tree must have
+   a mapping row. Interaction ids (`int-*`, per the plan's id convention) are dashboard *actions*,
+   not zones — they are never placed in the tree.
+
 ---
 
 ## 2. The `STATE.md` schema

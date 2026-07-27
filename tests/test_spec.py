@@ -35,12 +35,28 @@ def _mock_html(ids=MOCK_IDS) -> str:
     return f"<!doctype html><html><body>\n{tagged}\n</body></html>"
 
 
-def _spec_md(rows=None) -> str:
-    """Render an IMPLEMENTATION-SPEC.md with an Element Mapping table.
+def _layout_json(ids) -> str:
+    """Render a minimal valid Layout JSON: a vert root placing each zone id once.
+
+    Interaction ids (``int-*``) are actions, not zones, so they are never placed.
+    """
+    zone_ids = [i for i in ids if not i.startswith("int-")]
+    share = round(100 / len(zone_ids), 2) if zone_ids else 100
+    children = ", ".join(f'{{"id": "{i}", "size": {share}}}' for i in zone_ids)
+    return (
+        '{"canvas": {"width": 1366, "height": 768}, '
+        f'"root": {{"type": "vert", "children": [{children}]}}}}'
+    )
+
+
+def _spec_md(rows=None, layout=None) -> str:
+    """Render an IMPLEMENTATION-SPEC.md with an Element Mapping table and Layout section.
 
     Args:
         rows: Iterable of ``(id, construct, justification)`` tuples. Defaults to a full,
             all-simple mapping of every ``MOCK_IDS`` element.
+        layout: The Layout section's fenced JSON text. Defaults to a valid tree placing
+            each mapped zone id once; pass ``""`` to omit the Layout section entirely.
 
     Returns:
         A spec markdown string.
@@ -52,12 +68,18 @@ def _spec_md(rows=None) -> str:
             ("flt-region", "Filter card on [region]", "-"),
             ("int-region-filter", "Filter action (Use as Filter)", "-"),
         ]
+    if layout is None:
+        layout = _layout_json([i for i, _, _ in rows])
     body = "\n".join(f"| {i} | {c} | {j} |" for i, c, j in rows)
+    layout_section = (
+        f"\n## Layout\n\nA vert stack of the mapped zones.\n\n```json\n{layout}\n```\n"
+        if layout else ""
+    )
     return (
         "# Implementation Spec: Sales\n\n## Element Mapping\n"
         "| id | tableau construct | justification |\n"
         "|----|-------------------|---------------|\n"
-        f"{body}\n"
+        f"{body}\n{layout_section}"
     )
 
 
@@ -258,6 +280,156 @@ def test_reconcile_notes_extra_mapped_ids():
 
     assert validation.ok is True
     assert validation.extra_ids == ["ghost-id"]
+
+
+# --- Layout container tree (issue #32) ----------------------------------------
+
+def test_reconcile_flags_missing_layout_section():
+    """A spec with no ## Layout section fails with an actionable message (AC)."""
+    validation = reconcile.reconcile(_mock_html(), _spec_md(layout=""))
+
+    assert validation.ok is False
+    assert any("Layout section missing" in error for error in validation.layout_errors)
+
+
+def test_reconcile_flags_unparseable_layout_json():
+    """A Layout block that is not valid JSON fails with a parse error."""
+    validation = reconcile.reconcile(_mock_html(), _spec_md(layout="{not json"))
+
+    assert validation.ok is False
+    assert any("does not parse" in error for error in validation.layout_errors)
+
+
+def test_reconcile_flags_mapped_id_absent_from_tree():
+    """A mapped zone id with no leaf in the tree blocks approval (AC)."""
+    layout = (
+        '{"canvas": {"width": 1366, "height": 768}, "root": {"type": "vert", "children": '
+        '[{"id": "kpi-revenue", "size": 50}, {"id": "chart-trend", "size": 50}]}}'
+    )  # flt-region unplaced
+    validation = reconcile.reconcile(_mock_html(), _spec_md(layout=layout))
+
+    assert validation.ok is False
+    assert any(
+        "missing from the layout tree" in error and "flt-region" in error
+        for error in validation.layout_errors
+    )
+
+
+def test_reconcile_flags_id_placed_more_than_once():
+    """A zone id placed twice in the tree blocks approval (AC)."""
+    layout = (
+        '{"canvas": {"width": 1366, "height": 768}, "root": {"type": "vert", "children": '
+        '[{"id": "kpi-revenue", "size": 25}, {"id": "kpi-revenue", "size": 25}, '
+        '{"id": "chart-trend", "size": 25}, {"id": "flt-region", "size": 25}]}}'
+    )
+    validation = reconcile.reconcile(_mock_html(), _spec_md(layout=layout))
+
+    assert validation.ok is False
+    assert any(
+        "more than once" in error and "kpi-revenue" in error
+        for error in validation.layout_errors
+    )
+
+
+def test_reconcile_flags_tree_id_with_no_mapping_row():
+    """An id in the tree that has no Element Mapping row blocks approval (AC)."""
+    layout = (
+        '{"canvas": {"width": 1366, "height": 768}, "root": {"type": "vert", "children": '
+        '[{"id": "kpi-revenue", "size": 25}, {"id": "chart-trend", "size": 25}, '
+        '{"id": "flt-region", "size": 25}, {"id": "ghost-zone", "size": 25}]}}'
+    )
+    validation = reconcile.reconcile(_mock_html(), _spec_md(layout=layout))
+
+    assert validation.ok is False
+    assert any(
+        "no Element Mapping row" in error and "ghost-zone" in error
+        for error in validation.layout_errors
+    )
+
+
+def test_reconcile_flags_insane_sibling_sizes():
+    """Sibling sizes far from 100% block approval (AC)."""
+    layout = (
+        '{"canvas": {"width": 1366, "height": 768}, "root": {"type": "vert", "children": '
+        '[{"id": "kpi-revenue", "size": 10}, {"id": "chart-trend", "size": 10}, '
+        '{"id": "flt-region", "size": 10}]}}'
+    )
+    validation = reconcile.reconcile(_mock_html(), _spec_md(layout=layout))
+
+    assert validation.ok is False
+    assert any("sum to 30" in error for error in validation.layout_errors)
+
+
+def test_reconcile_flags_missing_canvas():
+    """The canvas dimensions are required (the mock's design size drives the build)."""
+    layout = (
+        '{"root": {"type": "vert", "children": [{"id": "kpi-revenue", "size": 34}, '
+        '{"id": "chart-trend", "size": 33}, {"id": "flt-region", "size": 33}]}}'
+    )
+    validation = reconcile.reconcile(_mock_html(), _spec_md(layout=layout))
+
+    assert validation.ok is False
+    assert any("'canvas'" in error for error in validation.layout_errors)
+
+
+def test_reconcile_accepts_nested_containers():
+    """A well-formed nested vert/horz tree with sane sizes validates [OK] (AC)."""
+    layout = (
+        '{"canvas": {"width": 1366, "height": 768}, "root": {"type": "vert", "children": '
+        '[{"id": "flt-region", "size": 10}, '
+        '{"type": "horz", "size": 90, "children": '
+        '[{"id": "kpi-revenue", "size": 40}, {"id": "chart-trend", "size": 60}]}]}}'
+    )
+    validation = reconcile.reconcile(_mock_html(), _spec_md(layout=layout))
+
+    assert validation.ok is True
+    assert validation.layout_errors == []
+
+
+def test_reconcile_accepts_mapped_container():
+    """A container may itself carry a mapped id (e.g. a DZV panel holding zones)."""
+    ids = ("pnl-details", "kpi-revenue", "chart-trend")
+    rows = [
+        ("pnl-details", "Dynamic Zone Visibility on the details container", "no simpler toggle"),
+        ("kpi-revenue", "Text mark, SUM([revenue])", "-"),
+        ("chart-trend", "Line mark", "-"),
+    ]
+    layout = (
+        '{"canvas": {"width": 1366, "height": 768}, "root": {"type": "vert", "children": '
+        '[{"id": "chart-trend", "size": 60}, '
+        '{"id": "pnl-details", "type": "horz", "size": 40, "children": '
+        '[{"id": "kpi-revenue", "size": 100}]}]}}'
+    )
+    validation = reconcile.reconcile(_mock_html(ids), _spec_md(rows, layout=layout))
+
+    assert validation.ok is True
+    assert validation.layout_errors == []
+
+
+def test_reconcile_interaction_ids_stay_out_of_the_tree():
+    """int-* ids are actions, not zones: not required in the tree, and rejected if placed."""
+    placed_action = (
+        '{"canvas": {"width": 1366, "height": 768}, "root": {"type": "vert", "children": '
+        '[{"id": "kpi-revenue", "size": 25}, {"id": "chart-trend", "size": 25}, '
+        '{"id": "flt-region", "size": 25}, {"id": "int-region-filter", "size": 25}]}}'
+    )
+    validation = reconcile.reconcile(_mock_html(), _spec_md(layout=placed_action))
+
+    assert validation.ok is False
+    assert any("occupy no zone" in error for error in validation.layout_errors)
+    # The default helper layout omits int-region-filter and is valid (see other tests).
+
+
+def test_commit_refuses_spec_without_layout(tmp_path):
+    """commit is gated on the Layout section too, STATE.md untouched (AC)."""
+    _ready_project(tmp_path)
+    _write_spec(tmp_path, "v_1", _spec_md(layout=""))
+
+    result = spec.commit(tmp_path)
+
+    assert result.ok is False
+    assert "layout" in result.message.lower()
+    assert route.parse_state(tmp_path / "STATE.md").statuses["spec"] == "pending"
 
 
 # --- Versioning (CONTRACT.md §4.3: spec never bumps current_version) ----------
