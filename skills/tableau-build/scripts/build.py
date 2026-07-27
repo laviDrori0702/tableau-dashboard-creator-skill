@@ -55,6 +55,8 @@ logger = logging.getLogger(__name__)
 STATE_FILENAME = "STATE.md"
 DATA_MODEL_FILENAME = "DATA-MODEL.md"
 SPEC_FILENAME = "IMPLEMENTATION-SPEC.md"
+#: Optional read: styling. Absent (branding skipped) means Tableau's own defaults.
+DESIGN_TOKENS_FILENAME = "DESIGN-TOKENS.md"
 #: Build-internal, not a handoff artifact - hence lowercase (CONTRACT.md §3).
 MANIFEST_FILENAME = "build-manifest.json"
 WORKBOOK_FILENAME = "dashboard.twbx"
@@ -702,11 +704,14 @@ def build_workbook(project_dir: Path | str) -> BuildResult:
         )
 
     twb_path = version_dir / TWB_FILENAME
+    tokens_path = project_root / DESIGN_TOKENS_FILENAME
     twb_path.write_text(
         twb.render_workbook(
             document,
             (project_root / DATA_MODEL_FILENAME).read_text(encoding="utf-8-sig"),
             headers,
+            # Optional read (CONTRACT.md §4.1): no branding step, no styling overrides.
+            tokens_path.read_text(encoding="utf-8-sig") if tokens_path.exists() else "",
         ),
         encoding="utf-8",
     )

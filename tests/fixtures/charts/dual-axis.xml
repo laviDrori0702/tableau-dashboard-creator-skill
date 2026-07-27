@@ -1,0 +1,66 @@
+<worksheet name="Dual Axis">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#7f56d9" fontname="Open Sans" fontsize="14">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Order Date" datatype="date" name="[order_date]" role="dimension" type="ordinal" />
+            <column caption="Profit" datatype="real" name="[profit]" role="measure" type="quantitative" />
+            <column caption="Revenue" datatype="real" name="[revenue]" role="measure" type="quantitative" />
+            <column-instance column="[profit]" derivation="Sum" name="[sum:profit:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[revenue]" derivation="Sum" name="[sum:revenue:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[order_date]" derivation="Month-Trunc" name="[tmn:order_date:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="axis">
+            <encoding attr="space" class="0" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" field-type="quantitative" fold="true" scope="rows" synchronized="true" type="space" />
+            <format attr="display" class="0" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" scope="rows" value="false" />
+          </style-rule>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <color column="[federated.b2993893834e8f0306a282d0a717d7a9].[:Measure Names]" />
+            </encodings>
+          </pane>
+          <pane id="1" selection-relaxation-option="selection-relaxation-allow" y-axis-name="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <color column="[federated.b2993893834e8f0306a282d0a717d7a9].[:Measure Names]" />
+            </encodings>
+          </pane>
+          <pane id="2" selection-relaxation-option="selection-relaxation-allow" y-axis-name="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <color column="[federated.b2993893834e8f0306a282d0a717d7a9].[:Measure Names]" />
+            </encodings>
+          </pane>
+        </panes>
+        <rows>([federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk] + [federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk])</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[tmn:order_date:qk]</cols>
+      </table>
+      <simple-id uuid="{CEDEAAA5-EA1B-53A6-A4D9-BCD7DB3A9669}" />
+    </worksheet>

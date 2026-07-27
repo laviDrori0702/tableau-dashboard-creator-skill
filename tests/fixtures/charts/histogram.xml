@@ -1,0 +1,44 @@
+<worksheet name="Histogram">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#7f56d9" fontname="Open Sans" fontsize="14">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Revenue (bin)" datatype="integer" name="[Revenue (bin)]" role="dimension" type="ordinal">
+              <calculation class="bin" decimals="2" formula="[revenue]" peg="0" size="500" />
+            </column>
+            <column caption="Revenue" datatype="real" name="[revenue]" role="measure" type="quantitative" />
+            <column-instance column="[revenue]" derivation="Count" name="[cnt:revenue:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[Revenue (bin)]" derivation="None" name="[none:Revenue (bin):ok]" pivot="key" type="ordinal" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+          </pane>
+        </panes>
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[cnt:revenue:qk]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[none:Revenue (bin):ok]</cols>
+        <show-full-range>
+          <column>[federated.b2993893834e8f0306a282d0a717d7a9].[Revenue (bin)]</column>
+        </show-full-range>
+      </table>
+      <simple-id uuid="{BCAC38AF-B8B7-579D-A3C4-C181F1F859D4}" />
+    </worksheet>

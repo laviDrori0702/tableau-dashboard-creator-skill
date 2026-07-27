@@ -1,0 +1,41 @@
+<worksheet name="Calculated Field">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#7f56d9" fontname="Open Sans" fontsize="14">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Margin Pct" datatype="real" name="[Margin Pct]" role="measure" type="quantitative">
+              <calculation class="tableau" formula="SUM([profit]) / SUM([revenue])" />
+            </column>
+            <column caption="Region" datatype="string" name="[region]" role="dimension" type="nominal" />
+            <column-instance column="[region]" derivation="None" name="[none:region:nk]" pivot="key" type="nominal" />
+            <column-instance column="[Margin Pct]" derivation="User" name="[usr:Margin Pct:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+          </pane>
+        </panes>
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[usr:Margin Pct:qk]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]</cols>
+      </table>
+      <simple-id uuid="{7152EE60-EEAB-561C-8A77-09D70D36B673}" />
+    </worksheet>
