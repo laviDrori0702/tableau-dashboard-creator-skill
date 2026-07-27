@@ -152,11 +152,13 @@ The case of a filename encodes its role, so a skill can tell handoff artifacts f
   under `scaffold/` (see §3.1).
 
 **Build-internal files** are the third, narrow category: lowercase files a skill writes for
-its *own* next stage, never read by another skill. Today there is exactly one —
+its *own* next stage, never read by another skill. Today there are two, both `tableau-build`'s:
 `mock-version/v_N/build-manifest.json`, the machine-readable translation of
-`IMPLEMENTATION-SPEC.md` + `DATA-MODEL.md` that `tableau-build`'s workbook generator
-consumes. Because nothing downstream reads it, it is not a handoff and takes the lowercase
-casing; it is versioned with the deliverable it produces (§4.3). A skill may add one only
+`IMPLEMENTATION-SPEC.md` + `DATA-MODEL.md` that the workbook generator consumes; and
+`mock-version/v_N/dashboard.twb`, the unpackaged workbook the two validators read before it is
+zipped into the deliverable `.twbx` (it stays on disk after a failed build so the XML can be
+inspected). Because nothing downstream reads them, they are not handoffs and take the lowercase
+casing; they are versioned with the deliverable they produce (§4.3). A skill may add one only
 for a stage boundary inside itself.
 
 New artifacts MUST follow this rule. Do not introduce a lowercase handoff, an UPPER-KEBAB
@@ -280,7 +282,7 @@ Two kinds of outputs, two storage strategies:
   current copy. Re-running one of these skills updates the root file and triggers staleness (§4.2);
   it does **not** create a new version directory.
 - **Deliverables = standalone versioned copies.** `mock.html`, `IMPLEMENTATION-SPEC.md`, and
-  `dashboard.twbx` (plus build's internal `build-manifest.json`, §3) are written under
+  `dashboard.twbx` (plus build's internal `build-manifest.json` and `dashboard.twb`, §3) are written under
   `mock-version/v_N/`, all three deliverables sharing the **same** `v_N`
   directory. A version is anchored by its **mock**: `mock.html` is the leading deliverable, and
   **only `tableau-mock` bumps `current_version`**. Re-running `tableau-mock` after its step was

@@ -22,10 +22,13 @@ field, or element id named.
 | **Entry gate** | Refuses to run until `spec` is resolved **and** `IMPLEMENTATION-SPEC.md` exists at `current_version`, **and** `data` is resolved **and** `DATA-MODEL.md` plus at least one CSV exist (CONTRACT.md §4.1). |
 | **Next step** | None — the pipeline is complete (`tableau-route` confirms). |
 
-The mechanical guarantees — the entry gate, the manifest schema validation, and the STATE.md
-transition — live in `build.py` (CLI) and `manifest.py` (the schema core). Your job is the
-judgment part: translating each spec row into the right manifest entry. Run the script at
-the points below; do not hand-edit `STATE.md`.
+The mechanical guarantees live in Python: the entry gate, the manifest schema validation and
+the STATE.md transition in `build.py` / `manifest.py`, and the XML itself in `twb.py` — the
+element order, the generated ids, the four places every column must appear, the live-only
+connection and the version targeting are **code, not a checklist**, so a validated manifest
+builds a workbook that is correct by construction. Your job is the judgment part: translating
+each spec row into the right manifest entry. Run the script at the points below; do not
+hand-edit `STATE.md` or the generated XML.
 
 ## The build manifest
 
@@ -78,15 +81,30 @@ invented zone is caught rather than silently built.
    from a manifest that does not validate. When it prints `[OK]`, present the manifest
    summary (worksheets, layout zones, actions) for approval.
 
-5. **Commit** — only after the analyst approves:
+5. **Build the workbook:**
+
+   ```bash
+   python "${CLAUDE_SKILL_DIR}/scripts/build.py" build "<project-dir>"
+   ```
+
+   This assembles `dashboard.twb`, runs both validators over it, and packages
+   `dashboard.twbx` with the CSVs. `[BUILT]` means both validators are green — a `[WARN]`
+   line about a missing `explain-data` element is the expected version shift when the target
+   is `2024.2-2025.x` (the 2026.1 schema requires an element that older Tableau must not
+   carry), not a problem. `[INVALID]` leaves the `.twb` on disk unpackaged: read the named
+   errors, fix the manifest, and re-run. Never hand-patch the generated XML — the assembler
+   is the fix's home.
+
+6. **Commit** — only after the analyst approves:
 
    ```bash
    python "${CLAUDE_SKILL_DIR}/scripts/build.py" commit "<project-dir>"
    ```
 
-   Commit re-validates the manifest and records `build` = `approved`. If it prints
-   `[REFUSED]`, fix what it names and re-run. On success, tell the analyst the pipeline is
-   complete and where the deliverable lives.
+   Commit re-validates the manifest, refuses unless `dashboard.twbx` is on disk (run step 5
+   first), and records `build` = `approved`. If it prints `[REFUSED]`, fix what it names and
+   re-run. On success, tell the analyst the pipeline is complete and where the deliverable
+   lives.
 
 ## Notes
 
@@ -95,10 +113,13 @@ invented zone is caught rather than silently built.
   beside the `mock.html` / `IMPLEMENTATION-SPEC.md` they were built from (CONTRACT.md §4.3).
   Build **overwrites in place** on a re-run and never bumps `current_version`; a new build
   version is created by re-running `tableau-mock` (which bumps and stales spec and build).
-- **In development.** The deterministic workbook generator (spec → `dashboard.twbx`) is the
-  next ticket; today the skill gates the step and produces the validated manifest it will
-  consume.
+- **Live connection, always.** The workbook never carries an extract: the `.twbx` embeds the
+  CSVs, and the analyst points it at the real database with Data → Replace Data Source.
+- **Worksheet bodies are still coming.** Today's assembler emits the datasources, placeholder
+  worksheets, a dashboard sized from the mock's canvas, and the windows. Shelves, encodings,
+  marks and the dashboard's zone tree are the next ticket, so the built workbook opens
+  clean but the views are empty.
 
 > The full `STATE.md` schema and the ordering / staleness / versioning rules live in
-> `CONTRACT.md` at the repo root. This skill restates only its own slice; `build.py` /
-> `manifest.py` are the executable mirror of the contract it enforces.
+> `CONTRACT.md` at the repo root. This skill restates only its own slice; `build.py`,
+> `manifest.py` and `twb.py` are the executable mirror of the contract it enforces.
