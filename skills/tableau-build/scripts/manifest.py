@@ -74,20 +74,22 @@ _DATASOURCE_HEADING = re.compile(
 )
 
 
-def documented_fields(data_model_text: str) -> dict[str, set[str]]:
-    """Recover ``{csv filename: {field name}}`` from a DATA-MODEL.md.
+def documented_field_types(data_model_text: str) -> dict[str, dict[str, str]]:
+    """Recover ``{csv filename: {field name: type}}`` from a DATA-MODEL.md.
 
-    Only the field table's first column is needed here (types are the data step's
-    business); the parse is the tolerant mirror of ``tableau-data``'s renderer, so it keeps
+    ``DATA-MODEL.md`` is the field authority (CONTRACT.md §3), so the builder takes each
+    column's Tableau datatype from here rather than from the manifest - one authority, no
+    drift. The parse is the tolerant mirror of ``tableau-data``'s renderer, so it keeps
     working after the model enriches the Role/Description columns.
 
     Args:
         data_model_text: The contents of a ``DATA-MODEL.md`` file.
 
     Returns:
-        A mapping of CSV filename to the set of field names documented for it.
+        A mapping of CSV filename to ``{field name: lower-cased type}``. A field whose Type
+        cell is blank maps to ``""``.
     """
-    documented: dict[str, set[str]] = {}
+    documented: dict[str, dict[str, str]] = {}
     current: Optional[str] = None
     in_field_table = False
 
@@ -96,7 +98,7 @@ def documented_fields(data_model_text: str) -> dict[str, set[str]]:
         heading = _DATASOURCE_HEADING.match(line)
         if heading:
             current = heading.group(1)
-            documented.setdefault(current, set())
+            documented.setdefault(current, {})
             in_field_table = False
             continue
         if line.startswith("## "):  # a non-data-source section ends the current one
@@ -118,8 +120,23 @@ def documented_fields(data_model_text: str) -> dict[str, set[str]]:
             continue
         if not in_field_table or not name or set(name) <= set("-: "):
             continue  # separator row, or a table that is not the field table
-        documented[current].add(name)
+        documented[current][name] = cells[1].lower() if len(cells) >= 2 else ""
     return documented
+
+
+def documented_fields(data_model_text: str) -> dict[str, set[str]]:
+    """Recover ``{csv filename: {field name}}`` from a DATA-MODEL.md.
+
+    Args:
+        data_model_text: The contents of a ``DATA-MODEL.md`` file.
+
+    Returns:
+        A mapping of CSV filename to the set of field names documented for it.
+    """
+    return {
+        csv_name: set(fields)
+        for csv_name, fields in documented_field_types(data_model_text).items()
+    }
 
 
 def load_manifest(path: Path | str) -> tuple[Optional[dict], Optional[str]]:
@@ -470,9 +487,12 @@ def _validate_worksheets(
         The element ids the worksheets fill.
     """
     filled: set[str] = set()
-    if not isinstance(worksheets, list) or not worksheets:
-        errors.append("worksheets: must be a non-empty list (one per mock zone that is a view)")
+    if not isinstance(worksheets, list):
+        errors.append("worksheets: must be a list (one entry per mock zone that is a view)")
         return filled
+    # An empty list is legal: a dashboard of nothing but objects (a title, a logo, filter
+    # cards) has no view. The "every leaf zone is filled" check below is what actually
+    # catches a translation that dropped the views.
 
     seen_names: set[str] = set()
     for index, worksheet in enumerate(worksheets):

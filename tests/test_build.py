@@ -1,25 +1,34 @@
 """Contract test for tableau-build (CONTRACT.md step 8, §4.1, §4.3).
 
 ``tableau-build`` turns the approved ``IMPLEMENTATION-SPEC.md`` + ``DATA-MODEL.md`` into a
-Tableau workbook. The XML generation is the next ticket; what this test pins is the
-skeleton the builder stands on, split across the two modules:
+Tableau workbook, across three modules:
 
 * :mod:`manifest` (pure core) - the **build manifest**: the machine-readable JSON an agent
   derives from the spec + data model that the deterministic builder consumes. Validation is
   fail-fast and names the offending entry, so a bad spec-to-manifest translation is caught
   before any XML is generated.
+* :mod:`twb` (pure assembler) - manifest -> ``.twb`` XML. What is pinned here is everything
+  Tableau is strict about and an LLM checklist got wrong: the order of ``<workbook>``'s
+  children, unique generated ids, the four places every column must appear, the live-only
+  relation, and the version-dependent ``<explain-data>``.
 * :mod:`build` (orchestration) - the entry gate (§4.1: ``spec`` and ``data`` resolved with
-  their artifacts on disk) and the STATE.md transition (``build`` -> ``approved``, never
-  touching ``current_version``, overwriting in the current ``v_N``, §4.3).
+  their artifacts on disk), the assembly + packaging step, and the STATE.md transition
+  (``build`` -> ``approved``, never touching ``current_version``, overwriting in the
+  current ``v_N``, §4.3).
 """
 
 import json
+import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
+
+import pytest
 
 import build  # the orchestration under test
 import init  # builds a realistic STATE.md the same way a real project would
 import manifest  # the pure manifest-schema core (on sys.path via conftest.py)
 import route  # the router parses/routes the STATE.md build writes
+import twb  # the pure .twb assembler
 
 TARGET_VERSION = "2024.2-2025.x"
 
@@ -119,9 +128,11 @@ def _errors(document=None, **overrides) -> list[str]:
     )
 
 
-def _state_with(project_dir: Path, **status_overrides: str) -> None:
+def _state_with(
+    project_dir: Path, target: str = TARGET_VERSION, **status_overrides: str
+) -> None:
     """Write a canonical STATE.md, optionally overriding some step statuses."""
-    text = init.render_state_md(TARGET_VERSION)
+    text = init.render_state_md(target)
     if status_overrides:
         text = build.apply_status_updates(text, dict(status_overrides))
     (project_dir / "STATE.md").write_text(text, encoding="utf-8")
@@ -143,9 +154,13 @@ def _write_manifest(project_dir: Path, document: dict, version: str = "v_1") -> 
     )
 
 
-def _ready_project(project_dir: Path, **status_overrides: str) -> None:
+def _ready_project(
+    project_dir: Path, target: str = TARGET_VERSION, **status_overrides: str
+) -> None:
     """Open build's entry gate: spec+data resolved with all three artifacts on disk."""
-    _state_with(project_dir, **{"spec": "approved", "data": "approved", **status_overrides})
+    _state_with(
+        project_dir, target, **{"spec": "approved", "data": "approved", **status_overrides}
+    )
     (project_dir / "DATA-MODEL.md").write_text(DATA_MODEL, encoding="utf-8")
     data_dir = project_dir / "data"
     data_dir.mkdir(exist_ok=True)
@@ -153,6 +168,13 @@ def _ready_project(project_dir: Path, **status_overrides: str) -> None:
         "order_date,region,revenue\n2024-01-05,West,1200.5\n", encoding="utf-8"
     )
     _write_spec(project_dir)
+
+
+def _built_project(project_dir: Path, **status_overrides: str) -> build.BuildResult:
+    """A ready project with the manifest authored and the workbook built + packaged."""
+    _ready_project(project_dir, **status_overrides)
+    _write_manifest(project_dir, _manifest())
+    return build.build_workbook(project_dir)
 
 
 # --- Entry gate (CONTRACT.md §4.1) -------------------------------------------
@@ -699,7 +721,367 @@ def test_validate_blocked_gate_reports_the_blocker(tmp_path):
     assert result.ok is False and "tableau-init" in result.errors[0]
 
 
+# --- The .twb assembler (twb.py) ---------------------------------------------
+
+CSV_HEADERS = {"sales_orders.csv": ["order_date", "region", "revenue"]}
+
+
+def _render(document=None, **overrides) -> ET.Element:
+    """Assemble a manifest into a .twb and return the parsed ``<workbook>`` root."""
+    return ET.fromstring(
+        twb.render_workbook(
+            _manifest(**overrides) if document is None else document,
+            DATA_MODEL,
+            CSV_HEADERS,
+        )
+    )
+
+
+def test_minimal_manifest_builds_a_well_formed_twb():
+    """The floor: the assembler emits parseable XML rooted at <workbook> (AC #1)."""
+    root = _render()
+
+    assert root.tag == "workbook"
+    assert root.get("source-build") == twb.SOURCE_BUILD
+
+
+def test_workbook_child_order_is_canonical():
+    """Tableau rejects out-of-order children - the sequence is the XSD's, in code."""
+    assert [child.tag for child in _render()] == [
+        "document-format-change-manifest", "datasources", "worksheets", "dashboards",
+        "windows",
+    ]
+
+
+def test_every_column_appears_in_all_four_locations():
+    """Missing any one of the four causes silent corruption or a load failure (AC #4)."""
+    root = _render()
+    expected = set(CSV_HEADERS["sales_orders.csv"])
+
+    relation = {
+        column.get("name")
+        for column in root.findall(
+            "datasources/datasource/connection/relation/columns/column"
+        )
+    }
+    metadata = {
+        record.findtext("remote-name")
+        for record in root.findall(
+            "datasources/datasource/connection/metadata-records/metadata-record"
+        )
+        if record.get("class") == "column"
+    }
+    object_graph = {
+        column.get("name")
+        for column in root.findall(
+            "datasources/datasource/object-graph/objects/object/properties/relation/"
+            "columns/column"
+        )
+    }
+    ui_columns = {
+        column.get("name").strip("[]")
+        for column in root.findall("datasources/datasource/column")
+        if column.get("datatype") != "table"
+    }
+
+    assert relation == metadata == object_graph == ui_columns == expected
+
+
+def test_the_physical_schema_comes_from_the_csv_not_the_manifest():
+    """The manifest lists only the fields the dashboard uses; a partial relation is a
+    schema mismatch at load, so the CSV header is what the physical schema follows."""
+    document = _manifest()
+    document["datasources"][0]["fields"] = [{"name": "revenue", "type": "real"}]
+    document["worksheets"][1]["encodings"] = {}
+    document["worksheets"][1]["shelves"] = {"rows": ["revenue"]}
+
+    relation = _render(document).findall(
+        "datasources/datasource/connection/relation/columns/column"
+    )
+
+    assert [column.get("name") for column in relation] == CSV_HEADERS["sales_orders.csv"]
+
+
+def test_column_types_come_from_the_data_model():
+    """DATA-MODEL.md is the field authority (§3): type drives datatype, role, remote-type."""
+    root = _render()
+    by_name = {
+        column.get("name"): column
+        for column in root.findall("datasources/datasource/column")
+    }
+
+    assert by_name["[revenue]"].get("datatype") == "real"
+    assert by_name["[revenue]"].get("role") == "measure"
+    assert by_name["[region]"].get("role") == "dimension"
+    assert by_name["[order_date]"].get("datatype") == "date"
+    assert by_name["[revenue]"].get("caption") == "Revenue"
+
+
+def test_generated_ids_are_unique():
+    """Every id in the workbook must be unique or Tableau cross-references the wrong thing."""
+    root = _render()
+    ids = (
+        [element.get("uuid") for element in root.iter("simple-id")]
+        + [element.get("name") for element in root.findall("datasources/datasource")]
+        + [
+            element.get("name")
+            for element in root.iter("named-connection")
+        ]
+    )
+
+    assert len(ids) == len(set(ids))
+
+
+def test_no_snippet_ids_leak():
+    """Ids are generated, never copied from the reference snippets (AC #4)."""
+    xml = twb.render_workbook(_manifest(), DATA_MODEL, CSV_HEADERS)
+
+    for snippet_id in (
+        "1hckotw0bte0i51b8k3sd1ffpnqc",             # scaffold datasource
+        "16xkalt18d1a7p1cjzge51xf66r6",             # scaffold named connection
+        "09EB5EA8C4E1488681646EA8C7C1C3B0",         # scaffold object id
+        "{8ED4AD55-A43F-4C33-B8C1-A6484D0F1985}",   # scaffold worksheet simple-id
+        "{0CB252DB-8C32-4E23-87BF-F5520667C3F4}",   # scaffold dashboard simple-id
+        "{5072827F-AB68-407A-8A5C-209EC187C960}",   # scaffold worksheet window
+        "{3FC88B5F-B055-44CF-B059-FB779136E3D0}",   # scaffold dashboard window
+    ):
+        assert snippet_id not in xml
+
+
+def test_the_same_manifest_rebuilds_byte_identical():
+    """Ids are hash-derived, not random: a re-run is a no-op diff."""
+    first = twb.render_workbook(_manifest(), DATA_MODEL, CSV_HEADERS)
+    second = twb.render_workbook(_manifest(), DATA_MODEL, CSV_HEADERS)
+
+    assert first == second
+
+
+def test_2025_target_omits_explain_data_and_uses_18_1():
+    """The 2024.2-2025.x document format is 18.1 and has no <explain-data> (AC #5)."""
+    root = _render(target_tableau_version="2024.2-2025.x")
+
+    assert root.get("version") == "18.1" and root.get("original-version") == "18.1"
+    assert root.find("explain-data") is None
+
+
+def test_2026_target_emits_explain_data_and_26_1():
+    """Switching STATE.md's target flips both the version attribute and the element (AC #5)."""
+    root = _render(target_tableau_version="2026.1+")
+
+    assert root.get("version") == "26.1" and root.get("original-version") == "26.1"
+    explain_data = root.find("explain-data")
+    assert explain_data is not None
+    assert explain_data.get("enabled-for-viewer") == "false"
+    assert [child.tag for child in root][-1] == "explain-data"  # always the last child
+
+
+def test_relation_is_live_and_local():
+    """Never an extract, and the CSV is read from beside the .twb inside the .twbx."""
+    root = _render()
+    connection = root.find(
+        "datasources/datasource/connection/named-connections/named-connection/connection"
+    )
+
+    assert list(root.iter("extract")) == []
+    assert connection.get("class") == "textscan"
+    assert connection.get("directory") == "."
+    assert connection.get("filename") == "sales_orders.csv"
+    assert root.find("datasources/datasource/connection/relation").get("table") == (
+        "[sales_orders#csv]"
+    )
+
+
+def test_every_viewpoint_has_entire_view_zoom():
+    """A self-closing viewpoint defaults to 'standard' zoom - the sheet then under-fills."""
+    viewpoints = _render().findall("windows/window/viewpoints/viewpoint")
+
+    assert [viewpoint.get("name") for viewpoint in viewpoints] == [
+        "Revenue KPI", "Revenue Trend",
+    ]
+    for viewpoint in viewpoints:
+        assert viewpoint.find("zoom").get("type") == "entire-view"
+
+
+def test_every_worksheet_has_a_matching_hidden_window():
+    """validate_twb's worksheet<->window check is bidirectional; both sides come from here."""
+    root = _render()
+    worksheets = [sheet.get("name") for sheet in root.findall("worksheets/worksheet")]
+    windows = [
+        window.get("name") for window in root.findall("windows/window")
+        if window.get("class") == "worksheet"
+    ]
+
+    assert worksheets == windows == ["Revenue KPI", "Revenue Trend"]
+    assert all(
+        window.get("hidden") == "true" for window in root.findall("windows/window")
+        if window.get("class") == "worksheet"
+    )
+
+
+def test_dashboard_is_sized_from_the_layout_canvas():
+    """The mock's approved canvas is the workbook's dashboard size."""
+    size = _render().find("dashboards/dashboard/size")
+
+    assert size.attrib == {
+        "maxheight": "768", "maxwidth": "1366", "minheight": "768", "minwidth": "1366",
+    }
+
+
+def test_zero_worksheets_omits_the_worksheets_element():
+    """The XSD requires >=1 <worksheet>, so an empty <worksheets> is invalid - omit it."""
+    document = _manifest()
+    document["worksheets"] = []
+    document["objects"] = [
+        {"element_id": "kpi-revenue", "kind": "text"},
+        {"element_id": "chart-trend", "kind": "image"},
+    ]
+
+    root = _render(document)
+
+    assert root.find("worksheets") is None
+    assert [child.tag for child in root] == [
+        "document-format-change-manifest", "datasources", "dashboards", "windows",
+    ]
+
+
+def test_thumbnails_are_never_emitted():
+    """The XSD requires >=1 <thumbnail>; Tableau regenerates them, so omit the element."""
+    assert _render().find("thumbnails") is None
+
+
+def test_worksheets_may_be_empty_when_objects_fill_every_zone():
+    """The manifest relaxation behind the zero-worksheet case: no views is a legal
+    dashboard as long as every leaf zone is still filled."""
+    document = _manifest()
+    document["worksheets"] = []
+    document["objects"] = [
+        {"element_id": "kpi-revenue", "kind": "text"},
+        {"element_id": "chart-trend", "kind": "image"},
+    ]
+
+    assert _errors(document) == []
+
+
+def test_an_unfilled_zone_is_still_rejected_with_no_worksheets():
+    """The relaxation must not open a hole: a zone nothing fills is still an error."""
+    document = _manifest()
+    document["worksheets"] = []
+    document["objects"] = [{"element_id": "kpi-revenue", "kind": "text"}]
+
+    assert any("chart-trend" in error for error in _errors(document))
+
+
+# --- Assembly, validation, packaging (build.build_workbook) -------------------
+
+def test_build_writes_a_validated_twb_and_twbx(tmp_path):
+    """The end-to-end deliverable: a minimal manifest builds both files (AC #1)."""
+    result = _built_project(tmp_path)
+
+    assert result.ok is True, result.errors
+    assert (tmp_path / build.VERSION_DIR / "v_1" / build.TWB_FILENAME).exists()
+    assert (tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME).exists()
+
+
+def test_twbx_contains_the_twb_and_every_csv(tmp_path):
+    """Packaging is flat, so directory='.' resolves each CSV beside the .twb (AC #1)."""
+    _built_project(tmp_path)
+
+    with zipfile.ZipFile(
+        tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME
+    ) as archive:
+        assert sorted(archive.namelist()) == ["dashboard.twb", "sales_orders.csv"]
+
+
+def test_semantic_validator_passes_on_the_generated_twb(tmp_path):
+    """The migrated breakage-only validator is green on what the assembler emits (AC #2)."""
+    import validate_twb  # migrated into the skill by this ticket
+
+    _built_project(tmp_path)
+
+    report = validate_twb.TwbValidator(
+        str(tmp_path / build.VERSION_DIR / "v_1" / build.TWB_FILENAME)
+    ).validate()
+
+    assert report.passed is True, [
+        (result.name, result.details) for result in report.results if not result.passed
+    ]
+
+
+def test_xsd_reports_at_most_the_documented_version_shift(tmp_path):
+    """2026.1 validates clean; 2025.x differs only by the required <explain-data> (AC #2)."""
+    pytest.importorskip("lxml")
+    import validate_twb_xsd  # migrated into the skill by this ticket
+
+    schema = validate_twb_xsd.load_schema(validate_twb_xsd.XSD_PATH)
+
+    _built_project(tmp_path)
+    _, errors_2025 = validate_twb_xsd.validate(
+        tmp_path / build.VERSION_DIR / "v_1" / build.TWB_FILENAME, schema
+    )
+    assert len(errors_2025) <= 1
+    assert all("explain-data" in error.message for error in errors_2025)
+
+    newer = tmp_path / "newer"
+    newer.mkdir()
+    _ready_project(newer, target="2026.1+")
+    _write_manifest(newer, _manifest(target_tableau_version="2026.1+"))
+    assert build.build_workbook(newer).ok is True
+
+    passed, errors_2026 = validate_twb_xsd.validate(
+        newer / build.VERSION_DIR / "v_1" / build.TWB_FILENAME, schema
+    )
+    assert passed is True and errors_2026 == []
+
+
+def test_build_reports_the_version_shift_as_a_warning_not_an_error(tmp_path):
+    """The 2025.x XSD complaint is expected - it must not read as a broken workbook."""
+    pytest.importorskip("lxml")
+
+    result = _built_project(tmp_path)
+
+    assert result.ok is True
+    assert any("explain-data" in warning for warning in result.warnings)
+
+
+def test_build_refuses_an_invalid_manifest(tmp_path):
+    """No XML is generated from a manifest that does not validate."""
+    _ready_project(tmp_path)
+    document = _manifest()
+    document["worksheets"][1]["chart_type"] = "donut"
+    _write_manifest(tmp_path, document)
+
+    result = build.build_workbook(tmp_path)
+
+    assert result.ok is False
+    assert any("donut" in error for error in result.errors)
+    assert not (tmp_path / build.VERSION_DIR / "v_1" / build.TWB_FILENAME).exists()
+
+
+def test_build_refuses_a_csv_that_is_not_on_disk(tmp_path):
+    """A datasource with no CSV would build a workbook bound to nothing."""
+    _ready_project(tmp_path)
+    _write_manifest(tmp_path, _manifest())
+    (tmp_path / "data" / "sales_orders.csv").rename(tmp_path / "data" / "orders.csv")
+
+    result = build.build_workbook(tmp_path)
+
+    assert result.ok is False
+    assert any("sales_orders.csv" in error for error in result.errors)
+
+
 # --- STATE.md transition (CONTRACT.md §4.3) ----------------------------------
+
+def test_commit_refuses_without_a_workbook(tmp_path):
+    """The deliverable is the workbook: a validated manifest alone does not approve it."""
+    _ready_project(tmp_path)
+    _write_manifest(tmp_path, _manifest())
+
+    result = build.commit(tmp_path)
+
+    assert result.ok is False
+    assert build.WORKBOOK_FILENAME in result.message
+    assert route.parse_state(tmp_path / "STATE.md").statuses["build"] == "pending"
+
 
 def test_commit_refuses_without_a_manifest(tmp_path):
     """No manifest => nothing to build; STATE.md is untouched."""
@@ -728,8 +1110,7 @@ def test_commit_refuses_an_invalid_manifest(tmp_path):
 
 def test_commit_approves_and_leaves_current_version_alone(tmp_path):
     """A valid manifest approves build in place - current_version is never bumped (§4.3)."""
-    _ready_project(tmp_path)
-    _write_manifest(tmp_path, _manifest())
+    _built_project(tmp_path)
 
     result = build.commit(tmp_path)
 
@@ -741,8 +1122,7 @@ def test_commit_approves_and_leaves_current_version_alone(tmp_path):
 
 def test_recommit_overwrites_in_place(tmp_path):
     """Re-running build after approval overwrites the same v_N; no new version dir (§4.3)."""
-    _ready_project(tmp_path)
-    _write_manifest(tmp_path, _manifest())
+    _built_project(tmp_path)
     build.commit(tmp_path)
 
     result = build.commit(tmp_path)
@@ -754,8 +1134,7 @@ def test_recommit_overwrites_in_place(tmp_path):
 
 def test_commit_from_stale_reapproves_the_same_version(tmp_path):
     """The realistic re-run: mock bumped and staled build, which rebuilds into that v_N."""
-    _ready_project(tmp_path, build="stale")
-    _write_manifest(tmp_path, _manifest())
+    _built_project(tmp_path, build="stale")
 
     result = build.commit(tmp_path)
 
@@ -765,13 +1144,12 @@ def test_commit_from_stale_reapproves_the_same_version(tmp_path):
 
 def test_router_reports_done_after_build_is_approved(tmp_path):
     """Cross-check through the router: build approved completes the pipeline."""
-    _ready_project(tmp_path, intake="approved", brand="skipped", plan="approved",
+    _built_project(tmp_path, intake="approved", brand="skipped", plan="approved",
                    mock="approved")
     (tmp_path / "DASHBOARD-PLAN.md").write_text("# Plan\n", encoding="utf-8")
     (tmp_path / build.VERSION_DIR / "v_1" / "mock.html").write_text(
         "<html></html>", encoding="utf-8"
     )
-    _write_manifest(tmp_path, _manifest())
 
     assert build.commit(tmp_path).ok is True
 

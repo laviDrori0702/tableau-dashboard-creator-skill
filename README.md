@@ -70,11 +70,11 @@ Each step is owned by exactly one skill, reads a known set of artifacts, and wri
 | 5 | `tableau-plan`   | Blueprint: screen size, slots, KPIs, charts, filters, interactions (stable ids) | `DATA-MODEL.md` (+ `PRD.md`, `DESIGN-TOKENS.md`) → `DASHBOARD-PLAN.md` | no |
 | 6 | `tableau-mock`   | Interactive HTML demo from real sample data | `DASHBOARD-PLAN.md`, `data/*.csv` → `mock-version/v_N/mock.html` | no |
 | 7 | `tableau-spec`   | Map every mock element to a concrete Tableau construct | `mock.html`, `DASHBOARD-PLAN.md` → `mock-version/v_N/IMPLEMENTATION-SPEC.md` | no |
-| 8 | `tableau-build` *(in development)* | Generate the version-aware, XSD-validated workbook | `IMPLEMENTATION-SPEC.md`, `DATA-MODEL.md`, `data/*.csv` → `mock-version/v_N/dashboard.twbx` | no |
+| 8 | `tableau-build` *(views in development)* | Generate the version-aware, XSD-validated workbook | `IMPLEMENTATION-SPEC.md`, `DATA-MODEL.md`, `data/*.csv` → `mock-version/v_N/dashboard.twbx` | no |
 
 > **`tableau-route`** is the compass, not a step: it reads `STATE.md` and reports the single next skill to run. It only recommends — it never runs another skill for you.
 
-> **Status — step 8 is not shipped yet.** Steps 1–7 (`init` → `spec`) are available today; `tableau-build` is in active development and releasing shortly. Tableau has announced a **native skill** for generating a workbook from a spec — when it ships we intend to integrate it as the build step rather than maintain a parallel generator, so the exact shape of step 8 may change.
+> **Status — step 8 is landing in pieces.** Steps 1–7 (`init` → `spec`) are complete. `tableau-build` today derives and validates the build manifest and assembles a workbook that Tableau opens: datasources (live, with the CSVs packaged into the `.twbx`), a dashboard sized from the approved mock, windows, and version targeting, checked by both validators on every build. The worksheet bodies (shelves, encodings, marks) and the dashboard's zone tree are the remaining piece, so the views are still empty. Tableau has announced a **native skill** for generating a workbook from a spec — when it ships we intend to integrate it as the build step rather than maintain a parallel generator, so the exact shape of step 8 may change.
 
 Skippable steps (`intake`, `brand`) let you go straight from a scaffolded project to planning with sensible fallbacks (the raw request text; neutral styling).
 
@@ -145,7 +145,7 @@ If you used the old single skill: the workflow now lives in this plugin. Install
 - **No box shadows** — not natively supported in Tableau.
 - **Container hierarchy** must follow Tableau's zone model (layout-basic → layout-flow → sheets).
 - **Fallback-driven choices are disclosed** — when a skill uses a Tableau default for missing input, it says so.
-- **`tableau-build` is in development** — the workbook-generation step is not shipped yet (see the status note above); when available, always review the generated workbook in Tableau Desktop before publishing.
+- **`tableau-build` still emits empty views** — the workbook it produces opens cleanly and carries the data, but the shelves/encodings are the remaining piece (see the status note above); always review the generated workbook in Tableau Desktop before publishing.
 
 ## Contributing
 

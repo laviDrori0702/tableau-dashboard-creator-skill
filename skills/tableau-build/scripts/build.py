@@ -17,11 +17,16 @@ filesystem:
 3. **STATE.md transition** - committing flips ``build`` to ``approved``. Build is the last
    step, so there is nothing downstream to stale (§4.2 is a no-op here).
 
+4. **Assembly** - ``build`` turns the validated manifest into the deliverable: the XML comes
+   from :mod:`twb` (pure, correct by construction), and this module supplies the CSV header
+   rows it needs, runs both migrated validators over the result, and packages the ``.twb``
+   plus the CSVs into a ``.twbx``.
+
 The module is pure and stdlib-only (it does **not** import the router) so the contract test
 can call its functions directly, exactly like ``spec.py``. The CLI exposes ``precheck``
 (before authoring - reports the target ``v_N`` and the inputs), ``validate`` (the manifest
-schema check), and ``commit`` (after approval). Program output goes to stdout; diagnostics
-through ``logging``.
+schema check), ``build`` (manifest -> validated ``.twbx``), and ``commit`` (after approval).
+Program output goes to stdout; diagnostics through ``logging``.
 
 Keep ``STEP_ORDER`` in lock-step with CONTRACT.md §1.
 """
@@ -29,14 +34,18 @@ Keep ``STEP_ORDER`` in lock-step with CONTRACT.md §1.
 from __future__ import annotations
 
 import argparse
+import csv
+import importlib.util
 import json
 import logging
 import re
 import sys
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+import twb
 from manifest import load_manifest, placed_layout_ids, validate_manifest
 
 logger = logging.getLogger(__name__)
@@ -49,6 +58,9 @@ SPEC_FILENAME = "IMPLEMENTATION-SPEC.md"
 #: Build-internal, not a handoff artifact - hence lowercase (CONTRACT.md §3).
 MANIFEST_FILENAME = "build-manifest.json"
 WORKBOOK_FILENAME = "dashboard.twbx"
+#: The unpackaged workbook, kept beside the .twbx: it is what the validators read, and it
+#: stays on disk after a failed build so the XML can be inspected.
+TWB_FILENAME = "dashboard.twb"
 VERSION_DIR = "mock-version"
 DATA_DIR = "data"
 SCAFFOLD_DATA_DIR = "scaffold/sample-data"
@@ -518,6 +530,202 @@ def validate(project_dir: Path | str) -> ValidationResult:
     return ValidationResult(not errors, errors, version, manifest_rel)
 
 
+# --- build (manifest -> validated .twbx) --------------------------------------
+
+#: The 2026.1 XSD requires ``<explain-data>``, which a workbook targeting 2024.2-2025.x must
+#: not carry. That single "missing child element" complaint is the documented version shift
+#: and the only XSD error a build tolerates.
+_VERSION_SHIFT_MARKERS = ("Missing child element", "explain-data")
+
+
+def read_csv_header(csv_path: Path) -> list[str]:
+    """Return a CSV's header row - the physical schema and its column order.
+
+    Args:
+        csv_path: Path to the CSV file.
+
+    Returns:
+        The column names in file order (empty for an empty file).
+    """
+    with csv_path.open(newline="", encoding="utf-8-sig") as handle:
+        for row in csv.reader(handle):
+            return [name.strip() for name in row]
+    return []
+
+
+def create_twbx(twb_path: Path, csv_paths: list[Path]) -> Path:
+    """Package a ``.twb`` and its CSVs into a flat ``.twbx`` beside it.
+
+    Flat (no directory entries) is what ``directory='.'`` in the workbook's connection
+    expects: Tableau unpacks the archive and finds each CSV next to the ``.twb``.
+
+    Args:
+        twb_path: The workbook XML file to package.
+        csv_paths: The CSVs the workbook reads.
+
+    Returns:
+        The path of the written ``.twbx``.
+    """
+    twbx_path = twb_path.with_suffix(".twbx")
+    with zipfile.ZipFile(twbx_path, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.write(twb_path, twb_path.name)
+        for csv_path in csv_paths:
+            archive.write(csv_path, csv_path.name)
+    return twbx_path
+
+
+@dataclass(frozen=True)
+class BuildResult:
+    """Outcome of assembling the workbook from the validated manifest.
+
+    Attributes:
+        ok: True when the workbook was built, validated, and packaged.
+        errors: Why it was not; empty when ``ok``.
+        version: The version directory built into.
+        twb_path: Project-relative path of the workbook XML (written even on a validator
+            failure, so the XML can be inspected).
+        twbx_path: Project-relative path of the package; ``""`` when nothing was packaged.
+        warnings: Non-fatal notes (a skipped XSD check, the documented version shift).
+    """
+
+    ok: bool
+    errors: list[str]
+    version: str
+    twb_path: str = ""
+    twbx_path: str = ""
+    warnings: list[str] = field(default_factory=list)
+
+
+def _semantic_errors(twb_path: Path) -> list[str]:
+    """Run the migrated semantic validator and return one message per failed check.
+
+    Args:
+        twb_path: The workbook XML to check.
+
+    Returns:
+        ``"<check name>: <detail>"`` messages; empty when every check passes.
+    """
+    import validate_twb  # same scripts/ dir - already importable, no subprocess
+
+    report = validate_twb.TwbValidator(str(twb_path)).validate()
+    return [
+        f"{result.name}: {detail}"
+        for result in report.results if not result.passed
+        for detail in (result.details or ["check failed"])
+    ]
+
+
+def _xsd_errors(twb_path: Path, target_tableau_version: str) -> tuple[list[str], list[str]]:
+    """Run the migrated XSD validator, tolerating the documented version shift.
+
+    Args:
+        twb_path: The workbook XML to check.
+        target_tableau_version: STATE.md's target (CONTRACT.md §2).
+
+    Returns:
+        ``(errors, warnings)``. For the 2026.1+ target every schema error is fatal; for
+        2024.2-2025.x the single ``<explain-data>`` complaint is downgraded to a warning.
+        When ``lxml`` is absent the check is skipped with a warning.
+    """
+    if importlib.util.find_spec("lxml") is None:
+        return [], ["XSD check skipped: lxml is not installed (pip install lxml)."]
+
+    import validate_twb_xsd  # imports lxml at module level - guarded above
+
+    schema = validate_twb_xsd.load_schema(validate_twb_xsd.XSD_PATH)
+    _, raw_errors = validate_twb_xsd.validate(twb_path, schema)
+    messages = [f"line {error.line}: {error.message}" for error in raw_errors]
+    if target_tableau_version.strip() == twb.TARGET_2026:
+        return messages, []
+
+    tolerated = [
+        message for message in messages
+        if all(marker in message for marker in _VERSION_SHIFT_MARKERS)
+    ]
+    fatal = [message for message in messages if message not in tolerated]
+    warnings = [
+        f"XSD (expected for the {target_tableau_version} target): {message}"
+        for message in tolerated
+    ]
+    return fatal, warnings
+
+
+def build_workbook(project_dir: Path | str) -> BuildResult:
+    """Assemble, validate, and package the workbook from the validated manifest.
+
+    The manifest must validate first (:func:`validate`), so the assembler never sees an
+    entry it cannot build. The XML then goes through both migrated validators before it is
+    packaged: a workbook that fails either is left on disk unpackaged, for debugging.
+
+    Args:
+        project_dir: The analyst's project directory.
+
+    Returns:
+        A :class:`BuildResult`.
+    """
+    project_root = Path(project_dir)
+    validation = validate(project_root)
+    if not validation.ok:
+        return BuildResult(False, validation.errors, validation.version)
+
+    version = validation.version
+    version_dir = project_root / VERSION_DIR / version
+    document, _ = load_manifest(version_dir / MANIFEST_FILENAME)
+
+    csv_paths = [project_root / relative for relative in _sample_csvs(project_root)]
+    headers = {path.name: read_csv_header(path) for path in csv_paths}
+    missing = sorted(
+        {
+            str(source.get("csv", "")).strip()
+            for source in document.get("datasources", [])
+            if str(source.get("csv", "")).strip() not in headers
+        }
+    )
+    if missing:
+        return BuildResult(
+            False,
+            [
+                f"datasource csv '{name}' is not on disk (found: "
+                f"{', '.join(sorted(headers)) or 'none'}) - the workbook would bind to "
+                f"nothing. Re-run 'tableau-data' or fix the manifest's 'csv'."
+                for name in missing
+            ],
+            version,
+        )
+
+    twb_path = version_dir / TWB_FILENAME
+    twb_path.write_text(
+        twb.render_workbook(
+            document,
+            (project_root / DATA_MODEL_FILENAME).read_text(encoding="utf-8-sig"),
+            headers,
+        ),
+        encoding="utf-8",
+    )
+    twb_relative = f"{VERSION_DIR}/{version}/{TWB_FILENAME}"
+
+    target = read_target_tableau_version(
+        (project_root / STATE_FILENAME).read_text(encoding="utf-8-sig")
+    )
+    errors = _semantic_errors(twb_path)
+    xsd_errors, warnings = _xsd_errors(twb_path, target)
+    errors += xsd_errors
+    if errors:
+        # Leave the .twb for inspection, but never package a workbook that failed a check.
+        return BuildResult(False, errors, version, twb_relative, warnings=warnings)
+
+    create_twbx(twb_path, csv_paths)
+    logger.info(f"Built {twb_relative} and its .twbx from the validated manifest.")
+    return BuildResult(
+        ok=True,
+        errors=[],
+        version=version,
+        twb_path=twb_relative,
+        twbx_path=f"{VERSION_DIR}/{version}/{WORKBOOK_FILENAME}",
+        warnings=warnings,
+    )
+
+
 # --- commit ------------------------------------------------------------------
 
 @dataclass
@@ -529,15 +737,12 @@ class CommitResult:
         message: Human-readable explanation (the refusal reason when not ``ok``).
         version: The version directory the (attempted) build lives in.
         errors: Manifest validation errors that refused the commit, when any.
-        project_dir: The project the commit ran against (so the report can check what
-            actually landed on disk).
     """
 
     ok: bool
     message: str
     version: str = "v_1"
     errors: list[str] = field(default_factory=list)
-    project_dir: str = "."
 
 
 def commit(project_dir: Path | str) -> CommitResult:
@@ -554,8 +759,6 @@ def commit(project_dir: Path | str) -> CommitResult:
         A :class:`CommitResult`. ``ok`` is False (STATE.md untouched) when the entry gate is
         closed or the manifest is missing / invalid.
     """
-    # TODO(builder ticket): once the deterministic builder lands, also require
-    # mock-version/<v_N>/dashboard.twbx to exist and pass XSD validation before approving.
     project_root = Path(project_dir)
     validation = validate(project_root)
     if not validation.ok:
@@ -569,6 +772,17 @@ def commit(project_dir: Path | str) -> CommitResult:
             errors=validation.errors,
         )
 
+    # The workbook is the deliverable, so approval requires one on disk. The validators ran
+    # in 'build' and refused to package a workbook that failed them - no need to re-run.
+    workbook_relative = f"{VERSION_DIR}/{validation.version}/{WORKBOOK_FILENAME}"
+    if not (project_root / workbook_relative).exists():
+        return CommitResult(
+            False,
+            f"Cannot approve build: '{workbook_relative}' does not exist. Run "
+            f"'build.py build' to assemble and package the workbook first.",
+            version=validation.version,
+        )
+
     state_path = project_root / STATE_FILENAME
     text = state_path.read_text(encoding="utf-8-sig")
     state_path.write_text(
@@ -580,7 +794,6 @@ def commit(project_dir: Path | str) -> CommitResult:
         ok=True,
         message=f"build -> approved ({validation.version})",
         version=validation.version,
-        project_dir=str(project_root),
     )
 
 
@@ -626,6 +839,24 @@ def format_validation(result: ValidationResult) -> str:
     return "\n".join(lines)
 
 
+def format_build(result: BuildResult) -> str:
+    """Render a :class:`BuildResult` as the assembly report."""
+    # Plain ASCII only (see format_precheck).
+    lines: list[str]
+    if result.ok:
+        lines = [
+            f"[BUILT] {result.twbx_path}",
+            f"  workbook xml : {result.twb_path} (semantic + XSD validated)",
+        ]
+    else:
+        lines = ["[INVALID] the workbook did not build:"]
+        lines += [f"  - {error}" for error in result.errors]
+        if result.twb_path:
+            lines.append(f"  the XML is at {result.twb_path} for inspection; nothing packaged.")
+    lines += [f"  [WARN] {warning}" for warning in result.warnings]
+    return "\n".join(lines)
+
+
 def format_commit(result: CommitResult) -> str:
     """Render a :class:`CommitResult` as a human-readable, plain-ASCII block."""
     # Plain ASCII only (see format_precheck).
@@ -635,21 +866,12 @@ def format_commit(result: CommitResult) -> str:
             text += f"\n  - {error}"
         return text
 
-    lines = [
+    return "\n".join([
         f"[BUILD] {result.message}.",
         f"  manifest: {VERSION_DIR}/{result.version}/{MANIFEST_FILENAME} (validated)",
-    ]
-    workbook = Path(result.project_dir) / VERSION_DIR / result.version / WORKBOOK_FILENAME
-    if workbook.exists():
-        lines.append(f"  deliverable: {VERSION_DIR}/{result.version}/{WORKBOOK_FILENAME}")
-    else:
-        # The deterministic generator is the next ticket; say so rather than announcing a
-        # workbook that is not on disk.
-        lines.append(
-            f"  note: no {WORKBOOK_FILENAME} yet - the workbook generator is in development."
-        )
-    lines.append("  the pipeline is complete - run 'tableau-route' to confirm.")
-    return "\n".join(lines)
+        f"  deliverable: {VERSION_DIR}/{result.version}/{WORKBOOK_FILENAME}",
+        "  the pipeline is complete - run 'tableau-route' to confirm.",
+    ])
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -670,6 +892,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     for name, help_text in (
         ("precheck", "Report whether build may run, what it reads, and where it writes."),
         ("validate", "Schema-check the build manifest against DATA-MODEL.md and the layout."),
+        ("build", "Assemble, validate, and package the workbook from the manifest."),
         ("commit", "Approve the build in STATE.md (never bumps current_version)."),
     ):
         sub = subparsers.add_parser(name, help=help_text)
@@ -689,6 +912,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         validation = validate(project_dir)
         print(format_validation(validation))
         return 0 if validation.ok else 2
+
+    if args.command == "build":
+        build_result = build_workbook(project_dir)
+        print(format_build(build_result))
+        return 0 if build_result.ok else 2
 
     commit_result = commit(project_dir)
     print(format_commit(commit_result))
