@@ -19,6 +19,7 @@ _SKILL_SCRIPT_DIRS = (
     _REPO_ROOT / "skills" / "tableau-plan" / "scripts",
     _REPO_ROOT / "skills" / "tableau-mock" / "scripts",
     _REPO_ROOT / "skills" / "tableau-spec" / "scripts",
+    _REPO_ROOT / "skills" / "tableau-build" / "scripts",
 )
 
 for _script_dir in _SKILL_SCRIPT_DIRS:
