@@ -69,6 +69,9 @@ approval is blocked until both are present and consistent (enforced by `tableau-
      containers and leaves (`{"id": ..., "size": ...}`);
    - every non-root node has a numeric `size` — its **percentage of the parent** along the parent's
      flow axis — and siblings sum to ~100.
+   - a node may carry both `id` **and** `children` — a **mapped container** (e.g. a DZV panel that
+     is itself a mapped element and also holds further zones). Its `id` occupies a zone, but that
+     zone is filled by the container's children, not by a worksheet or `objects` entry of its own.
 
    Every Element Mapping **zone** id appears in the tree **exactly once**; ids in the tree must have
    a mapping row. Interaction ids (`int-*`, per the plan's id convention) are dashboard *actions*,
@@ -143,11 +146,21 @@ The case of a filename encodes its role, so a skill can tell handoff artifacts f
 - **`UPPER-KEBAB.md` ⇒ handoff artifact** produced by a step and consumed by later steps:
   `PRD.md`, `DATA-MODEL.md`, `DESIGN-TOKENS.md`, `DASHBOARD-PLAN.md`, `IMPLEMENTATION-SPEC.md`.
   (`STATE.md` is the manifest and also uses this casing.)
-- **lowercase ⇒ input or config**, owned by the analyst, never produced as a handoff:
+- **lowercase ⇒ input or config, owned by the analyst, never produced as a handoff** — with
+  one narrow exception, the build-internal file described below:
   `.env`, `branding/`, `data/`, `datasources.json`, `DASHBOARD-REQUEST.md`. Their demo counterparts live
   under `scaffold/` (see §3.1).
 
-New artifacts MUST follow this rule. Do not introduce a lowercase handoff or an UPPER-KEBAB input.
+**Build-internal files** are the third, narrow category: lowercase files a skill writes for
+its *own* next stage, never read by another skill. Today there is exactly one —
+`mock-version/v_N/build-manifest.json`, the machine-readable translation of
+`IMPLEMENTATION-SPEC.md` + `DATA-MODEL.md` that `tableau-build`'s workbook generator
+consumes. Because nothing downstream reads it, it is not a handoff and takes the lowercase
+casing; it is versioned with the deliverable it produces (§4.3). A skill may add one only
+for a stage boundary inside itself.
+
+New artifacts MUST follow this rule. Do not introduce a lowercase handoff, an UPPER-KEBAB
+input, or a build-internal file read by more than the skill that wrote it.
 
 ### 3.1 Scaffold examples vs. production inputs
 
@@ -267,7 +280,8 @@ Two kinds of outputs, two storage strategies:
   current copy. Re-running one of these skills updates the root file and triggers staleness (§4.2);
   it does **not** create a new version directory.
 - **Deliverables = standalone versioned copies.** `mock.html`, `IMPLEMENTATION-SPEC.md`, and
-  `dashboard.twbx` are written under `mock-version/v_N/`, all three sharing the **same** `v_N`
+  `dashboard.twbx` (plus build's internal `build-manifest.json`, §3) are written under
+  `mock-version/v_N/`, all three deliverables sharing the **same** `v_N`
   directory. A version is anchored by its **mock**: `mock.html` is the leading deliverable, and
   **only `tableau-mock` bumps `current_version`**. Re-running `tableau-mock` after its step was
   approved bumps to a new `v_N`, writes the fresh `mock.html` there, and stales `spec`/`build`
