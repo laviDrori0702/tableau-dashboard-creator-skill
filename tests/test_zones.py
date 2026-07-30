@@ -98,13 +98,13 @@ def _walk_both(node, zone, path="root"):
         if not zone_children:
             return
         # A titled or colour-encoded leaf is wrapped, and the wrapper's children are the
-        # generated title / content / legend zones - never further layout nodes, so the tree
-        # still maps one-to-one.
+        # generated header row / content / legend zones - never further layout nodes, so the
+        # tree still maps one-to-one.
         label = zone.get("friendly-name", "")
         assert label.startswith("V-"), f"{path}: a leaf zone has children but is no wrapper"
         element = label[len("V-"):]
         names = [part.get("friendly-name") for part in zone_children]
-        assert set(names) <= {element, f"{element} title", f"{element} legend"}, (
+        assert set(names) <= {element, f"H-{element} header", f"{element} legend"}, (
             f"{path}: unexpected zone(s) under a leaf: {names}"
         )
         assert element in names, f"{path}: the wrapper lost its content zone"
@@ -307,8 +307,9 @@ def test_a_worksheet_zone_names_its_sheet_and_reports_it_as_embedded():
     assert embedded == {"Revenue Trend"}
 
 
-def test_a_titled_element_gets_a_text_zone_above_its_sheet():
-    """The spec's title becomes a styled text zone; the sheet's own title is suppressed."""
+def test_a_titled_element_gets_a_header_row_above_its_sheet():
+    """The spec's title becomes a styled text zone in a fixed-height header row; the sheet's
+    own title is suppressed."""
     tokens = worksheet.DesignTokens(
         font_family="Inter", title_size=14, title_color="#1a2b3c", present=True
     )
@@ -318,17 +319,24 @@ def test_a_titled_element_gets_a_text_zone_above_its_sheet():
         tokens=tokens,
     )
     wrapper = container.find("zone/zone/zone")
-    title_zone, sheet_zone = wrapper.findall("zone")
+    header_row, sheet_zone = wrapper.findall("zone")
 
-    assert wrapper.get("param") == "vert"  # the title stacks above the sheet
+    assert wrapper.get("param") == "vert"  # the header stacks above the sheet
+    assert header_row.get("param") == "horz"
+    assert header_row.get("is-fixed") == "true"
+    assert header_row.get("fixed-size") == str(zones.TITLE_HEIGHT_PX)
+
+    title_zone, spacer = header_row.findall("zone")
     assert title_zone.get("type-v2") == "text"
-    assert title_zone.get("is-fixed") == "true"
-    assert title_zone.get("fixed-size") == str(zones.TITLE_HEIGHT_PX)
     run = title_zone.find("formatted-text/run")
     assert run.text == "Revenue over time"
     assert run.attrib == {
         "bold": "true", "fontcolor": "#1a2b3c", "fontname": "Inter", "fontsize": "14",
     }
+    # The spacer is what a filter or a button fills later, so the row must not be all text.
+    assert spacer.get("type-v2") == "empty"
+    assert int(title_zone.get("w")) + int(spacer.get("w")) == int(header_row.get("w"))
+    assert int(title_zone.get("w")) > int(spacer.get("w"))
     assert sheet_zone.get("name") == "Trend" and sheet_zone.get("show-title") == "false"
 
 
@@ -377,7 +385,7 @@ def test_a_titled_colour_encoded_chart_stacks_title_sheet_legend():
     parts = wrapper.findall("zone")
 
     assert [zone.get("type-v2") or zone.get("name") for zone in parts] == [
-        "text", "Trend", "color",
+        "layout-flow", "Trend", "color",  # the header row, the sheet, the legend
     ]
     assert sum(int(zone.get("h")) for zone in parts) == int(wrapper.get("h"))
 
@@ -559,8 +567,10 @@ def test_the_workbooks_zone_tree_mirrors_the_manifests(layout_rich_workbook):
         "H-root.1", "img-logo", "txt-title",
         "H-root.2",
         "V-pnl-sidebar", "flt-region", "prm-target", "leg-region", "btn-reset", "spc-gap",
-        # The titled, colour-encoded chart is wrapped: title above, legend below.
-        "V-chart-revenue", "chart-revenue title", "chart-revenue", "chart-revenue legend",
+        # The titled, colour-encoded chart is wrapped: header row above, legend below.
+        "V-chart-revenue",
+        "H-chart-revenue header", "chart-revenue title", "chart-revenue header spacer",
+        "chart-revenue", "chart-revenue legend",
     ]
 
 

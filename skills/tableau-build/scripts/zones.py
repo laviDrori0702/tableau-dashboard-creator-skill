@@ -43,6 +43,11 @@ ZONE_MARGIN = "4"
 TITLE_HEIGHT_PX = 30
 LEGEND_HEIGHT_PX = 22
 
+#: The share of the header row's width the title text takes. The rest is a blank spacer, so
+#: dropping a filter or a button into the row in Desktop needs no restructuring - which is
+#: the whole reason the header is a horizontal container rather than a bare text zone.
+HEADER_TEXT_SHARE = 75.0
+
 #: manifest ``objects[].kind`` -> the zone's ``type-v2``, for the kinds a layout can render
 #: on its own: a text block and a spacer need nothing beyond their box and their text.
 OBJECT_ZONE_TYPES: dict[str, str] = {
@@ -396,13 +401,35 @@ class _ZoneWriter:
         render_zone_style(zone, ZONE_MARGIN)
 
     def _title(self, parent: ET.Element, text: str, box: Box, label: str) -> None:
-        """Render a fixed-height text zone carrying the element's title."""
-        zone = self._zone(
-            parent, box, f"{label} title", type_v2="text",
+        """Render the element's header row: a fixed-height horizontal container holding the
+        title text and a blank spacer.
+
+        A row rather than a bare text zone because that is the structure an analyst edits: a
+        filter, a button or a logo joins the header by filling the spacer, with no zone tree
+        to rebuild. It renders identically while the row holds only the title.
+
+        Args:
+            parent: The wrapper to append the row to.
+            text: The title text.
+            box: The rectangle for the whole header row.
+            label: The element's label, which names every zone in the row.
+        """
+        row = self._zone(
+            parent, box, f"{CONTAINER_PREFIXES['horz']}-{label} header",
+            type_v2="layout-flow", param="horz",
             fixed_size=str(TITLE_HEIGHT_PX), is_fixed="true",
         )
-        self._formatted_text(zone, text, bold=True)
-        render_zone_style(zone, ZONE_MARGIN)
+        text_box, spacer_box = self._divide(
+            box, "horz", [HEADER_TEXT_SHARE, 100.0 - HEADER_TEXT_SHARE]
+        )
+        title_zone = self._zone(row, text_box, f"{label} title", type_v2="text")
+        self._formatted_text(title_zone, text, bold=True)
+        render_zone_style(title_zone, ZONE_MARGIN)
+        spacer = self._zone(
+            row, spacer_box, f"{label} header spacer", type_v2=OBJECT_ZONE_TYPES["blank"],
+        )
+        render_zone_style(spacer, ZONE_MARGIN)
+        render_zone_style(row, ZONE_MARGIN)  # last child, always
 
     def _legend(self, parent: ET.Element, leaf: Leaf, box: Box, label: str) -> None:
         """Render a fixed-height colour legend zone keying the sheet's colour encoding."""
