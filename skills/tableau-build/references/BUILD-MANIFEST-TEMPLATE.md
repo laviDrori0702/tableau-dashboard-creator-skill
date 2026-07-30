@@ -18,7 +18,7 @@ a bad spec-to-manifest translation is fixed row-by-row before any XML is generat
 | `actions` | yes (`[]` if none) | Dashboard actions; `type` from `filter`/`highlight`/`parameter`/`set`/`url`. `source` is always a zone; a target is a zone for `filter`/`highlight`, a declared parameter for `parameter` (see below). |
 | `parameters` | yes (`[]` if none) | Each needs a `name`, a `data_type` (`string`/`integer`/`real`/`boolean`/`date`/`datetime`), and a `current_value`. Give it a domain — a `values` list **or** a `range` (`min`/`max`, optional `step`), never both — or it is a free-entry box. Optional `format`. |
 | `objects` | optional | Layout zones no view fills — a filter card, a parameter control, title text, a logo, a legend. `kind` from `filter`/`parameter`/`text`/`image`/`legend`/`button`/`blank`. `filter`, `parameter`, `text` and `blank` render today; `image`, `button` and `legend` reserve their box as an empty zone until the wiring they need lands. |
-| `calculated_fields` | optional | Fields that legitimately are not in the data model; declaring one makes it usable on a shelf of its `datasource`. Each takes a `name`, a `formula`, a `datasource`, an optional `type` (default `real`) and an optional `format`. |
+| `calculated_fields` | optional | Fields that legitimately are not in the data model; declaring one makes it usable on a shelf of its `datasource`. Each takes a `name`, a `formula`, a `datasource`, an optional `type` (default `real`) and an optional `format`. Any Tableau formula, **LOD expressions included** (`{FIXED [region]: SUM([revenue])}`) — an LOD is row-level, so it is re-aggregated when placed on a shelf, while a formula that already aggregates is not. |
 
 **Copy the `layout` tree from the spec verbatim** — `validate` diffs the two and rejects any
 zone the manifest drops or invents, so the workbook cannot disagree with the approved mock.
@@ -156,6 +156,10 @@ costs no dashboard real estate.
 makes a field view-independent, and Tableau accepts it — but it is hard to reason about, hard
 to fix by hand in Desktop, and silently changes what "single value" means when a filter moves.
 A parameter comparison is the whole vocabulary needed here.
+
+This restriction is **specific to visibility calcs**. LOD expressions are otherwise a normal,
+supported part of a manifest — declare one as any other `calculated_fields` entry and place it
+on a shelf like any measure.
 
 Everything mechanical is the builder's job, not the manifest's: it puts the visibility field on
 the controlled sheet's Detail shelf (Tableau evaluates it off the *view* — the `<datagraph>`

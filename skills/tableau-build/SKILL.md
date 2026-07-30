@@ -162,11 +162,13 @@ invented zone is caught rather than silently built.
   a parameter. Either shape is normal: a two-value parameter with a control (`= true` / `=
   "on"`, the collapse-this-panel toggle) or a parameter a parameter action writes into,
   compared against its opening value (`<> "All"`, the nothing-to-show-until-you-pick reveal,
-  which needs no control because clearing the selection resets it). **Never write that calc as
-  an LOD expression** — `{FIXED : …}` is view-independent too and Tableau accepts it, but it is
-  hard to reason about and hard to repair by hand. A row-level boolean is not a visibility
-  field at all: it splits the marks and the zone stops toggling. The Detail-shelf placement the
-  field needs, the parameter declarations and the format flags are all the builder's job.
+  which needs no control because clearing the selection resets it). **Never write a *visibility*
+  calc as an LOD expression** — `{FIXED : …}` is view-independent too and Tableau accepts it,
+  but it is hard to reason about and hard to repair by hand. That is the only place LODs are
+  ruled out; elsewhere they are ordinary `calculated_fields`. A row-level boolean is not a
+  visibility field at all: it splits the marks and the zone stops toggling. The Detail-shelf
+  placement the field needs, the parameter declarations and the format flags are the builder's
+  job.
 - **An image / button / legend object reserves its box, empty.** Each of those zone types needs
   a reference the manifest does not carry (a filename, an action, a sheet + colour field), and
   Tableau does not treat those as optional — so the layout keeps the geometry until the wiring
