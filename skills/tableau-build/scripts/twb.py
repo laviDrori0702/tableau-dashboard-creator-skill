@@ -50,7 +50,8 @@ _DEFAULT_WORKBOOK_VERSION = "18.1"
 SOURCE_BUILD = "2025.1.10 (20251.25.1121.1650)"
 
 #: The document-format feature flags, copied verbatim from a Tableau-saved workbook.
-#: Adding or removing one changes Tableau's behaviour - keep the set as-is.
+#: Adding or removing one changes Tableau's behaviour - keep the set as-is. Tableau writes
+#: them alphabetically, which is why :data:`SORT_FORMAT_FLAG` can just be sorted in.
 FORMAT_CHANGE_FLAGS: tuple[str, ...] = (
     "AccessibleZoneTabOrder",
     "AnimationOnByDefault",
@@ -64,6 +65,10 @@ FORMAT_CHANGE_FLAGS: tuple[str, ...] = (
     "WindowsPersistSimpleIdentifiers",
     "ZoneFriendlyName",
 )
+
+#: The extra flag a workbook containing a sorted worksheet carries
+#: (WORKSHEETS.md:512, seen in ``bar-chart-sorted.twb`` and ``custom-tooltip.twb``).
+SORT_FORMAT_FLAG = "SortTagCleanup"
 
 #: The single dashboard this ticket emits (the zone tree from ``layout.root`` is next).
 DASHBOARD_NAME = "Dashboard 1"
@@ -625,8 +630,13 @@ def render_workbook(
         "xmlns:user": "http://www.tableausoftware.com/xml/user",
     })
 
+    worksheet_entries = manifest_document.get("worksheets") or []
+    flags = FORMAT_CHANGE_FLAGS
+    if any(entry.get("sort") for entry in worksheet_entries):
+        flags = tuple(sorted(flags + (SORT_FORMAT_FLAG,)))
+
     format_manifest = ET.SubElement(workbook, "document-format-change-manifest")
-    for flag in FORMAT_CHANGE_FLAGS:
+    for flag in flags:
         ET.SubElement(format_manifest, flag)
 
     field_types = documented_field_types(data_model_text)

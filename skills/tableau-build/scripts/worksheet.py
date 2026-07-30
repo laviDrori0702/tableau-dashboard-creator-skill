@@ -194,16 +194,17 @@ def is_aggregate_formula(formula: str) -> bool:
     """
     return bool(formula) and _AGGREGATE_CALL.search(formula) is not None
 
+
 #: manifest date_part -> (prefix, derivation). ``date`` is the exact date: no truncation,
-#: but still continuous, which is what makes a line/area chart draw a line.
+#: but still continuous, which is what makes a line/area chart draw a line. Only the levels
+#: WORKSHEETS.md documents from real Tableau output are here - ``manifest.DATE_PARTS`` reads
+#: this table, so an hour/minute request fails validation rather than guessing a prefix.
 DATE_PART_DERIVATIONS: dict[str, tuple[str, str]] = {
     "year": ("tyr", "Year-Trunc"),
     "quarter": ("tqr", "Quarter-Trunc"),
     "month": ("tmn", "Month-Trunc"),
     "week": ("twk", "Week-Trunc"),
     "day": ("tdy", "Day-Trunc"),
-    "hour": ("thr", "Hour-Trunc"),
-    "minute": ("tmi", "Minute-Trunc"),
     "date": ("none", "None"),
 }
 
@@ -809,14 +810,14 @@ def _render_calculation(column: ET.Element, reference: FieldRef) -> None:
             "decimals": BIN_DECIMALS,
             "formula": f"[{reference.bin_source}]",
             "peg": "0",
-            "size": _number(reference.bin_size),
+            "size": _bin_size_text(reference.bin_size),
         })
     elif reference.formula:
         ET.SubElement(column, "calculation", {"class": "tableau", "formula": reference.formula})
 
 
-def _number(value: float) -> str:
-    """Render a manifest number without a trailing ``.0`` (Tableau writes ``500``)."""
+def _bin_size_text(value: float) -> str:
+    """Render a bin size the way Tableau writes it - no trailing ``.0`` (``500``, not ``500.0``)."""
     return str(int(value)) if float(value).is_integer() else str(value)
 
 

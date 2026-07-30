@@ -53,11 +53,11 @@ carrying what the builder must apply: `{"field": "revenue", "aggregation": "sum"
 `{"field": "order_date", "date_part": "month"}`, or `{"field": "revenue", "bin": 500}`.
 Aggregations: `sum`, `avg`, `min`, `max`, `count`, `countd`, `median`, `attr`, `none` — a
 measure with none of them defaults to `SUM`. Date parts: `year`, `quarter`, `month`, `week`,
-`day`, `hour`, `minute`, `date`. Never write an expression like `"SUM([revenue])"` — that is
-the spec's prose, not a field reference.
+`day`, `date`. Never write an expression like `"SUM([revenue])"` — that is the spec's prose,
+not a field reference.
 
 Encodings the builder emits: `color`, `size`, `shape`, `text`, `lod`, `wedge-size`,
-`geometry`, `path`, `tooltip`.
+`geometry`, `tooltip`. Any other name is a validation error, not a silent drop.
 
 ## Optional worksheet keys (the modifiers)
 

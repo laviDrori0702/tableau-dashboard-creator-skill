@@ -518,6 +518,26 @@ def test_no_map_means_no_workbook_mapsources():
     assert ET.fromstring(_render(document)).find("mapsources") is None
 
 
+def test_a_sorted_workbook_carries_the_sort_format_flag():
+    """WORKSHEETS.md:512 - a workbook holding a sorted worksheet adds <SortTagCleanup/> to
+    the format-change manifest, and Tableau writes those flags alphabetically."""
+    flags = [
+        element.tag
+        for element in ALL_CHARTS_ROOT.find("document-format-change-manifest")
+    ]
+    assert "SortTagCleanup" in flags
+    assert flags == sorted(flags)
+
+    unsorted_document = _manifest([_sheet(
+        "Bar", "bar", shelves={"columns": ["region"], "rows": ["revenue"]},
+    )])
+    unsorted_root = ET.fromstring(_render(unsorted_document))
+    unsorted_flags = [
+        element.tag for element in unsorted_root.find("document-format-change-manifest")
+    ]
+    assert "SortTagCleanup" not in unsorted_flags
+
+
 def test_a_kpi_card_suppresses_its_tooltip():
     """A KPI card is one number, not a mark worth hovering."""
     style = _worksheet_element("Kpi Card").find("table/tooltip-style")
@@ -799,6 +819,18 @@ def test_a_filter_with_nothing_to_filter_on_is_rejected():
     )])
     errors = manifest.validate_manifest(document, DATA_MODEL, TARGET_VERSION)
     assert any("nothing to filter on" in error for error in errors)
+
+
+def test_an_unknown_encoding_name_is_rejected():
+    """The builder only emits ENCODING_ORDER, so a typo'd 'colour' would vanish - the field
+    behind it validates fine, which is exactly what makes the name worth checking."""
+    document = _manifest([_sheet(
+        "Typo", "bar",
+        shelves={"columns": ["region"], "rows": ["revenue"]},
+        encodings={"colour": "product_category"},
+    )])
+    errors = manifest.validate_manifest(document, DATA_MODEL, TARGET_VERSION)
+    assert any("unknown encoding 'colour'" in error for error in errors)
 
 
 def test_a_sort_with_neither_by_nor_order_is_rejected():

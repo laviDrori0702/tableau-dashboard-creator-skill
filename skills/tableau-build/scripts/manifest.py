@@ -31,19 +31,19 @@ import re
 from pathlib import Path
 from typing import Optional
 
+# Names, not the module: half the functions below take a parameter called ``worksheet``.
+from worksheet import CHART_SPECS, DATE_PART_DERIVATIONS, ENCODING_ORDER
+
 #: Sections a manifest must carry (actions/parameters may be empty lists, never absent -
 #: "None" must be said explicitly so a forgotten section is not mistaken for "no actions").
 REQUIRED_KEYS: tuple[str, ...] = (
     "target_tableau_version", "datasources", "worksheets", "layout", "actions", "parameters",
 )
 
-#: Mark/chart types the builder knows how to emit. Add a type here only once the builder
-#: has a validated snippet for it - an unknown type must fail loudly, not build blank.
-CHART_TYPES = frozenset({
-    "bar", "line", "area", "pie", "scatter", "map", "text", "table",
-    "heatmap", "histogram", "treemap", "bullet", "gantt", "boxplot",
-    "dual-axis", "combo",
-})
+#: Mark/chart types the builder knows how to emit - read straight off the builder's table,
+#: so a type can never be accepted here and rendered blank there. Add a chart type by adding
+#: a :data:`worksheet.CHART_SPECS` row.
+CHART_TYPES = frozenset(CHART_SPECS)
 
 #: Chart types that overlay two measures on one axis pair - they need exactly two entries on
 #: the rows shelf, or the second axis (and the whole point of the chart) is missing.
@@ -68,10 +68,12 @@ AGGREGATIONS = frozenset({
     "sum", "avg", "min", "max", "count", "countd", "median", "attr", "none",
 })
 
-#: Date parts a shelf/encoding entry may request of a date field.
-DATE_PARTS = frozenset({
-    "year", "quarter", "month", "week", "day", "hour", "minute", "date",
-})
+#: Date parts a shelf/encoding entry may request of a date field, and the encoding names an
+#: ``encodings`` block may use. Both come off the builder's tables for the same reason as
+#: :data:`CHART_TYPES`: an entry this module accepts but the builder has no case for is
+#: dropped silently, and Tableau shows no sign of the missing encoding.
+DATE_PARTS = frozenset(DATE_PART_DERIVATIONS)
+ENCODING_NAMES = frozenset(ENCODING_ORDER)
 
 # A data-source heading in DATA-MODEL.md: "## Data source: `sales.csv`" -> "sales.csv".
 _DATASOURCE_HEADING = re.compile(
@@ -493,6 +495,55 @@ def _validate_reference(
         )
 
 
+def _validate_modifiers(label: str, worksheet: dict, errors: list[str]) -> None:
+    """Reject modifier entries the builder would have to drop.
+
+    A filter with nothing to filter on, a sort with nothing to sort by, or an encoding the
+    builder has no case for is an entry the assembler cannot render - and one Tableau would
+    show no sign of. Naming it here is the difference between "the filter is missing" and
+    "the manifest row is incomplete".
+
+    Args:
+        label: The worksheet's error label.
+        worksheet: One ``worksheets`` entry.
+        errors: Accumulator for validation errors.
+    """
+    encodings = worksheet.get("encodings")
+    if isinstance(encodings, dict):
+        # The field behind each encoding is checked by _validate_reference; only the
+        # encoding *name* is checked here, so a typo'd 'colour' fails instead of vanishing.
+        for name in encodings:
+            if str(name).strip().lower() not in ENCODING_NAMES:
+                errors.append(
+                    f"{label}: unknown encoding '{name}' "
+                    f"(expected one of: {', '.join(sorted(ENCODING_NAMES))})"
+                )
+
+    filters = worksheet.get("filters")
+    if isinstance(filters, list):
+        for index, entry in enumerate(filters):
+            if not isinstance(entry, dict):
+                errors.append(f"{label}: filters[{index}] must be an object with a 'field'")
+                continue
+            values = entry.get("values")
+            if not (isinstance(values, list) and values) and (
+                entry.get("min") is None and entry.get("max") is None
+            ):
+                errors.append(
+                    f"{label}: filters[{index}] has nothing to filter on - give it "
+                    f"'values' (a member list) or 'min'/'max' (a range)"
+                )
+
+    sort = worksheet.get("sort")
+    if isinstance(sort, dict):
+        order = sort.get("order")
+        if sort.get("by") is None and not (isinstance(order, list) and order):
+            errors.append(
+                f"{label}: 'sort' has neither 'by' (the measure to sort on) nor 'order' "
+                f"(an explicit member list) - one of the two is required"
+            )
+
+
 def _validate_worksheets(
     worksheets: object,
     declared_fields: dict[str, set[str]],
@@ -581,43 +632,6 @@ def _validate_worksheets(
             _validate_reference(label, where, entry, available, source, errors)
         _validate_modifiers(label, worksheet, errors)
     return filled
-
-
-def _validate_modifiers(label: str, worksheet: dict, errors: list[str]) -> None:
-    """Reject modifier entries the builder would have to drop.
-
-    A filter with nothing to filter on, or a sort with nothing to sort by, is an entry the
-    assembler cannot render - and one Tableau would show no sign of. Naming it here is the
-    difference between "the filter is missing" and "the manifest row is incomplete".
-
-    Args:
-        label: The worksheet's error label.
-        worksheet: One ``worksheets`` entry.
-        errors: Accumulator for validation errors.
-    """
-    filters = worksheet.get("filters")
-    if isinstance(filters, list):
-        for index, entry in enumerate(filters):
-            if not isinstance(entry, dict):
-                errors.append(f"{label}: filters[{index}] must be an object with a 'field'")
-                continue
-            values = entry.get("values")
-            if not (isinstance(values, list) and values) and (
-                entry.get("min") is None and entry.get("max") is None
-            ):
-                errors.append(
-                    f"{label}: filters[{index}] has nothing to filter on - give it "
-                    f"'values' (a member list) or 'min'/'max' (a range)"
-                )
-
-    sort = worksheet.get("sort")
-    if isinstance(sort, dict):
-        order = sort.get("order")
-        if sort.get("by") is None and not (isinstance(order, list) and order):
-            errors.append(
-                f"{label}: 'sort' has neither 'by' (the measure to sort on) nor 'order' "
-                f"(an explicit member list) - one of the two is required"
-            )
 
 
 def _validate_objects(
