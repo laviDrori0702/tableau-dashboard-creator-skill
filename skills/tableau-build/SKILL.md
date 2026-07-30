@@ -23,12 +23,31 @@ field, or element id named.
 | **Next step** | None — the pipeline is complete (`tableau-route` confirms). |
 
 The mechanical guarantees live in Python: the entry gate, the manifest schema validation and
-the STATE.md transition in `build.py` / `manifest.py`, and the XML itself in `twb.py` — the
-element order, the generated ids, the four places every column must appear, the live-only
+the STATE.md transition in `build.py` / `manifest.py`, the workbook shell in `twb.py`, and
+every chart template in `worksheet.py` — the element order, the generated ids, the four
+places every column must appear, the mark class and shelves per chart type, the live-only
 connection and the version targeting are **code, not a checklist**, so a validated manifest
 builds a workbook that is correct by construction. Your job is the judgment part: translating
 each spec row into the right manifest entry. Run the script at the points below; do not
 hand-edit `STATE.md` or the generated XML.
+
+## Chart templates
+
+Every chart type is built from manifest fields — nothing is copied from a snippet, so no
+stray field name or datasource id can leak into the analyst's workbook. Pick the
+`chart_type` from `references/BUILD-MANIFEST-TEMPLATE.md`'s table (`bar`, `line`, `area`,
+`pie`, `scatter`, `map`, `text` = KPI card, `table` = text table, `histogram`, `dual-axis`,
+`combo`, plus `heatmap` / `treemap` / `bullet` / `gantt` / `boxplot`).
+
+Four things the spec may ask for are **not** chart types — they are optional keys on any
+worksheet: `sort`, `filters`, `tooltip`, and `axis_titles` / `number_formats`. A *stacked*
+bar is a `bar` with a `color` encoding. Reach for a modifier before reaching for a new
+chart type.
+
+Styling comes from `DESIGN-TOKENS.md` when the analyst ran `tableau-brand`: its font family
+and chart-title size/colour are applied to every worksheet automatically. When it is absent,
+Tableau's own defaults apply and nothing is invented. The manifest never carries fonts or
+colours.
 
 ## The build manifest
 
@@ -115,11 +134,12 @@ invented zone is caught rather than silently built.
   version is created by re-running `tableau-mock` (which bumps and stales spec and build).
 - **Live connection, always.** The workbook never carries an extract: the `.twbx` embeds the
   CSVs, and the analyst points it at the real database with Data → Replace Data Source.
-- **Worksheet bodies are still coming.** Today's assembler emits the datasources, placeholder
-  worksheets, a dashboard sized from the mock's canvas, and the windows. Shelves, encodings,
-  marks and the dashboard's zone tree are the next ticket, so the built workbook opens
-  clean but the views are empty.
+- **The dashboard's zone tree is still coming.** Today's assembler emits the datasources,
+  fully populated worksheets, a dashboard sized from the mock's canvas, and the windows.
+  Nesting the layout tree into dashboard zones is the next ticket, so every view renders but
+  the dashboard itself is still a single container.
 
 > The full `STATE.md` schema and the ordering / staleness / versioning rules live in
 > `CONTRACT.md` at the repo root. This skill restates only its own slice; `build.py`,
-> `manifest.py` and `twb.py` are the executable mirror of the contract it enforces.
+> `manifest.py`, `twb.py` and `worksheet.py` are the executable mirror of the contract it
+> enforces.

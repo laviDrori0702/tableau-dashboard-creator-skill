@@ -1,0 +1,40 @@
+<worksheet name="Bar Sorted">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#7f56d9" fontname="Open Sans" fontsize="14">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Product Category" datatype="string" name="[product_category]" role="dimension" type="nominal" />
+            <column caption="Revenue" datatype="real" name="[revenue]" role="measure" type="quantitative" />
+            <column-instance column="[product_category]" derivation="None" name="[none:product_category:nk]" pivot="key" type="nominal" />
+            <column-instance column="[revenue]" derivation="Sum" name="[sum:revenue:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <computed-sort column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]" direction="DESC" using="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+          </pane>
+        </panes>
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]</cols>
+      </table>
+      <simple-id uuid="{54DE9D6E-A43F-59FB-A684-1B50B806F89E}" />
+    </worksheet>

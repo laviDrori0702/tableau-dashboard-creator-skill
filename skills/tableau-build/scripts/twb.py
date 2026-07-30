@@ -20,9 +20,9 @@ Two authorities, deliberately kept apart:
 
 The manifest's own ``fields[].type`` is validated but not read here: one authority, no drift.
 
-Scope: datasources, placeholder worksheets, a one-zone dashboard sized from the layout
-canvas, windows, and version targeting. Worksheet bodies (shelves, encodings, marks) and the
-dashboard's zone tree are the next ticket.
+Scope: datasources, worksheet bodies (:mod:`worksheet` owns the shelves, encodings, marks
+and styling), a one-zone dashboard sized from the layout canvas, windows, and version
+targeting. The dashboard's zone tree is the next ticket.
 """
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 
+import worksheet
 from manifest import documented_field_types
 
 # --- Version targeting (CONTRACT.md §2 values) -------------------------------
@@ -49,7 +50,8 @@ _DEFAULT_WORKBOOK_VERSION = "18.1"
 SOURCE_BUILD = "2025.1.10 (20251.25.1121.1650)"
 
 #: The document-format feature flags, copied verbatim from a Tableau-saved workbook.
-#: Adding or removing one changes Tableau's behaviour - keep the set as-is.
+#: Adding or removing one changes Tableau's behaviour - keep the set as-is. Tableau writes
+#: them alphabetically, which is why :data:`SORT_FORMAT_FLAG` can just be sorted in.
 FORMAT_CHANGE_FLAGS: tuple[str, ...] = (
     "AccessibleZoneTabOrder",
     "AnimationOnByDefault",
@@ -63,6 +65,10 @@ FORMAT_CHANGE_FLAGS: tuple[str, ...] = (
     "WindowsPersistSimpleIdentifiers",
     "ZoneFriendlyName",
 )
+
+#: The extra flag a workbook containing a sorted worksheet carries
+#: (WORKSHEETS.md:512, seen in ``bar-chart-sorted.twb`` and ``custom-tooltip.twb``).
+SORT_FORMAT_FLAG = "SortTagCleanup"
 
 #: The single dashboard this ticket emits (the zone tree from ``layout.root`` is next).
 DASHBOARD_NAME = "Dashboard 1"
@@ -300,7 +306,8 @@ def _render_metadata_records(
 
 
 def _render_datasource(
-    parent: ET.Element, name: str, csv_name: str, columns: list[Column], version: str
+    parent: ET.Element, name: str, csv_name: str, columns: list[Column], version: str,
+    derived: list[worksheet.FieldRef],
 ) -> None:
     """Render one inline, live-connection datasource over a single CSV.
 
@@ -310,6 +317,9 @@ def _render_datasource(
         csv_name: The CSV the datasource reads.
         columns: The physical schema, rendered into all four required locations.
         version: The workbook document version (the datasource carries it too).
+        derived: Calculated and binned columns the worksheets introduce. They are not in
+            the CSV, so they appear only among the UI-level columns - but they must appear
+            *here* as well as in each worksheet, or Tableau drops them on save.
     """
     datasource = ET.SubElement(parent, "datasource", {
         "caption": name,
@@ -349,6 +359,8 @@ def _render_datasource(
             "role": facts.role,
             "type": facts.type_attr,
         })
+    for reference in derived:
+        worksheet.render_column(datasource, reference)
     ET.SubElement(datasource, "layout", {
         "dim-ordering": "alphabetic", "measure-ordering": "alphabetic",
         "show-structure": "true",
@@ -365,32 +377,6 @@ def _render_datasource(
 
 # --- Worksheets, dashboard, windows --------------------------------------------
 
-def _render_worksheet(parent: ET.Element, name: str) -> None:
-    """Render a placeholder worksheet body (the shelves/marks are the next ticket).
-
-    Args:
-        parent: The ``<worksheets>`` element.
-        name: The sheet name, which its window must match exactly.
-    """
-    # TODO(next ticket): fill the body from the manifest - datasource-dependencies, the
-    # column-instances, the mark class, and the rows/cols shelf text.
-    worksheet = ET.SubElement(parent, "worksheet", {"name": name})
-    table = ET.SubElement(worksheet, "table")
-    view = ET.SubElement(table, "view")
-    ET.SubElement(view, "datasources")
-    ET.SubElement(view, "aggregation", {"value": "true"})
-    ET.SubElement(table, "style")
-    panes = ET.SubElement(table, "panes")
-    pane = ET.SubElement(
-        panes, "pane", {"selection-relaxation-option": "selection-relaxation-allow"}
-    )
-    ET.SubElement(ET.SubElement(pane, "view"), "breakdown", {"value": "auto"})
-    ET.SubElement(pane, "mark", {"class": "Automatic"})
-    ET.SubElement(table, "rows")
-    ET.SubElement(table, "cols")
-    ET.SubElement(worksheet, "simple-id", {"uuid": simple_id("worksheet", name)})
-
-
 def _render_zone_style(parent: ET.Element, margin: str) -> None:
     """Append the four-format ``<zone-style>`` block Tableau writes on every zone."""
     zone_style = ET.SubElement(parent, "zone-style")
@@ -401,7 +387,7 @@ def _render_zone_style(parent: ET.Element, margin: str) -> None:
         ET.SubElement(zone_style, "format", {"attr": attribute, "value": value})
 
 
-def _render_dashboard(parent: ET.Element, canvas: dict, root_zone_id: str) -> None:
+def _render_dashboard(parent: ET.Element, canvas: dict, root_zone_id: str) -> set[str]:
     """Render the dashboard: its size from the mock's canvas, and one root zone.
 
     The zone *tree* (``layout.root``) is the next ticket; what this pins is the geometry
@@ -411,6 +397,11 @@ def _render_dashboard(parent: ET.Element, canvas: dict, root_zone_id: str) -> No
         parent: The ``<dashboards>`` element.
         canvas: The layout's ``canvas`` object (``width`` / ``height`` in px).
         root_zone_id: The id of the root zone (the dashboard window's ``active`` target).
+
+    Returns:
+        The names of the worksheets this dashboard embeds in a zone - empty until the zone
+        tree lands. :func:`_render_windows` hides exactly these, so a sheet that is embedded
+        nowhere keeps its tab instead of leaving the analyst a blank workbook.
     """
     dashboard = ET.SubElement(parent, "dashboard", {
         "enable-sort-zone-taborder": "true", "name": DASHBOARD_NAME,
@@ -427,28 +418,37 @@ def _render_dashboard(parent: ET.Element, canvas: dict, root_zone_id: str) -> No
         "w": ZONE_SPACE, "x": "0", "y": "0",
     })
     # TODO(next ticket): nest the manifest's layout.root tree inside this zone, one child
-    # zone per element id, with each worksheet zone naming its sheet.
+    # zone per element id, with each worksheet zone naming its sheet - and return those
+    # sheet names here, which is all _render_windows needs to start hiding tabs again.
     _render_zone_style(root_zone, ROOT_ZONE_MARGIN)  # zone-style is the zone's last child
     ET.SubElement(dashboard, "simple-id", {"uuid": simple_id("dashboard", DASHBOARD_NAME)})
+    return set()
 
 
 def _render_windows(
-    parent: ET.Element, worksheet_names: list[str], root_zone_id: str
+    parent: ET.Element,
+    plans: list[worksheet.WorksheetPlan],
+    root_zone_id: str,
+    embedded: set[str],
 ) -> None:
-    """Render one hidden window per worksheet plus the dashboard window.
+    """Render one window per worksheet plus the dashboard window.
 
     Args:
         parent: The ``<workbook>`` element.
-        worksheet_names: The sheet names, in manifest order.
+        plans: The resolved worksheets, in manifest order.
         root_zone_id: The zone the dashboard window opens on.
+        embedded: Names of worksheets the dashboard embeds in a zone; only those get
+            ``hidden='true'``. Hiding a sheet no zone shows makes it unreachable - Tableau
+            renders no tab for it, so the analyst opens a workbook with nothing in it.
     """
     windows = ET.SubElement(parent, "windows", {"source-height": "30"})
+    worksheet_names = [plan.name for plan in plans]
 
-    for name in worksheet_names:
-        # hidden: these sheets only ever appear embedded in the dashboard.
-        window = ET.SubElement(
-            windows, "window", {"class": "worksheet", "hidden": "true", "name": name}
-        )
+    for plan in plans:
+        attributes = {"class": "worksheet", "name": plan.name}
+        if plan.name in embedded:
+            attributes["hidden"] = "true"
+        window = ET.SubElement(windows, "window", dict(sorted(attributes.items())))
         cards = ET.SubElement(window, "cards")
         left = ET.SubElement(cards, "edge", {"name": "left"})
         left_strip = ET.SubElement(left, "strip", {"size": "160"})
@@ -460,7 +460,17 @@ def _render_windows(
             ET.SubElement(
                 ET.SubElement(top, "strip", {"size": size}), "card", {"type": card_type}
             )
-        ET.SubElement(window, "simple-id", {"uuid": simple_id("window", name)})
+        # A colour- or size-encoded chart with no legend renders, but reads as broken.
+        legends = worksheet.legend_cards(plan)
+        if legends:
+            right_strip = ET.SubElement(
+                ET.SubElement(cards, "edge", {"name": "right"}), "strip", {"size": "160"}
+            )
+            for card_type, column, pane_id in legends:
+                ET.SubElement(right_strip, "card", {
+                    "pane-specification-id": pane_id, "param": column, "type": card_type,
+                })
+        ET.SubElement(window, "simple-id", {"uuid": simple_id("window", plan.name)})
 
     dashboard_window = ET.SubElement(windows, "window", {
         "class": "dashboard", "maximized": "true", "name": DASHBOARD_NAME,
@@ -495,10 +505,114 @@ def workbook_version(target_tableau_version: str) -> str:
     )
 
 
+def _build_resolvers(
+    manifest_document: dict, field_types: dict[str, dict[str, str]]
+) -> dict[str, worksheet.FieldResolver]:
+    """Build one :class:`worksheet.FieldResolver` per declared datasource.
+
+    Args:
+        manifest_document: The parsed build manifest.
+        field_types: ``{csv: {field: type}}`` from ``DATA-MODEL.md``.
+
+    Returns:
+        ``{datasource name: resolver}``. Each resolver knows the datasource's federated id,
+        its CSV's field types, and its calculated fields' formulas.
+    """
+    calculated: dict[str, dict[str, tuple[str, str]]] = {}
+    for entry in manifest_document.get("calculated_fields", []) or []:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name", "")).strip()
+        source = str(entry.get("datasource", "")).strip()
+        if not (name and source):
+            continue
+        # No 'type' means a numeric result - the overwhelmingly common calculated field.
+        calculated.setdefault(source, {})[name] = (
+            str(entry.get("formula", "")).strip(),
+            str(entry.get("type", "")).strip().lower() or "real",
+        )
+
+    # The resolver only needs the role and the UI type from each DATA-MODEL.md type; passing
+    # a plain mapping keeps :mod:`worksheet` free of an import back into this module.
+    type_facts = {
+        datatype: (facts.role, facts.type_attr) for datatype, facts in TYPE_FACTS.items()
+    }
+    resolvers: dict[str, worksheet.FieldResolver] = {}
+    for entry in manifest_document.get("datasources", []) or []:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name", "")).strip()
+        csv_name = str(entry.get("csv", "")).strip()
+        resolvers[name] = worksheet.FieldResolver(
+            datasource_id(name),
+            name,
+            field_types.get(csv_name, {}),
+            calculated.get(name, {}),
+            type_facts,
+        )
+    return resolvers
+
+
+def _plan_worksheets(
+    manifest_document: dict, resolvers: dict[str, worksheet.FieldResolver]
+) -> list[tuple[str, worksheet.WorksheetPlan]]:
+    """Resolve every manifest worksheet, paired with its datasource name."""
+    plans: list[tuple[str, worksheet.WorksheetPlan]] = []
+    for entry in manifest_document.get("worksheets", []) or []:
+        if not isinstance(entry, dict):
+            continue
+        source = str(entry.get("datasource", "")).strip()
+        resolver = resolvers.get(source)
+        if resolver is None:  # validate_manifest already named this worksheet
+            continue
+        plans.append((source, worksheet.plan_worksheet(entry, resolver)))
+    return plans
+
+
+def _collect_derived_columns(
+    manifest_document: dict,
+    resolvers: dict[str, worksheet.FieldResolver],
+    plans: list[tuple[str, worksheet.WorksheetPlan]],
+) -> dict[str, list[worksheet.FieldRef]]:
+    """Collect the non-CSV columns each datasource must declare.
+
+    Two kinds: the manifest's ``calculated_fields``, and the binned columns a histogram
+    introduces on a shelf. Both are declared at the datasource level as well as inside each
+    worksheet that uses them - Tableau drops a worksheet-only calculation on save.
+
+    Args:
+        manifest_document: The parsed build manifest.
+        resolvers: The per-datasource resolvers.
+        plans: The resolved worksheets.
+
+    Returns:
+        ``{datasource name: [FieldRef]}``, de-duplicated and in a stable order.
+    """
+    derived: dict[str, dict[str, worksheet.FieldRef]] = {}
+    for entry in manifest_document.get("calculated_fields", []) or []:
+        if not isinstance(entry, dict):
+            continue
+        source = str(entry.get("datasource", "")).strip()
+        resolver = resolvers.get(source)
+        name = str(entry.get("name", "")).strip()
+        if resolver is None or not name:
+            continue
+        reference = resolver.reference(name)
+        if reference is not None:
+            derived.setdefault(source, {}).setdefault(reference.column_name, reference)
+
+    for source, plan in plans:
+        for reference in worksheet.bin_columns(plan):
+            derived.setdefault(source, {}).setdefault(reference.column_name, reference)
+
+    return {source: list(columns.values()) for source, columns in derived.items()}
+
+
 def render_workbook(
     manifest_document: dict,
     data_model_text: str,
     csv_headers: dict[str, list[str]],
+    design_tokens_text: str = "",
 ) -> str:
     """Assemble a validated build manifest into ``.twb`` XML.
 
@@ -511,12 +625,15 @@ def render_workbook(
         manifest_document: The parsed, validated ``build-manifest.json``.
         data_model_text: The contents of ``DATA-MODEL.md`` (the type authority).
         csv_headers: ``{csv filename: header row}`` - the physical schema and its order.
+        design_tokens_text: The contents of ``DESIGN-TOKENS.md``; ``""`` when the analyst
+            skipped branding, in which case Tableau's own defaults apply.
 
     Returns:
         The workbook XML, ready to write as ``dashboard.twb``.
     """
     target = str(manifest_document.get("target_tableau_version", "")).strip()
     version = workbook_version(target)
+    tokens = worksheet.parse_design_tokens(design_tokens_text)
 
     workbook = ET.Element("workbook", {
         "original-version": version,
@@ -526,35 +643,53 @@ def render_workbook(
         "xmlns:user": "http://www.tableausoftware.com/xml/user",
     })
 
+    worksheet_entries = manifest_document.get("worksheets") or []
+    flags = FORMAT_CHANGE_FLAGS
+    if any(entry.get("sort") for entry in worksheet_entries):
+        flags = tuple(sorted(flags + (SORT_FORMAT_FLAG,)))
+
     format_manifest = ET.SubElement(workbook, "document-format-change-manifest")
-    for flag in FORMAT_CHANGE_FLAGS:
+    for flag in flags:
         ET.SubElement(format_manifest, flag)
 
     field_types = documented_field_types(data_model_text)
+    resolvers = _build_resolvers(manifest_document, field_types)
+    plans = _plan_worksheets(manifest_document, resolvers)
+    derived = _collect_derived_columns(manifest_document, resolvers, plans)
+
     datasources = ET.SubElement(workbook, "datasources")
     for entry in manifest_document.get("datasources", []):
         csv_name = str(entry.get("csv", "")).strip()
+        name = str(entry.get("name", "")).strip()
         _render_datasource(
             datasources,
-            str(entry.get("name", "")).strip(),
+            name,
             csv_name,
             _columns_for(csv_headers.get(csv_name, []), field_types.get(csv_name, {})),
             version,
+            derived.get(name, []),
         )
 
-    worksheet_names = [
-        str(worksheet.get("name", "")).strip()
-        for worksheet in manifest_document.get("worksheets", [])
-    ]
-    if worksheet_names:  # the XSD requires >=1 <worksheet>; omit the element otherwise
+    if any(plan.spec.geographic for _, plan in plans):
+        # A map needs its <mapsources> at *both* levels: the workbook's declares the source,
+        # each map worksheet's view references it. One without the other renders no basemap.
+        ET.SubElement(
+            ET.SubElement(workbook, "mapsources"), "mapsource", {"name": worksheet.MAPSOURCE_NAME}
+        )
+
+    if plans:  # the XSD requires >=1 <worksheet>; omit the element otherwise
         worksheets = ET.SubElement(workbook, "worksheets")
-        for name in worksheet_names:
-            _render_worksheet(worksheets, name)
+        for _, plan in plans:
+            worksheet.render_worksheet(
+                worksheets, plan, tokens, simple_id("worksheet", plan.name)
+            )
 
     layout = manifest_document.get("layout")
     canvas = layout.get("canvas", {}) if isinstance(layout, dict) else {}
-    _render_dashboard(ET.SubElement(workbook, "dashboards"), canvas, ROOT_ZONE_ID)
-    _render_windows(workbook, worksheet_names, ROOT_ZONE_ID)
+    embedded = _render_dashboard(
+        ET.SubElement(workbook, "dashboards"), canvas, ROOT_ZONE_ID
+    )
+    _render_windows(workbook, [plan for _, plan in plans], ROOT_ZONE_ID, embedded)
 
     if target == TARGET_2026:
         explain_data = ET.SubElement(workbook, "explain-data", {
@@ -563,7 +698,7 @@ def render_workbook(
         ET.SubElement(explain_data, "explanation-types")
 
     ET.indent(workbook, space="  ")
-    return (
+    return worksheet.unwrap_cdata(
         "<?xml version='1.0' encoding='utf-8' ?>\n\n"
         + ET.tostring(workbook, encoding="unicode")
         + "\n"

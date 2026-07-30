@@ -28,14 +28,53 @@ unfilled zone would build an empty container. A *mapped container* (a node with 
 and `children`, e.g. a DZV panel) is filled by its children and needs no entry of its own.
 Interaction ids (`int-*`) are actions, not zones, and never appear in the tree.
 
-Chart types the builder emits: `bar`, `line`, `area`, `pie`, `scatter`, `map`, `text`,
-`table`, `heatmap`, `histogram`, `treemap`, `bullet`, `gantt`, `boxplot`.
+## Chart types
+
+| `chart_type` | what it emits |
+|--------------|---------------|
+| `bar` | Discrete dimension × aggregated measure. Add a `color` encoding for a **stacked** bar. |
+| `line` | Same shape, but the dimension is a **continuous date** — give it a `date_part`. |
+| `area` | Line with an explicit `Area` mark. |
+| `pie` | Rows/Cols stay empty; everything is encodings (`color`, `wedge-size`, `size`, `text`). |
+| `scatter` | A measure on each axis, a dimension on `lod` (Detail). |
+| `map` | Tableau's generated lat/long; `lod` is the geographic dimension, `color` the measure. Optional `geo_role` (e.g. `"[Country].[ISO3166_2]"`). |
+| `text` | **KPI card** — empty shelves, a single `text` encoding, rendered as a big number. |
+| `table` | **Text table** — a dimension on each axis, the measure on `text`. |
+| `histogram` | A binned dimension: `{"field": "revenue", "bin": 500}` on `columns`, a `count` on `rows`. |
+| `dual-axis` | Exactly **two** measures on `rows`, overlaid on synchronised axes. |
+| `combo` | A dual axis with Bar marks on the first measure and Line on the second. |
+| `heatmap`, `treemap`, `bullet`, `gantt`, `boxplot` | The corresponding mark class. |
+
+Four of the legacy patterns are **modifiers**, not chart types — they apply to any of the
+above via the optional worksheet keys below.
 
 **Shelf and encoding entries** are either a bare field name (`"revenue"`) or an object
-carrying what the builder must apply: `{"field": "revenue", "aggregation": "sum"}` or
-`{"field": "order_date", "date_part": "month"}`. Aggregations: `sum`, `avg`, `min`, `max`,
-`count`, `countd`, `median`, `attr`, `none`. Never write an expression like
-`"SUM([revenue])"` — that is the spec's prose, not a field reference.
+carrying what the builder must apply: `{"field": "revenue", "aggregation": "sum"}`,
+`{"field": "order_date", "date_part": "month"}`, or `{"field": "revenue", "bin": 500}`.
+Aggregations: `sum`, `avg`, `min`, `max`, `count`, `countd`, `median`, `attr`, `none` — a
+measure with none of them defaults to `SUM`. Date parts: `year`, `quarter`, `month`, `week`,
+`day`, `date`. Never write an expression like `"SUM([revenue])"` — that is the spec's prose,
+not a field reference.
+
+Encodings the builder emits: `color`, `size`, `shape`, `text`, `lod`, `wedge-size`,
+`geometry`, `tooltip`. Any other name is a validation error, not a silent drop.
+
+## Optional worksheet keys (the modifiers)
+
+| key | shape | what it does |
+|-----|-------|--------------|
+| `sort` | `{"field": "region", "direction": "DESC", "by": {"field": "revenue", "aggregation": "sum"}}` | Computed sort. Swap `by` for `"order": ["West", "East"]` to sort manually. |
+| `filters` | `[{"field": "region", "values": ["Europe"], "context": true}, {"field": "order_date", "min": "2025-01-01", "max": "2025-06-30"}]` | Categorical (member list) or in-range filter. `context: true` runs it before FIXED LODs. |
+| `tooltip` | `[{"label": "Revenue", "field": "revenue", "aggregation": "sum"}]` | A custom tooltip template, one label/value pair per line. |
+| `axis_titles` | `{"rows": "Revenue per category"}` | Overrides the generated axis title. |
+| `number_formats` | `[{"field": "revenue", "format": "$#,##0"}]` | Cell number format for that field. |
+
+Every modifier's field is resolved as strictly as a shelf field — a filter on a field the
+data model does not document is rejected, not silently dropped.
+
+**Styling comes from `DESIGN-TOKENS.md`, not the manifest.** When it exists, its font family
+and chart-title size/colour are applied to every worksheet; when it does not, Tableau's own
+defaults apply. Nothing in the manifest sets fonts or colours.
 
 **Action targets depend on the type**: `filter` / `highlight` target layout zones, a
 `parameter` action targets a declared parameter by name. The `source` is always a zone.
@@ -58,7 +97,7 @@ carrying what the builder must apply: `{"field": "revenue", "aggregation": "sum"
   ],
   "calculated_fields": [
     {"name": "Revenue per Order", "formula": "SUM([revenue]) / COUNTD([order_id])",
-     "datasource": "sales_orders"}
+     "datasource": "sales_orders", "type": "real"}
   ],
   "worksheets": [
     {
@@ -78,7 +117,11 @@ carrying what the builder must apply: `{"field": "revenue", "aggregation": "sum"
         "columns": [{"field": "order_date", "date_part": "month"}],
         "rows": [{"field": "revenue", "aggregation": "sum"}]
       },
-      "encodings": {"color": "region"}
+      "encodings": {"color": "region"},
+      "filters": [{"field": "region", "values": ["West", "East"], "context": true}],
+      "sort": {"field": "region", "direction": "DESC",
+               "by": {"field": "revenue", "aggregation": "sum"}},
+      "number_formats": [{"field": "revenue", "format": "$#,##0"}]
     }
   ],
   "objects": [

@@ -1,0 +1,57 @@
+<worksheet name="Bar Filtered">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#7f56d9" fontname="Open Sans" fontsize="14">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Order Date" datatype="date" name="[order_date]" role="dimension" type="ordinal" />
+            <column caption="Product Category" datatype="string" name="[product_category]" role="dimension" type="nominal" />
+            <column caption="Region" datatype="string" name="[region]" role="dimension" type="nominal" />
+            <column caption="Revenue" datatype="real" name="[revenue]" role="measure" type="quantitative" />
+            <column-instance column="[order_date]" derivation="None" name="[none:order_date:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[product_category]" derivation="None" name="[none:product_category:nk]" pivot="key" type="nominal" />
+            <column-instance column="[region]" derivation="None" name="[none:region:nk]" pivot="key" type="nominal" />
+            <column-instance column="[revenue]" derivation="Sum" name="[sum:revenue:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <filter class="categorical" column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]" context="true">
+            <groupfilter function="union" user:ui-domain="database" user:ui-enumeration="inclusive" user:ui-marker="enumerate">
+              <groupfilter function="member" level="[none:region:nk]" member="&quot;Europe&quot;" />
+              <groupfilter function="member" level="[none:region:nk]" member="&quot;Asia&quot;" />
+            </groupfilter>
+          </filter>
+          <filter class="quantitative" column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:order_date:qk]" included-values="in-range">
+            <min>#2025-03-03#</min>
+            <max>#2025-04-22#</max>
+          </filter>
+          <slices>
+            <column>[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]</column>
+            <column>[federated.b2993893834e8f0306a282d0a717d7a9].[none:order_date:qk]</column>
+          </slices>
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+          </pane>
+        </panes>
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]</cols>
+      </table>
+      <simple-id uuid="{B5082F3E-A7F0-5857-9888-2C0DCF34552D}" />
+    </worksheet>

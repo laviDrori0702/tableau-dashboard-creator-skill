@@ -1,0 +1,50 @@
+<worksheet name="Text Table">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#7f56d9" fontname="Open Sans" fontsize="14">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Product Category" datatype="string" name="[product_category]" role="dimension" type="nominal" />
+            <column caption="Region" datatype="string" name="[region]" role="dimension" type="nominal" />
+            <column caption="Revenue" datatype="real" name="[revenue]" role="measure" type="quantitative" />
+            <column-instance column="[product_category]" derivation="None" name="[none:product_category:nk]" pivot="key" type="nominal" />
+            <column-instance column="[region]" derivation="None" name="[none:region:nk]" pivot="key" type="nominal" />
+            <column-instance column="[revenue]" derivation="Sum" name="[sum:revenue:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
+            </encodings>
+            <style>
+              <style-rule element="mark">
+                <format attr="mark-labels-show" value="true" />
+                <format attr="mark-labels-cull" value="true" />
+              </style-rule>
+            </style>
+          </pane>
+        </panes>
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]</cols>
+      </table>
+      <simple-id uuid="{D4D12C98-B6EB-5585-B5FE-AC86A7C14B59}" />
+    </worksheet>

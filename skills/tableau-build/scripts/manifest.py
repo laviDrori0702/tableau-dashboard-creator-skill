@@ -31,18 +31,23 @@ import re
 from pathlib import Path
 from typing import Optional
 
+# Names, not the module: half the functions below take a parameter called ``worksheet``.
+from worksheet import CHART_SPECS, DATE_PART_DERIVATIONS, ENCODING_ORDER
+
 #: Sections a manifest must carry (actions/parameters may be empty lists, never absent -
 #: "None" must be said explicitly so a forgotten section is not mistaken for "no actions").
 REQUIRED_KEYS: tuple[str, ...] = (
     "target_tableau_version", "datasources", "worksheets", "layout", "actions", "parameters",
 )
 
-#: Mark/chart types the builder knows how to emit. Add a type here only once the builder
-#: has a validated snippet for it - an unknown type must fail loudly, not build blank.
-CHART_TYPES = frozenset({
-    "bar", "line", "area", "pie", "scatter", "map", "text", "table",
-    "heatmap", "histogram", "treemap", "bullet", "gantt", "boxplot",
-})
+#: Mark/chart types the builder knows how to emit - read straight off the builder's table,
+#: so a type can never be accepted here and rendered blank there. Add a chart type by adding
+#: a :data:`worksheet.CHART_SPECS` row.
+CHART_TYPES = frozenset(CHART_SPECS)
+
+#: Chart types that overlay two measures on one axis pair - they need exactly two entries on
+#: the rows shelf, or the second axis (and the whole point of the chart) is missing.
+DUAL_AXIS_TYPES = frozenset({"dual-axis", "combo"})
 
 #: Dashboard action types (the Tableau constructs behind CONTRACT.md §6's vocabulary).
 ACTION_TYPES = frozenset({"filter", "highlight", "parameter", "set", "url"})
@@ -63,10 +68,12 @@ AGGREGATIONS = frozenset({
     "sum", "avg", "min", "max", "count", "countd", "median", "attr", "none",
 })
 
-#: Date parts a shelf/encoding entry may request of a date field.
-DATE_PARTS = frozenset({
-    "year", "quarter", "month", "week", "day", "hour", "minute", "date",
-})
+#: Date parts a shelf/encoding entry may request of a date field, and the encoding names an
+#: ``encodings`` block may use. Both come off the builder's tables for the same reason as
+#: :data:`CHART_TYPES`: an entry this module accepts but the builder has no case for is
+#: dropped silently, and Tableau shows no sign of the missing encoding.
+DATE_PARTS = frozenset(DATE_PART_DERIVATIONS)
+ENCODING_NAMES = frozenset(ENCODING_ORDER)
 
 # A data-source heading in DATA-MODEL.md: "## Data source: `sales.csv`" -> "sales.csv".
 _DATASOURCE_HEADING = re.compile(
@@ -385,17 +392,20 @@ def _calculated_field_names(
 
 
 def _worksheet_field_references(worksheet: dict) -> list[tuple[str, object]]:
-    """Return the ``(where, entry)`` pairs a worksheet's shelves/encodings reference.
+    """Return the ``(where, entry)`` pairs a worksheet's fields are referenced from.
 
-    Each entry is either a bare field name (``"revenue"``) or an object carrying the
-    aggregation / date part the builder must apply
-    (``{"field": "revenue", "aggregation": "sum"}``).
+    Each entry is either a bare field name (``"revenue"``) or an object carrying what the
+    builder must apply (``{"field": "revenue", "aggregation": "sum"}``). Shelves and
+    encodings place fields on the view; ``filters``, ``sort``, ``tooltip`` and
+    ``number_formats`` are the optional modifiers that any chart type may carry, and their
+    fields have to resolve just as strictly - a filter on a field that does not exist is a
+    filter Tableau silently ignores.
 
     Args:
         worksheet: One ``worksheets`` entry.
 
     Returns:
-        ``(where, entry)`` pairs, where ``where`` is e.g. ``shelves.rows`` / ``encodings.color``.
+        ``(where, entry)`` pairs, where ``where`` is e.g. ``shelves.rows`` / ``sort.by``.
     """
     references: list[tuple[str, object]] = []
     shelves = worksheet.get("shelves")
@@ -407,6 +417,18 @@ def _worksheet_field_references(worksheet: dict) -> list[tuple[str, object]]:
     if isinstance(encodings, dict):
         for encoding, entry in encodings.items():
             references.append((f"encodings.{encoding}", entry))
+
+    for key in ("filters", "tooltip", "number_formats"):
+        entries = worksheet.get(key)
+        if isinstance(entries, list):
+            for index, entry in enumerate(entries):
+                references.append((f"{key}[{index}]", entry))
+
+    sort = worksheet.get("sort")
+    if isinstance(sort, dict):
+        references.append(("sort", sort))
+        if sort.get("by") is not None:
+            references.append(("sort.by", sort["by"]))
     return references
 
 
@@ -425,6 +447,7 @@ def _validate_reference(
         source: The datasource name, for the message.
         errors: Accumulator for validation errors.
     """
+    bin_size: object = None
     if isinstance(entry, dict):
         field_name = _bare_field(entry.get("field"))
         # A JSON null (or any other non-string) means "not specified", same as a missing
@@ -433,6 +456,7 @@ def _validate_reference(
         aggregation = raw_aggregation.strip().lower() if isinstance(raw_aggregation, str) else ""
         raw_date_part = entry.get("date_part", "")
         date_part = raw_date_part.strip().lower() if isinstance(raw_date_part, str) else ""
+        bin_size = entry.get("bin")
     else:
         field_name, aggregation, date_part = _bare_field(entry), "", ""
 
@@ -462,6 +486,62 @@ def _validate_reference(
             f"{label}: {where} '{field_name}' has unknown date_part '{date_part}' "
             f"(expected one of: {', '.join(sorted(DATE_PARTS))})"
         )
+    if bin_size is not None and not (
+        isinstance(bin_size, (int, float)) and not isinstance(bin_size, bool) and bin_size > 0
+    ):
+        errors.append(
+            f"{label}: {where} '{field_name}' has a 'bin' of {bin_size!r} - a bin width "
+            f"must be a positive number (e.g. 500 for a histogram of 0-500, 500-1000, ...)"
+        )
+
+
+def _validate_modifiers(label: str, worksheet: dict, errors: list[str]) -> None:
+    """Reject modifier entries the builder would have to drop.
+
+    A filter with nothing to filter on, a sort with nothing to sort by, or an encoding the
+    builder has no case for is an entry the assembler cannot render - and one Tableau would
+    show no sign of. Naming it here is the difference between "the filter is missing" and
+    "the manifest row is incomplete".
+
+    Args:
+        label: The worksheet's error label.
+        worksheet: One ``worksheets`` entry.
+        errors: Accumulator for validation errors.
+    """
+    encodings = worksheet.get("encodings")
+    if isinstance(encodings, dict):
+        # The field behind each encoding is checked by _validate_reference; only the
+        # encoding *name* is checked here, so a typo'd 'colour' fails instead of vanishing.
+        for name in encodings:
+            if str(name).strip().lower() not in ENCODING_NAMES:
+                errors.append(
+                    f"{label}: unknown encoding '{name}' "
+                    f"(expected one of: {', '.join(sorted(ENCODING_NAMES))})"
+                )
+
+    filters = worksheet.get("filters")
+    if isinstance(filters, list):
+        for index, entry in enumerate(filters):
+            if not isinstance(entry, dict):
+                errors.append(f"{label}: filters[{index}] must be an object with a 'field'")
+                continue
+            values = entry.get("values")
+            if not (isinstance(values, list) and values) and (
+                entry.get("min") is None and entry.get("max") is None
+            ):
+                errors.append(
+                    f"{label}: filters[{index}] has nothing to filter on - give it "
+                    f"'values' (a member list) or 'min'/'max' (a range)"
+                )
+
+    sort = worksheet.get("sort")
+    if isinstance(sort, dict):
+        order = sort.get("order")
+        if sort.get("by") is None and not (isinstance(order, list) and order):
+            errors.append(
+                f"{label}: 'sort' has neither 'by' (the measure to sort on) nor 'order' "
+                f"(an explicit member list) - one of the two is required"
+            )
 
 
 def _validate_worksheets(
@@ -514,6 +594,15 @@ def _validate_worksheets(
                 f"{label}: unknown chart_type '{chart_type}' "
                 f"(expected one of: {', '.join(sorted(CHART_TYPES))})"
             )
+        elif chart_type in DUAL_AXIS_TYPES:
+            shelves = worksheet.get("shelves")
+            rows = shelves.get("rows") if isinstance(shelves, dict) else None
+            if not (isinstance(rows, list) and len(rows) == 2):
+                errors.append(
+                    f"{label}: chart_type '{chart_type}' needs exactly two measures on "
+                    f"'shelves.rows' (the two axes to overlay); got "
+                    f"{len(rows) if isinstance(rows, list) else 0}"
+                )
 
         element_id = str(worksheet.get("element_id", "")).strip()
         if not element_id:
@@ -541,6 +630,7 @@ def _validate_worksheets(
         available = declared_fields[source] | calculated.get(source, set())
         for where, entry in _worksheet_field_references(worksheet):
             _validate_reference(label, where, entry, available, source, errors)
+        _validate_modifiers(label, worksheet, errors)
     return filled
 
 

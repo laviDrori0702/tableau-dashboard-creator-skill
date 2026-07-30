@@ -1,0 +1,1159 @@
+"""Worksheet bodies for the tableau-build assembler (CONTRACT.md step 8).
+
+:mod:`twb` owns the workbook shell - datasources, dashboard, windows. This module owns what
+goes *inside* a ``<worksheet>``: the mark class, the shelves, the encodings, the sorts, the
+filters and the design-token styling. Every one of the 15 validated legacy patterns (bar,
+sorted / filtered / styled bar, stacked bar, line, area, pie, scatter, text table, KPI card,
+histogram, map, dual axis, combo, custom tooltip) is produced from manifest fields here -
+nothing is copy-pasted from a snippet, so no snippet's field names, datasource ids or UUIDs
+can leak into an analyst's workbook.
+
+The 15 patterns are **not** 15 chart types. Four of them (sorted, filtered, styled, custom
+tooltip) are modifiers that apply to *any* chart, and "stacked bar" is a bar with a colour
+encoding. So the shape here is a :data:`CHART_SPECS` table of what a chart type changes
+(mark class, pane count, whether the marks carry labels) crossed with modifier renderers that
+each read one optional manifest key. A new chart type is a row in the table, not a function.
+
+Everything is pure and stdlib-only: text in, XML elements out, no filesystem.
+"""
+
+from __future__ import annotations
+
+import re
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
+from typing import Optional
+
+# --- CDATA -------------------------------------------------------------------
+# ponytail: ElementTree cannot emit CDATA, and Tableau *requires* it around field
+# references in <run> elements (entity-encoded refs render as literal text, which the
+# semantic validator rejects). A sentinel pair plus one regex at serialisation time is far
+# cheaper than a custom serializer.
+
+#: Private-use characters wrapped around text that must serialise as a CDATA section.
+#: Written as escapes, not literals: the source has to survive a cp1252 console.
+CDATA_OPEN = "\ue000"
+CDATA_CLOSE = "\ue001"
+
+_CDATA_SPAN = re.compile(f"{CDATA_OPEN}(.*?){CDATA_CLOSE}", re.DOTALL)
+_ENTITIES = (("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'), ("&apos;", "'"), ("&amp;", "&"))
+
+
+def unwrap_cdata(xml_text: str) -> str:
+    """Turn every sentinel-marked span in serialised XML into a real CDATA section.
+
+    Args:
+        xml_text: The output of ``ET.tostring``, still carrying the sentinels.
+
+    Returns:
+        The same XML with each span rewritten as ``<![CDATA[...]]>`` and the escaping
+        ElementTree applied inside it undone.
+    """
+    def _restore(match: re.Match) -> str:
+        inner = match.group(1)
+        for entity, character in _ENTITIES:  # &amp; last: it is the escape of the escapes
+            inner = inner.replace(entity, character)
+        return f"<![CDATA[{inner}]]>"
+
+    return _CDATA_SPAN.sub(_restore, xml_text)
+
+
+def cdata(text: str) -> str:
+    """Wrap ``text`` so :func:`unwrap_cdata` emits it as a CDATA section."""
+    return f"{CDATA_OPEN}{text}{CDATA_CLOSE}"
+
+
+# --- Design tokens ------------------------------------------------------------
+
+#: Tableau's own defaults, used for any token DESIGN-TOKENS.md does not carry (and for every
+#: token when the file is absent) - "neutral" means Tableau's look, not an invented one.
+DEFAULT_FONT = "Tableau Book"
+DEFAULT_TITLE_SIZE = 12
+DEFAULT_TITLE_COLOR = "#000000"
+DEFAULT_KPI_SIZE = 22
+
+_HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
+_SIZE = re.compile(r"(\d+)\s*px", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class DesignTokens:
+    """The slice of DESIGN-TOKENS.md a worksheet body can actually apply.
+
+    Tableau styles a *worksheet* with a font family, a title run, and cell/axis formats.
+    The palette's series colours are deliberately not mapped onto marks: a colour palette
+    binds hex values to concrete data members (``<map to='#...'><bucket>"West"</bucket>``),
+    and the builder does not know the data's members. Colour therefore stays with Tableau's
+    default palette and the tokens drive type.
+
+    Attributes:
+        font_family: Body font for the whole worksheet.
+        title_size: Chart-title point size.
+        title_color: Chart-title colour, lower-cased hex.
+        kpi_size: Point size for a KPI card's big number.
+        present: Whether a DESIGN-TOKENS.md was actually supplied.
+    """
+
+    font_family: str = DEFAULT_FONT
+    title_size: int = DEFAULT_TITLE_SIZE
+    title_color: str = DEFAULT_TITLE_COLOR
+    kpi_size: int = DEFAULT_KPI_SIZE
+    present: bool = False
+
+
+def parse_design_tokens(tokens_text: str) -> DesignTokens:
+    """Read the typography tokens out of a DESIGN-TOKENS.md.
+
+    The parse is tolerant by design (the file is prose an agent authored from a template):
+    it looks for the ``- **Font family**:`` and ``- **Chart title**:`` bullets and takes the
+    first font name / px size / hex colour on each. Anything it cannot find keeps its
+    Tableau default.
+
+    Args:
+        tokens_text: The contents of a ``DESIGN-TOKENS.md`` (``""`` when absent).
+
+    Returns:
+        The parsed :class:`DesignTokens`; ``present`` is False for empty input.
+    """
+    if not tokens_text.strip():
+        return DesignTokens()
+
+    font, title_size, title_color = DEFAULT_FONT, DEFAULT_TITLE_SIZE, DEFAULT_TITLE_COLOR
+    for raw_line in tokens_text.splitlines():
+        line = raw_line.strip()
+        if not line.startswith("-"):
+            continue
+        label, _, value = line.lstrip("- ").partition(":")
+        label = label.strip().strip("*").lower()
+        value = value.strip()
+        if not value or value.startswith("["):  # an unfilled template placeholder
+            continue
+
+        if label == "font family":
+            font = value.strip("`*")
+        elif label == "chart title":
+            size = _SIZE.search(value)
+            if size:
+                title_size = int(size.group(1))
+            color = _HEX.search(value)
+            if color:
+                title_color = color.group(0).lower()
+
+    return DesignTokens(
+        font_family=font,
+        title_size=title_size,
+        title_color=title_color,
+        kpi_size=max(title_size + 8, DEFAULT_KPI_SIZE),
+        present=True,
+    )
+
+
+# --- Field references ----------------------------------------------------------
+# A shelf/encoding entry names a field; Tableau needs a <column>, a <column-instance>, and a
+# qualified reference for it, all three consistent. These tables are the single place the
+# naming rules live.
+
+#: manifest aggregation -> (column-instance prefix, ``derivation`` attribute).
+AGGREGATION_DERIVATIONS: dict[str, tuple[str, str]] = {
+    "sum": ("sum", "Sum"),
+    "avg": ("avg", "Avg"),
+    "min": ("min", "Min"),
+    "max": ("max", "Max"),
+    "count": ("cnt", "Count"),
+    "countd": ("ctd", "CountD"),
+    "median": ("med", "Median"),
+    "attr": ("attr", "Attribute"),
+    "none": ("none", "None"),
+}
+
+#: Aggregations that turn any field into a continuous measure on the shelf.
+_AGGREGATING = frozenset({"sum", "avg", "min", "max", "count", "countd", "median"})
+
+#: A calculated field that already aggregates cannot be aggregated again - ``SUM()`` of
+#: ``SUM([profit]) / SUM([revenue])`` is an error Tableau refuses at load. Such a field goes
+#: on a shelf as-is, which Tableau records as the ``User`` derivation.
+USER_DERIVATION = ("usr", "User")
+
+_AGGREGATE_CALL = re.compile(
+    r"\b(SUM|AVG|MIN|MAX|COUNT|COUNTD|MEDIAN|ATTR|STDEV|STDEVP|VAR|VARP|PERCENTILE"
+    r"|CORR|COVAR|COVARP|TOTAL|WINDOW_\w+|RUNNING_\w+)\s*\(",
+    re.IGNORECASE,
+)
+
+
+def is_aggregate_formula(formula: str) -> bool:
+    """Return whether a calculated field's formula already aggregates.
+
+    Args:
+        formula: The calculation's Tableau formula.
+
+    Returns:
+        True when the formula calls an aggregate function, so the field must reach a shelf
+        un-aggregated. A row-level formula (``[quantity] * [unit_price]``) returns False and
+        is treated like any other measure.
+    """
+    return bool(formula) and _AGGREGATE_CALL.search(formula) is not None
+
+
+#: manifest date_part -> (prefix, derivation). ``date`` is the exact date: no truncation,
+#: but still continuous, which is what makes a line/area chart draw a line. Only the levels
+#: WORKSHEETS.md documents from real Tableau output are here - ``manifest.DATE_PARTS`` reads
+#: this table, so an hour/minute request fails validation rather than guessing a prefix.
+DATE_PART_DERIVATIONS: dict[str, tuple[str, str]] = {
+    "year": ("tyr", "Year-Trunc"),
+    "quarter": ("tqr", "Quarter-Trunc"),
+    "month": ("tmn", "Month-Trunc"),
+    "week": ("twk", "Week-Trunc"),
+    "day": ("tdy", "Day-Trunc"),
+    "date": ("none", "None"),
+}
+
+#: The column-instance name's trailing key, per instance type.
+_TYPE_SUFFIX = {"quantitative": "qk", "nominal": "nk", "ordinal": "ok"}
+
+#: Tableau's built-in pivot fields, referenced qualified but never declared.
+MEASURE_NAMES = "[:Measure Names]"
+
+#: The basemap a map worksheet draws on. Declared at the workbook level *and* in the view.
+MAPSOURCE_NAME = "Tableau"
+
+#: Tableau's generated geographic fields - a map's shelves and geometry encoding.
+GENERATED_LONGITUDE = "[Longitude (generated)]"
+GENERATED_LATITUDE = "[Latitude (generated)]"
+GENERATED_GEOMETRY = "[Geometry (generated)]"
+
+#: What a binned column looks like: always an integer dimension, sliced ordinally.
+BIN_DATATYPE = "integer"
+#: Decimal places Tableau records on a bin calculation.
+BIN_DECIMALS = "2"
+
+
+def caption_for(field_name: str) -> str:
+    """Return the UI caption for a field name (``order_date`` -> ``Order Date``)."""
+    return field_name.replace("_", " ").title()
+
+
+@dataclass(frozen=True)
+class FieldRef:
+    """One resolved shelf/encoding entry: the column, its instance, and how to name both.
+
+    Attributes:
+        field_name: The bare field name from the manifest.
+        datatype: The Tableau datatype of the underlying column.
+        role: ``dimension`` / ``measure``.
+        column_type: The ``type`` attribute of the ``<column>``.
+        instance_type: The ``type`` attribute of the ``<column-instance>``.
+        prefix: The instance-name prefix (``sum``, ``tmn``, ``none``, ...).
+        derivation: The instance's ``derivation`` attribute.
+        formula: A calculated field's formula, else ``""``.
+        bin_size: Bin width when the entry asked for a binned column, else ``None``.
+        bin_source: The measure a bin is computed from, else ``""``.
+    """
+
+    field_name: str
+    datatype: str
+    role: str
+    column_type: str
+    instance_type: str
+    prefix: str
+    derivation: str
+    formula: str = ""
+    bin_size: Optional[float] = None
+    bin_source: str = ""
+
+    @property
+    def column_name(self) -> str:
+        """str: The bracketed column name (``[revenue]``, ``[Revenue (bin)]``)."""
+        return f"[{self.field_name}]"
+
+    @property
+    def instance_name(self) -> str:
+        """str: The bracketed column-instance name (``[sum:revenue:qk]``)."""
+        return f"[{self.prefix}:{self.field_name}:{_TYPE_SUFFIX[self.instance_type]}]"
+
+    @property
+    def caption(self) -> str:
+        """str: The caption Tableau shows for the column.
+
+        A bin's name is already the caption (``Revenue (bin)``); title-casing it would
+        turn the ``(bin)`` marker into ``(Bin)`` and stop matching the column name.
+        """
+        return self.field_name if self.bin_size is not None else caption_for(self.field_name)
+
+
+class FieldResolver:
+    """Turns manifest shelf/encoding entries into :class:`FieldRef`s for one datasource.
+
+    Args:
+        datasource_id: The ``federated.*`` id every reference is qualified with.
+        datasource_caption: The datasource's manifest name, as the view declares it.
+        field_types: ``{field name: DATA-MODEL.md type}`` for the datasource's CSV.
+        calculated: ``{name: (formula, type)}`` for the datasource's calculated fields.
+        type_facts: ``{type: (role, column type)}`` - :mod:`twb`'s type table, passed in so
+            this module stays free of a circular import.
+    """
+
+    def __init__(
+        self,
+        datasource_id: str,
+        datasource_caption: str,
+        field_types: dict[str, str],
+        calculated: dict[str, tuple[str, str]],
+        type_facts: dict[str, tuple[str, str]],
+    ) -> None:
+        self.datasource_id = datasource_id
+        self.datasource_caption = datasource_caption
+        self.field_types = field_types
+        self.calculated = calculated
+        self.type_facts = type_facts
+
+    def qualify(self, name: str) -> str:
+        """Return a bracketed name qualified with the datasource (``[ds].[name]``)."""
+        return f"[{self.datasource_id}].{name}"
+
+    def reference(self, entry: object) -> Optional[FieldRef]:
+        """Resolve one shelf/encoding entry.
+
+        Args:
+            entry: A bare field name, or an object with ``field`` plus any of
+                ``aggregation`` / ``date_part`` / ``bin``.
+
+        Returns:
+            The resolved :class:`FieldRef`, or ``None`` when the entry names no field
+            (``manifest.validate_manifest`` has already rejected that case).
+        """
+        if isinstance(entry, dict):
+            field_name = str(entry.get("field", "")).strip().strip("[]").strip()
+            aggregation = _lower(entry.get("aggregation"))
+            date_part = _lower(entry.get("date_part"))
+            raw_bin = entry.get("bin")
+            bin_size = (
+                raw_bin
+                if isinstance(raw_bin, (int, float)) and not isinstance(raw_bin, bool)
+                else None
+            )
+        else:
+            field_name = str(entry or "").strip().strip("[]").strip()
+            aggregation, date_part, bin_size = "", "", None
+        if not field_name:
+            return None
+
+        formula, declared_type = self.calculated.get(field_name, ("", ""))
+        datatype = declared_type or self.field_types.get(field_name, "string")
+        role, column_type = self.type_facts.get(datatype, ("dimension", "nominal"))
+
+        if bin_size is not None:
+            # A bin is a *new* dimension column computed from the measure, not a derivation
+            # of it - hence its own name, datatype and ordinal slicing.
+            return FieldRef(
+                field_name=f"{caption_for(field_name)} (bin)",
+                datatype=BIN_DATATYPE,
+                role="dimension",
+                column_type="ordinal",
+                instance_type="ordinal",
+                prefix="none",
+                derivation="None",
+                bin_size=float(bin_size),
+                bin_source=field_name,
+            )
+
+        # An unknown aggregation / date part cannot reach here from a validated manifest;
+        # falling back to the un-derived instance keeps a direct call from crashing.
+        if date_part and datatype in {"date", "datetime"}:
+            prefix, derivation = DATE_PART_DERIVATIONS.get(date_part, ("none", "None"))
+            instance_type = "quantitative"
+        elif aggregation:
+            prefix, derivation = AGGREGATION_DERIVATIONS.get(aggregation, ("none", "None"))
+            instance_type = "quantitative" if aggregation in _AGGREGATING else column_type
+        elif is_aggregate_formula(formula):
+            prefix, derivation = USER_DERIVATION
+            instance_type = column_type
+        elif role == "measure":
+            # A measure on a shelf without an explicit aggregation is SUM - Tableau's own
+            # default, and what every spec row means by "revenue on Rows".
+            prefix, derivation, instance_type = "sum", "Sum", "quantitative"
+        else:
+            prefix, derivation, instance_type = "none", "None", column_type
+
+        return FieldRef(
+            field_name=field_name,
+            datatype=datatype,
+            role=role,
+            column_type=column_type,
+            instance_type=instance_type,
+            prefix=prefix,
+            derivation=derivation,
+            formula=formula,
+        )
+
+    def references(self, entries: object) -> list[FieldRef]:
+        """Resolve a shelf's list of entries, dropping any that name no field."""
+        if entries is None:
+            return []
+        raw = entries if isinstance(entries, list) else [entries]
+        return [ref for ref in (self.reference(entry) for entry in raw) if ref is not None]
+
+
+def _lower(value: object) -> str:
+    """Lower-case a manifest string value; anything else (``null``) reads as absent."""
+    return value.strip().lower() if isinstance(value, str) else ""
+
+
+# --- Chart types ---------------------------------------------------------------
+
+@dataclass(frozen=True)
+class ChartSpec:
+    """What a chart type changes about an otherwise identical worksheet body.
+
+    Attributes:
+        mark_class: The ``<mark class='...'>`` for the single pane.
+        label_marks: Show mark labels (a text table's numbers, a pie's slice values).
+        kpi_card: Centre the cell text and render the text encoding as one big
+            number - the KPI card treatment.
+        dual: Two measures share one axis pair: 3 panes and an axis-sync style rule.
+        pane_marks: Per-pane mark classes for a dual chart (a combo's Bar then Line);
+            empty means every pane keeps ``mark_class``.
+        geographic: Shelves are Tableau's generated lat/long and the marks carry geometry.
+        empty_shelves: The chart puts nothing on Rows/Cols (pie, KPI card).
+    """
+
+    mark_class: str = "Automatic"
+    label_marks: bool = False
+    kpi_card: bool = False
+    dual: bool = False
+    pane_marks: tuple[str, ...] = ()
+    geographic: bool = False
+    empty_shelves: bool = False
+
+
+#: Every chart type the builder emits, and what it changes. The four legacy "chart types"
+#: that are really modifiers - sorted, filtered, styled, custom tooltip - are the optional
+#: ``sort`` / ``filters`` / design tokens / ``tooltip`` manifest keys, applicable to any row
+#: here; a stacked bar is ``bar`` with a ``color`` encoding.
+CHART_SPECS: dict[str, ChartSpec] = {
+    "bar": ChartSpec(),
+    "line": ChartSpec(),
+    "area": ChartSpec(mark_class="Area"),
+    "pie": ChartSpec(mark_class="Pie", label_marks=True, empty_shelves=True),
+    "scatter": ChartSpec(),
+    "map": ChartSpec(geographic=True),
+    "text": ChartSpec(label_marks=True, kpi_card=True, empty_shelves=True),
+    "table": ChartSpec(label_marks=True),
+    "heatmap": ChartSpec(mark_class="Square"),
+    "histogram": ChartSpec(),
+    "treemap": ChartSpec(mark_class="Square", label_marks=True),
+    "bullet": ChartSpec(mark_class="Bar"),
+    "gantt": ChartSpec(mark_class="Gantt"),
+    "boxplot": ChartSpec(mark_class="Circle"),
+    "dual-axis": ChartSpec(dual=True),
+    "combo": ChartSpec(dual=True, pane_marks=("Bar", "Line")),
+}
+
+#: Encoding names the builder emits, in the order Tableau writes them. An encoding the
+#: manifest names but this list does not is ignored rather than emitted blind.
+ENCODING_ORDER: tuple[str, ...] = (
+    "color", "size", "shape", "text", "lod", "wedge-size", "geometry", "tooltip",
+)
+
+#: Encodings that need a legend card on the window's right edge.
+LEGEND_ENCODINGS: tuple[str, ...] = ("color", "size", "shape")
+
+#: The pane attribute every snippet carries.
+PANE_RELAXATION = {"selection-relaxation-option": "selection-relaxation-allow"}
+
+#: Tableau's line break inside a formatted-text run: AE ligature + tab. Not ``\n``.
+TOOLTIP_BREAK = "\u00c6\t"
+
+
+# --- Worksheet parts ------------------------------------------------------------
+
+@dataclass(frozen=True)
+class FilterPlan:
+    """One resolved filter: the field, the members or bounds, and whether it is a context
+    filter (which runs before FIXED LODs and every other filter).
+
+    Attributes:
+        reference: The filtered field.
+        members: Explicit members for a categorical filter; empty for a range filter.
+        minimum: Lower bound of a range filter, or ``None``.
+        maximum: Upper bound of a range filter, or ``None``.
+        context: Whether Tableau evaluates it first.
+    """
+
+    reference: FieldRef
+    members: tuple[str, ...] = ()
+    minimum: Optional[str] = None
+    maximum: Optional[str] = None
+    context: bool = False
+
+
+@dataclass(frozen=True)
+class SortPlan:
+    """One resolved sort: computed (``by`` a measure) or manual (an explicit ``order``).
+
+    Attributes:
+        reference: The dimension being sorted.
+        by: The measure that determines the order, for a computed sort.
+        order: The explicit member order, for a manual sort.
+        direction: ``ASC`` or ``DESC``.
+    """
+
+    reference: FieldRef
+    by: Optional[FieldRef] = None
+    order: tuple[str, ...] = ()
+    direction: str = "DESC"
+
+
+@dataclass
+class WorksheetPlan:
+    """Everything one worksheet needs, resolved once and rendered from twice.
+
+    :func:`render_worksheet` writes the body; :func:`legend_cards` and :func:`bin_columns`
+    read the same plan for the window's legends and the datasource's derived columns. Every
+    field reference - including the ones behind filters, sorts and tooltips - is resolved
+    here, because :attr:`all_refs` is what declares them in ``<datasource-dependencies>``,
+    and a field Tableau finds referenced but not declared is a broken worksheet.
+
+    Attributes:
+        name: The Tableau sheet name.
+        spec: The chart type's :class:`ChartSpec`.
+        resolver: The datasource's :class:`FieldResolver`.
+        columns: Resolved Cols shelf entries.
+        rows: Resolved Rows shelf entries.
+        encodings: ``{encoding name: FieldRef}``.
+        filters: Resolved filters, in manifest order.
+        sort: The resolved sort, if any.
+        tooltip: ``(label, field)`` pairs for a custom tooltip template.
+        number_formats: ``(field, format pattern)`` pairs for the cell style rule.
+        axis_titles: ``{"rows"|"columns": title}`` overrides.
+        geo_role: A map's geographic semantic role, or ``""``.
+    """
+
+    name: str
+    spec: ChartSpec
+    resolver: FieldResolver
+    columns: list[FieldRef] = field(default_factory=list)
+    rows: list[FieldRef] = field(default_factory=list)
+    encodings: dict[str, FieldRef] = field(default_factory=dict)
+    filters: list[FilterPlan] = field(default_factory=list)
+    sort: Optional[SortPlan] = None
+    tooltip: list[tuple[str, FieldRef]] = field(default_factory=list)
+    number_formats: list[tuple[FieldRef, str]] = field(default_factory=list)
+    axis_titles: dict[str, str] = field(default_factory=dict)
+    geo_role: str = ""
+
+    def qualify(self, name: str) -> str:
+        """Return a bracketed name qualified with this worksheet's datasource."""
+        return self.resolver.qualify(name)
+
+    def reference_of(self, reference: FieldRef) -> str:
+        """Return the qualified column-instance reference for a resolved field."""
+        return self.resolver.qualify(reference.instance_name)
+
+    @property
+    def all_refs(self) -> list[FieldRef]:
+        """list[FieldRef]: Every field the worksheet references, from any of its parts."""
+        references = [*self.columns, *self.rows, *self.encodings.values()]
+        references += [entry.reference for entry in self.filters]
+        if self.sort is not None:
+            references.append(self.sort.reference)
+            if self.sort.by is not None:
+                references.append(self.sort.by)
+        references += [reference for _, reference in self.tooltip]
+        references += [reference for reference, _ in self.number_formats]
+        return references
+
+
+def plan_worksheet(entry: dict, resolver: FieldResolver) -> WorksheetPlan:
+    """Resolve one manifest worksheet into a :class:`WorksheetPlan`.
+
+    Args:
+        entry: One ``worksheets`` entry from the build manifest.
+        resolver: The :class:`FieldResolver` for the worksheet's datasource.
+
+    Returns:
+        The plan; an unknown chart type falls back to the plain ``bar`` spec, which
+        ``manifest.validate_manifest`` has already rejected before the assembler runs.
+    """
+    spec = CHART_SPECS.get(str(entry.get("chart_type", "")).strip().lower(), ChartSpec())
+    shelves = entry.get("shelves") if isinstance(entry.get("shelves"), dict) else {}
+    raw_encodings = entry.get("encodings") if isinstance(entry.get("encodings"), dict) else {}
+    axis_titles = entry.get("axis_titles") if isinstance(entry.get("axis_titles"), dict) else {}
+
+    encodings: dict[str, FieldRef] = {}
+    for name in ENCODING_ORDER:
+        if name not in raw_encodings:
+            continue
+        reference = resolver.reference(raw_encodings[name])
+        if reference is not None:
+            encodings[name] = reference
+
+    return WorksheetPlan(
+        name=str(entry.get("name", "")).strip(),
+        spec=spec,
+        resolver=resolver,
+        columns=resolver.references(shelves.get("columns")),
+        rows=resolver.references(shelves.get("rows")),
+        encodings=encodings,
+        filters=_plan_filters(entry.get("filters"), resolver),
+        sort=_plan_sort(entry.get("sort"), resolver),
+        tooltip=_plan_tooltip(entry.get("tooltip"), resolver),
+        number_formats=_plan_number_formats(entry.get("number_formats"), resolver),
+        axis_titles={
+            shelf: str(title).strip()
+            for shelf, title in axis_titles.items()
+            if isinstance(title, str) and title.strip()
+        },
+        geo_role=str(entry.get("geo_role", "")).strip() if spec.geographic else "",
+    )
+
+
+def _plan_filters(entries: object, resolver: FieldResolver) -> list[FilterPlan]:
+    """Resolve the ``filters`` list into :class:`FilterPlan`s, dropping empty entries."""
+    if not isinstance(entries, list):
+        return []
+    plans: list[FilterPlan] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        values = entry.get("values")
+        members = tuple(str(value) for value in values) if isinstance(values, list) else ()
+        minimum, maximum = entry.get("min"), entry.get("max")
+        if not members and minimum is None and maximum is None:
+            continue  # nothing to filter on
+
+        # A range filter needs the *continuous* instance of a date: the discrete one has no
+        # min/max to compare against, and Tableau ignores the filter.
+        request = dict(entry)
+        if not members and not request.get("date_part"):
+            request["date_part"] = "date"
+        reference = resolver.reference(request)
+        if reference is None:
+            continue
+        plans.append(FilterPlan(
+            reference=reference,
+            members=members,
+            minimum=None if minimum is None else _bound(minimum, reference.datatype),
+            maximum=None if maximum is None else _bound(maximum, reference.datatype),
+            context=entry.get("context") is True,
+        ))
+    return plans
+
+
+def _plan_sort(entry: object, resolver: FieldResolver) -> Optional[SortPlan]:
+    """Resolve the ``sort`` object into a :class:`SortPlan`, or ``None`` when absent."""
+    if not isinstance(entry, dict):
+        return None
+    reference = resolver.reference(entry)
+    if reference is None:
+        return None
+    order = entry.get("order")
+    by = resolver.reference(entry["by"]) if entry.get("by") is not None else None
+    if by is None and not (isinstance(order, list) and order):
+        return None  # a sort naming neither a measure nor an order sorts by nothing
+    return SortPlan(
+        reference=reference,
+        by=by,
+        order=tuple(str(member) for member in order) if isinstance(order, list) else (),
+        direction=str(entry.get("direction", "DESC")).strip().upper() or "DESC",
+    )
+
+
+def _plan_tooltip(entries: object, resolver: FieldResolver) -> list[tuple[str, FieldRef]]:
+    """Resolve the ``tooltip`` list into ``(label, field)`` pairs."""
+    if not isinstance(entries, list):
+        return []
+    pairs: list[tuple[str, FieldRef]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        reference = resolver.reference(entry)
+        if reference is not None:
+            pairs.append((str(entry.get("label", reference.caption)).strip(), reference))
+    return pairs
+
+
+def _plan_number_formats(
+    entries: object, resolver: FieldResolver
+) -> list[tuple[FieldRef, str]]:
+    """Resolve the ``number_formats`` list into ``(field, format pattern)`` pairs."""
+    if not isinstance(entries, list):
+        return []
+    formats: list[tuple[FieldRef, str]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        pattern = str(entry.get("format", "")).strip()
+        reference = resolver.reference(entry)
+        if reference is not None and pattern:
+            formats.append((reference, pattern))
+    return formats
+
+
+def bin_columns(plan: WorksheetPlan) -> list[FieldRef]:
+    """Return the binned columns a worksheet introduces (histogram support).
+
+    A bin is a real column on the datasource, not a worksheet-local derivation, so
+    :mod:`twb` collects these across worksheets and declares them once per datasource.
+    """
+    return [reference for reference in plan.all_refs if reference.bin_size is not None]
+
+
+def legend_cards(plan: WorksheetPlan) -> list[tuple[str, str, str]]:
+    """Return the ``(card type, qualified field, pane id)`` triples for the right edge.
+
+    Without a legend card a colour- or size-encoded chart renders, but the analyst has no
+    key for it - which reads as a broken dashboard. A dual-axis / combo chart is coloured by
+    the built-in Measure Names rather than by anything the manifest named, and its legend
+    belongs to the first *measure* pane, not the shared pane 0.
+    """
+    if plan.spec.dual:
+        return [("color", plan.qualify(MEASURE_NAMES), "1")]
+    return [
+        (name, plan.qualify(plan.encodings[name].instance_name), "0")
+        for name in LEGEND_ENCODINGS
+        if name in plan.encodings
+    ]
+
+
+# --- Rendering ------------------------------------------------------------------
+
+def _render_run(parent: ET.Element, text: str, tokens: DesignTokens, size: int,
+                color: str = "", bold: bool = False) -> None:
+    """Append one styled ``<run>`` to a formatted-text block."""
+    attributes = {"fontname": tokens.font_family, "fontsize": str(size)}
+    if bold:
+        attributes["bold"] = "true"
+    if color:
+        attributes["fontcolor"] = color.lower()
+    ET.SubElement(parent, "run", dict(sorted(attributes.items()))).text = text
+
+
+def _render_title(parent: ET.Element, tokens: DesignTokens) -> None:
+    """Render the worksheet's title styling from the design tokens.
+
+    ``<Sheet Name>`` is Tableau's placeholder: the run styles the title without hard-coding
+    the sheet's name into it.
+    """
+    layout_options = ET.SubElement(parent, "layout-options")
+    title = ET.SubElement(layout_options, "title")
+    formatted = ET.SubElement(title, "formatted-text")
+    _render_run(formatted, "<Sheet Name>", tokens, tokens.title_size, tokens.title_color)
+
+
+def _render_dependencies(parent: ET.Element, plan: WorksheetPlan) -> None:
+    """Declare every column and column-instance the worksheet references.
+
+    Both are emitted in name order so the same manifest always produces byte-identical XML;
+    the schema accepts them in any order.
+    """
+    dependencies = ET.SubElement(
+        parent, "datasource-dependencies", {"datasource": plan.resolver.datasource_id}
+    )
+    by_column: dict[str, FieldRef] = {}
+    by_instance: dict[str, FieldRef] = {}
+    for reference in plan.all_refs:
+        by_column.setdefault(reference.column_name, reference)
+        by_instance.setdefault(reference.instance_name, reference)
+
+    # A map's geographic dimension must say which geography it is, or Tableau plots nothing.
+    geo_column = (
+        plan.encodings["lod"].column_name
+        if plan.geo_role and "lod" in plan.encodings else ""
+    )
+
+    for name in sorted(by_column):
+        render_column(
+            dependencies, by_column[name], plan.geo_role if name == geo_column else ""
+        )
+
+    for name in sorted(by_instance):
+        reference = by_instance[name]
+        ET.SubElement(dependencies, "column-instance", {
+            "column": reference.column_name,
+            "derivation": reference.derivation,
+            "name": name,
+            "pivot": "key",
+            "type": reference.instance_type,
+        })
+
+
+def render_column(parent: ET.Element, reference: FieldRef, semantic_role: str = "") -> None:
+    """Render one ``<column>`` - the field definition, plus any calculation behind it.
+
+    Used both inside a worksheet's ``<datasource-dependencies>`` and at the datasource
+    level (where the calculated and binned columns must also be declared).
+
+    Args:
+        parent: The element to append the column to.
+        reference: The resolved field.
+        semantic_role: A geographic role (``[Country].[ISO3166_2]``), or ``""``.
+    """
+    attributes = {
+        "caption": reference.caption,
+        "datatype": reference.datatype,
+        "name": reference.column_name,
+        "role": reference.role,
+        "type": reference.column_type,
+    }
+    if semantic_role:
+        attributes["semantic-role"] = semantic_role
+    column = ET.SubElement(parent, "column", dict(sorted(attributes.items())))
+    _render_calculation(column, reference)
+
+
+def _render_calculation(column: ET.Element, reference: FieldRef) -> None:
+    """Append the ``<calculation>`` child a bin or a calculated field carries."""
+    if reference.bin_size is not None:
+        ET.SubElement(column, "calculation", {
+            "class": "bin",
+            "decimals": BIN_DECIMALS,
+            "formula": f"[{reference.bin_source}]",
+            "peg": "0",
+            "size": _bin_size_text(reference.bin_size),
+        })
+    elif reference.formula:
+        ET.SubElement(column, "calculation", {"class": "tableau", "formula": reference.formula})
+
+
+def _bin_size_text(value: float) -> str:
+    """Render a bin size the way Tableau writes it - no trailing ``.0`` (``500``, not ``500.0``)."""
+    return str(int(value)) if float(value).is_integer() else str(value)
+
+
+def _render_filters(parent: ET.Element, plan: WorksheetPlan) -> list[str]:
+    """Render the worksheet's filters and return the columns ``<slices>`` must list.
+
+    Two shapes, both from the legacy patterns: a categorical filter over an explicit member
+    list, and a quantitative in-range filter (a date or numeric window).
+
+    Args:
+        parent: The ``<view>`` element.
+        plan: The worksheet plan.
+
+    Returns:
+        The qualified column names that were filtered, in manifest order.
+    """
+    filtered: list[str] = []
+    for entry in plan.filters:
+        qualified = plan.reference_of(entry.reference)
+        attributes = {"column": qualified}
+        if entry.context:
+            # A context filter runs before FIXED LODs and every other filter.
+            attributes["context"] = "true"
+
+        if entry.members:
+            _render_categorical(
+                ET.SubElement(
+                    parent, "filter",
+                    dict(sorted({"class": "categorical", **attributes}.items())),
+                ),
+                entry.reference.instance_name,
+                list(entry.members),
+            )
+        else:
+            range_filter = ET.SubElement(parent, "filter", dict(sorted({
+                "class": "quantitative", "included-values": "in-range", **attributes,
+            }.items())))
+            for tag, bound in (("min", entry.minimum), ("max", entry.maximum)):
+                if bound is not None:
+                    ET.SubElement(range_filter, tag).text = bound
+        filtered.append(qualified)
+    return filtered
+
+
+def _render_categorical(parent: ET.Element, level: str, members: list[str]) -> None:
+    """Render a categorical filter's members, wrapping >1 of them in a union."""
+    ui_attributes = {
+        "user:ui-domain": "database",
+        "user:ui-enumeration": "inclusive",
+        "user:ui-marker": "enumerate",
+    }
+    if len(members) == 1:
+        ET.SubElement(parent, "groupfilter", {
+            "function": "member", "level": level, "member": f'"{members[0]}"', **ui_attributes,
+        })
+        return
+    union = ET.SubElement(parent, "groupfilter", {"function": "union", **ui_attributes})
+    for member in members:
+        ET.SubElement(union, "groupfilter", {
+            "function": "member", "level": level, "member": f'"{member}"',
+        })
+
+
+def _bound(value: object, datatype: str) -> str:
+    """Render a filter bound: dates take Tableau's ``#...#`` literal delimiters."""
+    text = str(value).strip()
+    if datatype in {"date", "datetime"} and not text.startswith("#"):
+        return f"#{text}#"
+    return text
+
+
+def _render_sort(parent: ET.Element, plan: WorksheetPlan) -> None:
+    """Render the worksheet's sort: computed (by a measure) or manual (an explicit order)."""
+    if plan.sort is None:
+        return
+    column = plan.reference_of(plan.sort.reference)
+
+    if plan.sort.order:
+        manual = ET.SubElement(
+            parent, "sort", {"column": column, "direction": plan.sort.direction}
+        )
+        dictionary = ET.SubElement(manual, "dictionary")
+        for member in plan.sort.order:
+            ET.SubElement(dictionary, "bucket").text = f'"{member}"'
+        return
+
+    ET.SubElement(parent, "computed-sort", {
+        "column": column,
+        "direction": plan.sort.direction,
+        "using": plan.reference_of(plan.sort.by),
+    })
+
+
+def _render_style(parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens) -> None:
+    """Render the worksheet's ``<style>``, one style-rule per element, alphabetically.
+
+    Tableau Desktop rewrites style rules into alphabetical order on save; emitting them any
+    other way produces a diff on first open. Rules are collected into a dict keyed by
+    element and then sorted, so a new rule cannot be added in the wrong place.
+    """
+    rules: dict[str, list[tuple[str, dict]]] = {}
+
+    def add(element: str, tag: str, attributes: dict) -> None:
+        rules.setdefault(element, []).append((tag, attributes))
+
+    if tokens.present:
+        add("worksheet", "format", {"attr": "font-family", "value": tokens.font_family})
+
+    for shelf, scope, references in (
+        ("rows", "rows", plan.rows), ("columns", "cols", plan.columns)
+    ):
+        title = plan.axis_titles.get(shelf)
+        if not (title and references):
+            continue
+        add("axis", "format", {
+            "attr": "title", "class": "0",
+            "field": plan.reference_of(references[0]),
+            "scope": scope, "value": title,
+        })
+
+    for reference, pattern in plan.number_formats:
+        add("cell", "format", {
+            "attr": "text-format",
+            "field": plan.reference_of(reference),
+            "value": pattern,
+        })
+
+    if plan.spec.kpi_card:
+        add("cell", "format", {"attr": "text-align", "value": "center"})
+        add("cell", "format", {"attr": "vertical-align", "value": "center"})
+
+    if plan.spec.geographic:
+        add("map", "format", {"attr": "washout", "value": "0.0"})
+
+    if plan.spec.dual and len(plan.rows) > 1:
+        # Sync the two axes and hide the second one's labels: without this the chart draws
+        # two independent scales and reads as two unrelated series.
+        second = plan.reference_of(plan.rows[1])
+        add("axis", "encoding", {
+            "attr": "space", "class": "0", "field": second, "field-type": "quantitative",
+            "fold": "true", "scope": "rows", "synchronized": "true", "type": "space",
+        })
+        add("axis", "format", {
+            "attr": "display", "class": "0", "field": second, "scope": "rows",
+            "value": "false",
+        })
+
+    style = ET.SubElement(parent, "style")
+    for element in sorted(rules):
+        rule = ET.SubElement(style, "style-rule", {"element": element})
+        for tag, attributes in rules[element]:
+            ET.SubElement(rule, tag, attributes)
+
+
+def _render_panes(parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens) -> None:
+    """Render the worksheet's panes: one, or three for a dual-axis / combo chart."""
+    panes = ET.SubElement(parent, "panes")
+    if plan.spec.dual and len(plan.rows) > 1:
+        # Pane 0 is the shared default; panes 1..n each own one measure's axis, in the same
+        # order the measures sit on Rows.
+        _render_pane(panes, plan, tokens, {}, plan.spec.mark_class)
+        for index, reference in enumerate(plan.rows):
+            mark = (
+                plan.spec.pane_marks[index]
+                if index < len(plan.spec.pane_marks) else plan.spec.mark_class
+            )
+            _render_pane(
+                panes, plan, tokens,
+                {
+                    "id": str(index + 1),
+                    "y-axis-name": plan.reference_of(reference),
+                },
+                mark,
+            )
+        return
+    _render_pane(panes, plan, tokens, {}, plan.spec.mark_class)
+
+
+def _render_pane(
+    parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens,
+    attributes: dict, mark_class: str,
+) -> None:
+    """Render one pane: its mark class, encodings, tooltip, label and mark style.
+
+    The child order is the XSD's ``PaneSpecification-G`` sequence - view, mark, encodings,
+    customized-tooltip, customized-label, style - not the order they were decided in.
+    """
+    pane = ET.SubElement(
+        parent, "pane", dict(sorted({**attributes, **PANE_RELAXATION}.items()))
+    )
+    ET.SubElement(ET.SubElement(pane, "view"), "breakdown", {"value": "auto"})
+    ET.SubElement(pane, "mark", {"class": mark_class})
+
+    # {encoding: qualified column}. Two encodings are built-ins the manifest never names:
+    # a dual chart colours its two measures apart with Measure Names, and a map needs the
+    # generated geometry to draw its polygons.
+    columns = {
+        name: plan.reference_of(reference)
+        for name, reference in plan.encodings.items()
+    }
+    if plan.spec.dual:
+        columns["color"] = plan.qualify(MEASURE_NAMES)
+    if plan.spec.geographic:
+        columns["geometry"] = plan.qualify(GENERATED_GEOMETRY)
+
+    if columns or plan.tooltip:
+        block = ET.SubElement(pane, "encodings")
+        for name in ENCODING_ORDER:
+            if name in columns:
+                ET.SubElement(block, name, {"column": columns[name]})
+        # Every field the tooltip template names must also be registered as an encoding,
+        # or Tableau has no value to substitute into it.
+        for _, reference in plan.tooltip:
+            ET.SubElement(block, "tooltip", {
+                "column": plan.reference_of(reference)
+            })
+
+    if plan.tooltip:
+        _render_tooltip(pane, plan, tokens)
+    if plan.spec.kpi_card and "text" in plan.encodings:
+        _render_big_number(pane, plan, tokens)
+    if plan.spec.label_marks:
+        style = ET.SubElement(pane, "style")
+        rule = ET.SubElement(style, "style-rule", {"element": "mark"})
+        for attribute in ("mark-labels-show", "mark-labels-cull"):
+            ET.SubElement(rule, "format", {"attr": attribute, "value": "true"})
+
+
+def _render_tooltip(
+    parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens
+) -> None:
+    """Render a ``<customized-tooltip>``: one ``label: value`` line per tooltip pair.
+
+    The break goes *between* pairs only - a break after the label pushed every value onto
+    its own line, which is what made the rendered tooltip look double-spaced.
+    """
+    formatted = ET.SubElement(
+        ET.SubElement(parent, "customized-tooltip"), "formatted-text"
+    )
+    for index, (label, reference) in enumerate(plan.tooltip):
+        if index:  # separate this pair from the previous one
+            _render_run(formatted, TOOLTIP_BREAK, tokens, tokens.title_size)
+        _render_run(formatted, f"{label}: ", tokens, tokens.title_size, bold=True)
+        _render_run(
+            formatted,
+            cdata(f"<{plan.reference_of(reference)}>"),
+            tokens, tokens.title_size, bold=True,
+        )
+
+
+def _render_big_number(parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens) -> None:
+    """Render a KPI card's ``<customized-label>`` - the text encoding, set large."""
+    formatted = ET.SubElement(
+        ET.SubElement(parent, "customized-label"), "formatted-text"
+    )
+    _render_run(
+        formatted,
+        cdata(f"<{plan.reference_of(plan.encodings['text'])}>"),
+        tokens, tokens.kpi_size, tokens.title_color, bold=True,
+    )
+
+
+def _shelf_text(plan: WorksheetPlan, references: list[FieldRef], generated: str) -> str:
+    """Render one shelf's text from its resolved fields.
+
+    Args:
+        plan: The worksheet plan.
+        references: The shelf's fields, in manifest order.
+        generated: The Tableau-generated field this shelf carries on a map.
+
+    Returns:
+        The shelf string: empty for a pie/KPI card, ``(a + b)`` for a dual axis, ``(a / b)``
+        for nested dimensions, and the single qualified reference otherwise.
+    """
+    if plan.spec.geographic:
+        return plan.qualify(generated)
+    if plan.spec.empty_shelves or not references:
+        return ""
+    qualified = [plan.reference_of(reference) for reference in references]
+    if len(qualified) == 1:
+        return qualified[0]
+    # '+' overlays measures on one axis pair (dual axis / combo); '/' nests dimensions.
+    separator = " + " if plan.spec.dual else " / "
+    return "(" + separator.join(qualified) + ")"
+
+
+def render_worksheet(parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens,
+                     simple_id: str) -> None:
+    """Render one complete ``<worksheet>`` from its plan.
+
+    Args:
+        parent: The ``<worksheets>`` element.
+        plan: The resolved worksheet.
+        tokens: The design tokens (Tableau defaults when the file was absent).
+        simple_id: The braced UUID for the sheet's ``<simple-id>``.
+    """
+    element = ET.SubElement(parent, "worksheet", {"name": plan.name})
+    if tokens.present:
+        _render_title(element, tokens)
+
+    table = ET.SubElement(element, "table")
+    view = ET.SubElement(table, "view")
+    datasources = ET.SubElement(view, "datasources")
+    ET.SubElement(datasources, "datasource", {
+        "caption": plan.resolver.datasource_caption,
+        "name": plan.resolver.datasource_id,
+    })
+    if plan.spec.geographic:
+        ET.SubElement(
+            ET.SubElement(view, "mapsources"), "mapsource", {"name": MAPSOURCE_NAME}
+        )
+    _render_dependencies(view, plan)
+    filtered = _render_filters(view, plan)
+    _render_sort(view, plan)
+    if filtered:
+        # Every filtered field must appear here or Tableau silently drops the filter.
+        slices = ET.SubElement(view, "slices")
+        for column in filtered:
+            ET.SubElement(slices, "column").text = column
+    ET.SubElement(view, "aggregation", {"value": "true"})
+
+    _render_style(table, plan, tokens)
+    _render_panes(table, plan, tokens)
+    ET.SubElement(table, "rows").text = _shelf_text(plan, plan.rows, GENERATED_LATITUDE)
+    ET.SubElement(table, "cols").text = _shelf_text(plan, plan.columns, GENERATED_LONGITUDE)
+
+    # Both of these come after the shelves in the XSD's <table> sequence.
+    bins = bin_columns(plan)
+    if bins:
+        # Show every bin range, including the empty ones - a histogram with gaps silently
+        # dropped misreads as a different distribution.
+        full_range = ET.SubElement(table, "show-full-range")
+        for reference in bins:
+            ET.SubElement(full_range, "column").text = plan.qualify(reference.column_name)
+    if plan.spec.kpi_card:
+        # A KPI card is a single number, not a mark worth hovering.
+        ET.SubElement(table, "tooltip-style", {"tooltip-mode": "none"})
+
+    ET.SubElement(element, "simple-id", {"uuid": simple_id})

@@ -1,0 +1,50 @@
+<worksheet name="Map">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#7f56d9" fontname="Open Sans" fontsize="14">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <mapsources>
+            <mapsource name="Tableau" />
+          </mapsources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Country" datatype="string" name="[country]" role="dimension" semantic-role="[Country].[ISO3166_2]" type="nominal" />
+            <column caption="Profit" datatype="real" name="[profit]" role="measure" type="quantitative" />
+            <column-instance column="[country]" derivation="None" name="[none:country:nk]" pivot="key" type="nominal" />
+            <column-instance column="[profit]" derivation="Sum" name="[sum:profit:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="map">
+            <format attr="washout" value="0.0" />
+          </style-rule>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <color column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" />
+              <lod column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:country:nk]" />
+              <geometry column="[federated.b2993893834e8f0306a282d0a717d7a9].[Geometry (generated)]" />
+            </encodings>
+          </pane>
+        </panes>
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[Latitude (generated)]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[Longitude (generated)]</cols>
+      </table>
+      <simple-id uuid="{123BC0E8-35ED-585D-A4A9-CA9EB2844CEA}" />
+    </worksheet>
