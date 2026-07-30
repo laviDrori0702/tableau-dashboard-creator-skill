@@ -109,13 +109,29 @@ invented zone is caught rather than silently built.
    python "${CLAUDE_SKILL_DIR}/scripts/build.py" build "<project-dir>"
    ```
 
-   This assembles `dashboard.twb`, runs both validators over it, and packages
-   `dashboard.twbx` with the CSVs. `[BUILT]` means both validators are green — a `[WARN]`
+   This assembles `dashboard.twb`, runs the **validation gate** over it, and packages
+   `dashboard.twbx` with the CSVs. `[BUILT]` means all three validators are green — a `[WARN]`
    line about a missing `explain-data` element is the expected version shift when the target
    is `2024.2-2025.x` (the 2026.1 schema requires an element that older Tableau must not
    carry), not a problem. `[INVALID]` leaves the `.twb` on disk unpackaged: read the named
    errors, fix the manifest, and re-run. Never hand-patch the generated XML — the assembler
    is the fix's home.
+
+   **The gate is what the analyst's trust rests on**, so never present a workbook that has
+   not passed it. It is three validators under one verdict, each error prefixed with the one
+   that raised it: `[semantic]` (is the XML internally consistent?), `[schema]` (does it match
+   the XSD?) and `[conformance]` (does the workbook agree with the manifest — every layout
+   element became a zone, every zone names a real sheet, every declared worksheet is built,
+   placed, and has a window). Only the third can see something *missing*: what is absent is
+   absent consistently, so the first two happily pass a workbook that dropped a chart. To
+   re-run the gate over a `.twb` already on disk — the revalidate half of a fix — use:
+
+   ```bash
+   python "${CLAUDE_SKILL_DIR}/scripts/build.py" gate "<project-dir>"
+   ```
+
+   It repackages the `.twbx` when the gate passes and deletes it when it does not, so
+   `commit` can never approve a workbook that failed.
 
 6. **Commit** — only after the analyst approves:
 
@@ -171,10 +187,17 @@ invented zone is caught rather than silently built.
   visibility field at all: it splits the marks and the zone stops toggling. The Detail-shelf
   placement the field needs, the parameter declarations and the format flags are the builder's
   job.
-- **An image / button / legend object reserves its box, empty.** Each of those zone types needs
-  a reference the manifest does not carry (a filename, an action, a sheet + colour field), and
-  Tableau does not treat those as optional — so the layout keeps the geometry until the wiring
-  lands. `filter`, `parameter`, `text` and `blank` objects render fully today.
+- **An unsupported construct is refused by name, never silently.** An image / button / legend
+  object needs a reference the manifest does not carry (a filename, an action, a sheet + colour
+  field) and Tableau does not treat those as optional, so the layout **reserves its box as an
+  empty zone** — the approved geometry holds and everything else builds. `filter`, `parameter`,
+  `text` and `blank` objects render fully today. The gate emits a `[WARN]` naming each gap:
+  relay it to the analyst with both ways forward — **either** they build that one object in
+  Tableau Desktop and save a reference `.twb` for the repo (the permanent fix: a snippet under
+  `references/snippets/` and a template in the builder), **or** say the word and you hand-write
+  that one block into the `.twb` and prove it with `build.py gate` (the move-on fix, good for
+  this workbook only). Ask which; never pick silently, and never let the analyst discover the
+  gap as a blank rectangle in Desktop.
 
 > The full `STATE.md` schema and the ordering / staleness / versioning rules live in
 > `CONTRACT.md` at the repo root. This skill restates only its own slice; `build.py`,

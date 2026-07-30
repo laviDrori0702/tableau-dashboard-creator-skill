@@ -19,14 +19,21 @@ filesystem:
 
 4. **Assembly** - ``build`` turns the validated manifest into the deliverable: the XML comes
    from :mod:`twb` (pure, correct by construction), and this module supplies the CSV header
-   rows it needs, runs both migrated validators over the result, and packages the ``.twb``
+   rows it needs, runs the **validation gate** over the result, and packages the ``.twb``
    plus the CSVs into a ``.twbx``.
+5. **The gate** (:func:`run_gate`) - all three validators as one verdict: :mod:`validate_twb`
+   (is the XML internally consistent?), :mod:`validate_twb_xsd` (does it match the schema?)
+   and :mod:`validate_conformance` (does it agree with the manifest the analyst approved?).
+   A workbook that fails any of them is left on disk **unpackaged**, so the analyst is never
+   handed a ``.twbx`` that did not pass. Constructs the builder has no template for are named
+   as warnings rather than silently emptied.
 
 The module is pure and stdlib-only (it does **not** import the router) so the contract test
 can call its functions directly, exactly like ``spec.py``. The CLI exposes ``precheck``
 (before authoring - reports the target ``v_N`` and the inputs), ``validate`` (the manifest
-schema check), ``build`` (manifest -> validated ``.twbx``), and ``commit`` (after approval).
-Program output goes to stdout; diagnostics through ``logging``.
+schema check), ``build`` (manifest -> gated ``.twbx``), ``gate`` (re-run the gate over the
+``.twb`` on disk, for the fix loop), and ``commit`` (after approval). Program output goes to
+stdout; diagnostics through ``logging``.
 
 Keep ``STEP_ORDER`` in lock-step with CONTRACT.md §1.
 """
@@ -40,6 +47,7 @@ import json
 import logging
 import re
 import sys
+import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -656,6 +664,173 @@ def _xsd_errors(twb_path: Path, target_tableau_version: str) -> tuple[list[str],
     return fatal, warnings
 
 
+#: The three validators of the gate, in the order they run: the XML's internal consistency,
+#: its agreement with the schema, and its agreement with the manifest (CONTRACT.md §8 gate).
+GATE_VALIDATORS: tuple[str, ...] = ("semantic", "schema", "conformance")
+
+
+@dataclass(frozen=True)
+class GateReport:
+    """The verdict of all three validators over one built workbook.
+
+    Attributes:
+        results: ``{validator name: errors}`` for each of :data:`GATE_VALIDATORS`.
+        warnings: Non-fatal notes - a skipped XSD check, the documented version shift, and
+            each unsupported construct the build reserved a box for but did not draw.
+    """
+
+    results: dict[str, list[str]]
+    warnings: list[str]
+
+    @property
+    def ok(self) -> bool:
+        """True when every validator passed."""
+        return not any(self.results.values())
+
+    @property
+    def errors(self) -> list[str]:
+        """Every error, prefixed with the validator that raised it."""
+        return [
+            f"[{name}] {message}"
+            for name in GATE_VALIDATORS for message in self.results.get(name, [])
+        ]
+
+
+def _conformance_errors(twb_path: Path, document: dict) -> list[str]:
+    """Run the spec-conformance validator over a built workbook.
+
+    Args:
+        twb_path: The workbook XML to check.
+        document: The manifest it was built from.
+
+    Returns:
+        One message per disagreement between the two; empty when they agree.
+    """
+    import validate_conformance  # same scripts/ dir, stdlib-only
+
+    try:
+        root = ET.parse(twb_path).getroot()
+    except ET.ParseError as error:
+        # The semantic validator reports the parse error itself; do not double-report it.
+        logger.warning(f"Conformance check skipped: {twb_path} is not parseable ({error}).")
+        return []
+    return validate_conformance.conformance_errors(root, document)
+
+
+def run_gate(
+    twb_path: Path, document: dict, target_tableau_version: str
+) -> GateReport:
+    """Run all three validators over a built workbook and return one verdict.
+
+    This is the gate the analyst is never shown a workbook without passing: the semantic
+    validator (is the XML internally consistent?), the XSD validator (does it match the
+    schema?), and the conformance validator (does it agree with the manifest the analyst
+    approved?). Only the third can see a *missing* sheet or zone - what is absent is absent
+    consistently, so the first two pass a workbook that quietly dropped one.
+
+    Args:
+        twb_path: The workbook XML to check.
+        document: The manifest it was built from.
+        target_tableau_version: STATE.md's target (CONTRACT.md §2).
+
+    Returns:
+        A :class:`GateReport`.
+    """
+    import validate_conformance  # same scripts/ dir, stdlib-only
+
+    xsd_errors, warnings = _xsd_errors(twb_path, target_tableau_version)
+    return GateReport(
+        results={
+            "semantic": _semantic_errors(twb_path),
+            "schema": xsd_errors,
+            "conformance": _conformance_errors(twb_path, document),
+        },
+        # The unsupported-construct policy: a reserved-but-empty box is named here, never
+        # left for the analyst to discover as a blank rectangle in Desktop.
+        warnings=warnings + validate_conformance.unsupported_notes(document),
+    )
+
+
+def gate(project_dir: Path | str) -> BuildResult:
+    """Re-run the validation gate over the workbook already on disk.
+
+    The revalidate half of the fix loop: after a hand-written block is added to the ``.twb``
+    (the unsupported-construct escape hatch), this proves it before the ``.twbx`` is
+    repackaged. A passing gate repackages; a failing one leaves the package alone.
+
+    Args:
+        project_dir: The analyst's project directory.
+
+    Returns:
+        A :class:`BuildResult`, whose ``errors`` are the gate's.
+    """
+    project_root = Path(project_dir)
+    validation = validate(project_root)
+    if not validation.ok:
+        return BuildResult(False, validation.errors, validation.version)
+
+    version_dir = project_root / VERSION_DIR / validation.version
+    twb_path = version_dir / TWB_FILENAME
+    twb_relative = f"{VERSION_DIR}/{validation.version}/{TWB_FILENAME}"
+    if not twb_path.exists():
+        return BuildResult(
+            False,
+            [
+                f"'{twb_relative}' does not exist - run 'build.py build' to assemble the "
+                f"workbook before gating it."
+            ],
+            validation.version,
+        )
+
+    document, _ = load_manifest(version_dir / MANIFEST_FILENAME)
+    target = read_target_tableau_version(
+        (project_root / STATE_FILENAME).read_text(encoding="utf-8-sig")
+    )
+    # Drop the previous package first: 'commit' approves on the .twbx's existence, so one
+    # left behind by an earlier passing build would be approved despite this gate failing.
+    (version_dir / WORKBOOK_FILENAME).unlink(missing_ok=True)
+
+    report = run_gate(twb_path, document, target)
+    if not report.ok:
+        return BuildResult(
+            False, report.errors, validation.version, twb_relative,
+            warnings=report.warnings,
+        )
+
+    create_twbx(twb_path, _packaged_csvs(project_root, document))
+    return BuildResult(
+        ok=True,
+        errors=[],
+        version=validation.version,
+        twb_path=twb_relative,
+        twbx_path=f"{VERSION_DIR}/{validation.version}/{WORKBOOK_FILENAME}",
+        warnings=report.warnings,
+    )
+
+
+def _packaged_csvs(project_root: Path, document: dict) -> list[Path]:
+    """Return the CSVs the manifest binds to, in manifest order and de-duplicated.
+
+    Only those: an unrelated file in ``data/`` has no business shipping inside the analyst's
+    deliverable.
+
+    Args:
+        project_root: The analyst's project directory.
+        document: The build manifest.
+
+    Returns:
+        Absolute paths of the CSVs to package.
+    """
+    on_disk = {
+        (project_root / relative).name: project_root / relative
+        for relative in _sample_csvs(project_root)
+    }
+    wanted = [
+        str(source.get("csv", "")).strip() for source in document.get("datasources", [])
+    ]
+    return [on_disk[name] for name in dict.fromkeys(wanted) if name in on_disk]
+
+
 def build_workbook(project_dir: Path | str) -> BuildResult:
     """Assemble, validate, and package the workbook from the validated manifest.
 
@@ -720,16 +895,14 @@ def build_workbook(project_dir: Path | str) -> BuildResult:
     target = read_target_tableau_version(
         (project_root / STATE_FILENAME).read_text(encoding="utf-8-sig")
     )
-    errors = _semantic_errors(twb_path)
-    xsd_errors, warnings = _xsd_errors(twb_path, target)
-    errors += xsd_errors
-    if errors:
-        # Leave the .twb for inspection, but never package a workbook that failed a check.
-        return BuildResult(False, errors, version, twb_relative, warnings=warnings)
+    report = run_gate(twb_path, document, target)
+    if not report.ok:
+        # Leave the .twb for inspection, but never package a workbook that failed the gate.
+        return BuildResult(
+            False, report.errors, version, twb_relative, warnings=report.warnings
+        )
 
-    # Only the CSVs the manifest actually binds to: an unrelated file in data/ has no
-    # business shipping inside the analyst's deliverable.
-    create_twbx(twb_path, [on_disk[name] for name in dict.fromkeys(wanted)])
+    create_twbx(twb_path, _packaged_csvs(project_root, document))
     logger.info(f"Built {twb_relative} and its .twbx from the validated manifest.")
     return BuildResult(
         ok=True,
@@ -737,7 +910,7 @@ def build_workbook(project_dir: Path | str) -> BuildResult:
         version=version,
         twb_path=twb_relative,
         twbx_path=f"{VERSION_DIR}/{version}/{WORKBOOK_FILENAME}",
-        warnings=warnings,
+        warnings=report.warnings,
     )
 
 
@@ -854,17 +1027,27 @@ def format_validation(result: ValidationResult) -> str:
     return "\n".join(lines)
 
 
-def format_build(result: BuildResult) -> str:
-    """Render a :class:`BuildResult` as the assembly report."""
+def format_build(result: BuildResult, verb: str = "build") -> str:
+    """Render a :class:`BuildResult` as the assembly / gate report.
+
+    Args:
+        result: The outcome to render.
+        verb: What was attempted, for the failure line (``build`` or ``gate``).
+
+    Returns:
+        A plain-ASCII block with the single pass/fail summary of all three validators.
+    """
     # Plain ASCII only (see format_precheck).
     lines: list[str]
     if result.ok:
         lines = [
             f"[BUILT] {result.twbx_path}",
-            f"  workbook xml : {result.twb_path} (semantic + XSD validated)",
+            f"  gate: all {len(GATE_VALIDATORS)} validators passed "
+            f"({', '.join(GATE_VALIDATORS)}).",
+            f"  workbook xml : {result.twb_path}",
         ]
     else:
-        lines = ["[INVALID] the workbook did not build:"]
+        lines = [f"[INVALID] the workbook did not {verb} - the validation gate failed:"]
         lines += [f"  - {error}" for error in result.errors]
         if result.twb_path:
             lines.append(f"  the XML is at {result.twb_path} for inspection; nothing packaged.")
@@ -908,6 +1091,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         ("precheck", "Report whether build may run, what it reads, and where it writes."),
         ("validate", "Schema-check the build manifest against DATA-MODEL.md and the layout."),
         ("build", "Assemble, validate, and package the workbook from the manifest."),
+        ("gate", "Re-run all three validators over the .twb on disk, then repackage."),
         ("commit", "Approve the build in STATE.md (never bumps current_version)."),
     ):
         sub = subparsers.add_parser(name, help=help_text)
@@ -932,6 +1116,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         build_result = build_workbook(project_dir)
         print(format_build(build_result))
         return 0 if build_result.ok else 2
+
+    if args.command == "gate":
+        gate_result = gate(project_dir)
+        print(format_build(gate_result, verb="pass the gate"))
+        return 0 if gate_result.ok else 2
 
     commit_result = commit(project_dir)
     print(format_commit(commit_result))
