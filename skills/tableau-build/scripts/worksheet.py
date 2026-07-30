@@ -1049,15 +1049,18 @@ def _render_pane(
 def _render_tooltip(
     parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens
 ) -> None:
-    """Render a ``<customized-tooltip>``: ``label`` / newline / value, one pair per line."""
+    """Render a ``<customized-tooltip>``: one ``label: value`` line per tooltip pair.
+
+    The break goes *between* pairs only - a break after the label pushed every value onto
+    its own line, which is what made the rendered tooltip look double-spaced.
+    """
     formatted = ET.SubElement(
         ET.SubElement(parent, "customized-tooltip"), "formatted-text"
     )
     for index, (label, reference) in enumerate(plan.tooltip):
         if index:  # separate this pair from the previous one
             _render_run(formatted, TOOLTIP_BREAK, tokens, tokens.title_size)
-        _render_run(formatted, f"{label}:", tokens, tokens.title_size, bold=True)
-        _render_run(formatted, TOOLTIP_BREAK, tokens, tokens.title_size)
+        _render_run(formatted, f"{label}: ", tokens, tokens.title_size, bold=True)
         _render_run(
             formatted,
             cdata(f"<{plan.reference_of(reference)}>"),

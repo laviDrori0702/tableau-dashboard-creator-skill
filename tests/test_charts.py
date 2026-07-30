@@ -676,8 +676,11 @@ def test_a_custom_tooltip_registers_every_field_it_names():
     assert registered == {"[attr:product_category:nk]", "[sum:revenue:qk]"}
 
     runs = pane.findall("customized-tooltip/formatted-text/run")
-    assert runs[0].text == "Category:"
-    assert "[attr:product_category:nk]" in runs[2].text
+    # Label and value share a line: no break between them, one break between pairs.
+    assert runs[0].text == "Category: "
+    assert "[attr:product_category:nk]" in runs[1].text
+    assert runs[2].text == worksheet.TOOLTIP_BREAK
+    assert runs[3].text == "Revenue: "
     # The value runs must be CDATA - entity-escaped, Tableau prints the reference verbatim.
     assert "<![CDATA[<[federated" in _worksheet_xml("Custom Tooltip")
 
