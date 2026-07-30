@@ -50,9 +50,10 @@ _BARE_VALUE_TYPES = frozenset({"integer", "real"})
 #: What a parameter action's ``<clear-option>`` value is prefixed with - Tableau's own token,
 #: read off a Desktop 2025.1-saved workbook (``s:LROOT:All`` resets a parameter to ``All``).
 #: The value that follows is *undelimited*: the plain text, not a :func:`parameter_literal`.
-#: ponytail: only attested for a string parameter, which is why non-string parameters keep the
-#: attested ``do-nothing`` instead - if a numeric parameter ever needs resetting, save one in
-#: Desktop and check whether the tag is still ``s``.
+#: The ``s`` is a string's type tag and is all that is attested, so a parameter action may
+#: only target a string parameter - ``manifest.PARAMETER_ACTION_TARGET_TYPE`` enforces that,
+#: which is what makes the reset below unconditional for anything that validates (issue #49
+#: lifts the restriction once the other types' tags are read off a Desktop-saved workbook).
 CLEAR_VALUE_PREFIX = "s:LROOT:"
 
 
@@ -128,8 +129,8 @@ def plan_parameters(entries: object) -> list[Parameter]:
 
     Returns:
         One :class:`Parameter` per named entry, in manifest order. An entry
-        ``manifest.validate_manifest`` would have rejected (no name, unknown data type) is
-        skipped rather than guessed at.
+        ``manifest.validate_manifest`` would have rejected (no name, unknown data type, no
+        current value) is skipped rather than guessed at.
     """
     parameters: list[Parameter] = []
     for entry in entries if isinstance(entries, list) else []:
@@ -161,9 +162,7 @@ def plan_parameters(entries: object) -> list[Parameter]:
 
         current = entry.get("current_value")
         if current is None:
-            # Without a current value the control opens on nothing; the first allowed value
-            # (or the range's floor) is the only defensible default.
-            current = values[0] if members else (span or {}).get("min", "")
+            continue  # validate_manifest requires it; guessing would hide a bad manifest
         parameters.append(Parameter(
             name=name,
             data_type=data_type,
@@ -304,8 +303,8 @@ class ParameterAction:
 #: gates the element on them: without ``ParameterAction`` Desktop loads the workbook against a
 #: schema where ``edit-parameter-action`` is not declared at all and refuses it outright
 #: ("no declaration found for element"), even though the 2026.1 XSD accepts it. The second flag
-#: goes with the ``<clear-option>`` child. Both verified against a Desktop 2025.1.10-saved
-#: workbook (``skill/tableau-dashboard-creator/references/snippets/dashboard/parameter-action.twb``).
+#: goes with the ``<clear-option>`` child. Both verified against the Desktop 2025.1.10-saved
+#: workbook this skill keeps at ``references/snippets/dashboard/parameter-action.twb``.
 PARAMETER_ACTION_FORMAT_FLAGS: tuple[str, ...] = (
     "ParameterAction",
     "ParameterActionClearSelection",

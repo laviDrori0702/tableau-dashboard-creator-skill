@@ -59,8 +59,13 @@ CHART_TYPES = frozenset(CHART_SPECS)
 #: the rows shelf, or the second axis (and the whole point of the chart) is missing.
 DUAL_AXIS_TYPES = frozenset({"dual-axis", "combo"})
 
-#: Dashboard action types (the Tableau constructs behind CONTRACT.md §6's vocabulary).
-ACTION_TYPES = frozenset({"filter", "highlight", "parameter", "set", "url"})
+#: Dashboard action types (the Tableau constructs behind CONTRACT.md §6's vocabulary), and
+#: the ones this builder knows the *name* of but emits nothing for. An unemitted type has to
+#: fail validation: accepting it would build a dashboard whose interaction is silently absent,
+#: and CONTRACT.md §6's `drill` - the only term that reaches for a set action - is buildable
+#: as a parameter action instead.
+ACTION_TYPES = frozenset({"filter", "highlight", "parameter"})
+UNBUILDABLE_ACTION_TYPES = frozenset({"set", "url"})
 
 #: Non-worksheet dashboard objects, for layout zones no view fills (a filter card, a title,
 #: a logo, a legend). Every *leaf* zone must be filled by a worksheet or one of these; a
@@ -97,6 +102,15 @@ CARD_FILTER_TYPES = frozenset({"string", "boolean"})
 
 #: The type a Dynamic Zone Visibility field must have - a zone is shown or hidden, nothing else.
 VISIBILITY_TYPE = "boolean"
+
+#: The parameter data type a parameter action may target. Deselecting has to reset the
+#: parameter (:data:`features.CLEAR_VALUE_PREFIX`), or a panel the parameter reveals has
+#: nothing to hide it again and the viewer is stuck - and the reset value's serialization is
+#: only attested for a string. So a non-string target is rejected rather than built without
+#: its reset.
+#: ponytail: lift this the moment a numeric parameter action is saved in Desktop and the
+#: clear-option's type tag read off it - issue #49 carries the exact steps.
+PARAMETER_ACTION_TARGET_TYPE = "string"
 
 # A data-source heading in DATA-MODEL.md: "## Data source: `sales.csv`" -> "sales.csv".
 _DATASOURCE_HEADING = re.compile(
@@ -780,7 +794,7 @@ def _field_types(
 def _validate_objects(
     objects: object, layout_ids: set[str], container_ids: set[str],
     views: dict[str, ViewZone], field_types: dict[str, dict[str, str]],
-    parameter_names: set[str], errors: list[str],
+    parameter_types: dict[str, str], errors: list[str],
 ) -> set[str]:
     """Validate the non-worksheet dashboard objects and return the zones they fill.
 
@@ -791,7 +805,7 @@ def _validate_objects(
             their own - CONTRACT.md §1.1).
         views: ``{element id: ViewZone}`` - the sheets a filter card may filter.
         field_types: ``{datasource: {field: type}}``.
-        parameter_names: The declared parameter names.
+        parameter_types: ``{declared parameter name: data type}``.
         errors: Accumulator for validation errors.
 
     Returns:
@@ -831,11 +845,11 @@ def _validate_objects(
             )
         elif kind == "parameter":
             parameter = str(dashboard_object.get("parameter", "")).strip()
-            if parameter not in parameter_names:
+            if parameter not in parameter_types:
                 errors.append(
                     f"{label}: 'parameter' is {parameter or 'missing'} - a parameter control "
                     f"names one declared parameter (declared: "
-                    f"{', '.join(sorted(parameter_names)) or 'none'})"
+                    f"{', '.join(sorted(parameter_types)) or 'none'})"
                 )
     return filled
 
@@ -894,7 +908,7 @@ def _validate_filter_card(
 
 
 def _validate_actions(
-    actions: object, known_ids: set[str], parameter_names: set[str],
+    actions: object, known_ids: set[str], parameter_types: dict[str, str],
     views: dict[str, ViewZone], field_types: dict[str, dict[str, str]],
     errors: list[str],
 ) -> None:
@@ -902,14 +916,15 @@ def _validate_actions(
 
     The **source** is always a *view* zone: an action runs off the marks the analyst clicks,
     and a text or filter zone has none. What a **target** is depends on the type: ``filter`` /
-    ``highlight`` target other view zones, a ``parameter`` action targets a declared parameter
-    (and needs the ``field`` whose value it writes there), and ``set`` / ``url`` actions target
-    a set / a URL that this schema does not model - those are left to the builder.
+    ``highlight`` target other view zones, and a ``parameter`` action targets a declared
+    parameter (and needs the ``field`` whose value it writes there). ``set`` / ``url`` are
+    rejected outright - see :data:`UNBUILDABLE_ACTION_TYPES`.
 
     Args:
         actions: The manifest's ``actions`` value.
         known_ids: Element ids an action may point at (the layout's zones).
-        parameter_names: Declared parameter names (the targets of a parameter action).
+        parameter_types: ``{declared parameter name: data type}`` - a parameter action's
+            targets, and the types :data:`PARAMETER_ACTION_TARGET_TYPE` is checked against.
         views: ``{element id: ViewZone}`` - the zones an action may run from or to.
         field_types: ``{datasource: {field: type}}``, for a parameter action's source field.
         errors: Accumulator for validation errors.
@@ -929,7 +944,13 @@ def _validate_actions(
             errors.append(f"{label}: needs a 'name'")
 
         action_type = str(action.get("type", "")).strip().lower()
-        if action_type not in ACTION_TYPES:
+        if action_type in UNBUILDABLE_ACTION_TYPES:
+            errors.append(
+                f"{label}: '{action_type}' actions are not emitted by this builder - a "
+                f"dashboard that needs one would open with the interaction missing. Express "
+                f"a drill as a 'parameter' action (CONTRACT.md section 6) instead"
+            )
+        elif action_type not in ACTION_TYPES:
             errors.append(
                 f"{label}: unknown action type '{action_type}' "
                 f"(expected one of: {', '.join(sorted(ACTION_TYPES))})"
@@ -984,24 +1005,37 @@ def _validate_actions(
                     f"{label}: target '{target}' is not a view - a {action_type} action "
                     f"acts on a worksheet's marks, not on a text or control zone"
                 )
-            elif action_type == "parameter" and target not in parameter_names:
+            elif action_type == "parameter" and target not in parameter_types:
                 errors.append(
                     f"{label}: target '{target}' is not a declared parameter "
-                    f"(declared: {', '.join(sorted(parameter_names)) or 'none'})"
+                    f"(declared: {', '.join(sorted(parameter_types)) or 'none'})"
+                )
+            elif (
+                action_type == "parameter"
+                and parameter_types[target] != PARAMETER_ACTION_TARGET_TYPE
+            ):
+                errors.append(
+                    f"{label}: target parameter '{target}' is "
+                    f"'{parameter_types[target]}' - a parameter action's target must be "
+                    f"'{PARAMETER_ACTION_TARGET_TYPE}', because only a string's reset value "
+                    f"has an attested serialization and without the reset a zone the "
+                    f"parameter reveals never hides again. Declare it as "
+                    f"'{PARAMETER_ACTION_TARGET_TYPE}' with a 'values' domain"
                 )
 
 
-def _validate_parameters(parameters: object, errors: list[str]) -> set[str]:
-    """Validate the parameters' names, types, and uniqueness.
+def _validate_parameters(parameters: object, errors: list[str]) -> dict[str, str]:
+    """Validate the parameters' names, types, current values, and uniqueness.
 
     Args:
         parameters: The manifest's ``parameters`` value.
         errors: Accumulator for validation errors.
 
     Returns:
-        The declared parameter names (what a parameter action may target).
+        ``{declared parameter name: data type}`` - what a parameter action or a parameter
+        control may target, and the type each one has.
     """
-    seen: set[str] = set()
+    seen: dict[str, str] = {}
     if not isinstance(parameters, list):
         errors.append("parameters: must be a list (use [] when the dashboard has none)")
         return seen
@@ -1017,15 +1051,23 @@ def _validate_parameters(parameters: object, errors: list[str]) -> set[str]:
             errors.append(f"{label}: needs a 'name'")
         elif name in seen:
             errors.append(f"{label}: duplicate parameter name '{name}'")
-        seen.add(name)
 
         data_type = str(parameter.get("data_type", "")).strip().lower()
+        seen[name] = data_type
         if not data_type:
             errors.append(f"{label}: needs a 'data_type' (string/integer/real/boolean/date)")
         elif data_type not in PARAMETER_DATA_TYPES:
             errors.append(
                 f"{label}: unknown data_type '{data_type}' "
                 f"(expected one of: {', '.join(sorted(PARAMETER_DATA_TYPES))})"
+            )
+
+        # A parameter *is* its current value: the value is the column's calculation, so
+        # without one the control opens on nothing and every calc reading it is undefined.
+        if parameter.get("current_value") is None:
+            errors.append(
+                f"{label}: needs a 'current_value' - the value the parameter opens on, and "
+                f"the value a parameter action resets it to"
             )
 
         # A parameter has one domain: a member list, a numeric range, or anything. Two
@@ -1139,10 +1181,10 @@ def validate_manifest(
 
     views = _view_zones(manifest_document.get("worksheets"))
     field_types = _field_types(manifest_document, data_model_text)
-    parameter_names = _validate_parameters(manifest_document.get("parameters", []), errors)
+    parameter_types = _validate_parameters(manifest_document.get("parameters", []), errors)
     filled |= _validate_objects(
         manifest_document.get("objects", []), zone_ids, container_ids, views, field_types,
-        parameter_names, errors,
+        parameter_types, errors,
     )
     _validate_visibility(visibility, manifest_document, errors)
 
@@ -1157,7 +1199,7 @@ def validate_manifest(
         )
 
     _validate_actions(
-        manifest_document.get("actions", []), zone_ids, parameter_names, views, field_types,
+        manifest_document.get("actions", []), zone_ids, parameter_types, views, field_types,
         errors,
     )
     return errors

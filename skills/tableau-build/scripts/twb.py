@@ -554,7 +554,7 @@ def _plan_actions(
         kind = str(entry.get("type", "")).strip().lower()
         source = by_element.get(str(entry.get("source", "")).strip())
         if source is None or not (kind in features.ACTION_COMMANDS or kind == "parameter"):
-            continue  # 'set' / 'url' actions are vocabulary this builder does not emit yet
+            continue  # validate_manifest has already named this entry
         activation = features.ACTIVATIONS.get(
             str(entry.get("run_on", "")).strip().lower(), "on-select"
         )

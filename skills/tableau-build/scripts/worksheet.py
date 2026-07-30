@@ -185,6 +185,29 @@ _AGGREGATE_CALL = re.compile(
 )
 
 
+def strip_lod_expressions(formula: str) -> str:
+    """Return the formula with every brace-delimited LOD expression removed.
+
+    Args:
+        formula: The calculation's Tableau formula.
+
+    Returns:
+        The formula with each ``{...}`` span (nesting included) replaced by a space, so what
+        is left is only what the formula computes *around* its LODs.
+    """
+    kept: list[str] = []
+    depth = 0
+    for character in formula:
+        if character == "{":
+            depth += 1
+            kept.append(" ")
+        elif character == "}":
+            depth = max(0, depth - 1)
+        elif depth == 0:
+            kept.append(character)
+    return "".join(kept)
+
+
 def is_aggregate_formula(formula: str) -> bool:
     """Return whether a calculated field's formula already aggregates.
 
@@ -192,19 +215,21 @@ def is_aggregate_formula(formula: str) -> bool:
         formula: The calculation's Tableau formula.
 
     Returns:
-        True when the formula calls an aggregate function, so the field must reach a shelf
-        un-aggregated. A row-level formula (``[quantity] * [unit_price]``) returns False and
-        is treated like any other measure.
+        True when the formula calls an aggregate function *outside* any LOD expression, so the
+        field must reach a shelf un-aggregated. A row-level formula
+        (``[quantity] * [unit_price]``) returns False and is treated like any other measure.
 
     An **LOD expression** (``{FIXED [region]: SUM([revenue])}``) returns False even though it
     contains ``SUM(``: an LOD produces one row-level value per its own grain, so Tableau
     aggregates it again on the shelf (``SUM([Regional Revenue])``). Treating it as
     pre-aggregated is what put the ``User`` derivation on it and made the shelf read one
-    arbitrary member's value.
+    arbitrary member's value. Only the aggregate *inside* the braces is discounted, though -
+    ``SUM([revenue]) / {FIXED : SUM([revenue])}`` aggregates and must not be re-aggregated,
+    which is the whole point of a percent-of-total calc.
     """
-    if not formula or "{" in formula:
+    if not formula:
         return False
-    return _AGGREGATE_CALL.search(formula) is not None
+    return _AGGREGATE_CALL.search(strip_lod_expressions(formula)) is not None
 
 
 #: manifest ``table_calc`` -> the column-instance name's extra prefix. The keys are the
@@ -214,7 +239,8 @@ def is_aggregate_formula(formula: str) -> bool:
 #: rather than rendering a calc Tableau does not have.
 #: ponytail: only ``PctTotal`` -> ``pcto`` is attested (Desktop 2025.1 renamed ours on save).
 #: The rest are inferred; a wrong one costs nothing but a rewrite on open, and is fixed by
-#: reading the name out of a Desktop-saved workbook that uses that calc.
+#: reading the name out of a Desktop-saved workbook that uses that calc - issue #50 carries
+#: the exact sheet-by-sheet steps.
 TABLE_CALC_PREFIXES: dict[str, str] = {
     "CumTotal": "cum",
     "WindowTotal": "wnd",

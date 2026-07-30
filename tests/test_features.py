@@ -244,12 +244,16 @@ def test_each_calculated_field_is_declared_exactly_once_per_datasource():
     ("[quantity] * [unit_price]", False),
     ("{FIXED [region]: SUM([revenue])}", False),
     ("{ INCLUDE [region] : AVG([revenue]) }", False),
-    ("SUM([revenue]) / {FIXED : SUM([revenue])}", False),
+    ("{FIXED [region]: SUM([revenue])} / 2", False),
+    ("SUM([revenue]) / {FIXED : SUM([revenue])}", True),
+    ("{FIXED : SUM([revenue])} - SUM([cost])", True),
+    ("{FIXED [a]: MAX({FIXED [b]: SUM([revenue])})}", False),
     ("", False),
 ])
 def test_is_aggregate_formula_reads_lods_as_row_level(formula, aggregates):
     """An LOD contains SUM( but produces a row-level value, so it must be re-aggregated on
-    the shelf. Matching the SUM inside it is what put the User derivation on an LOD."""
+    the shelf. Matching the SUM inside it is what put the User derivation on an LOD - but an
+    aggregate *outside* the braces still aggregates, so only the braced span is discounted."""
     assert worksheet.is_aggregate_formula(formula) is aggregates
 
 
@@ -505,15 +509,25 @@ def _worksheets_without_dzv() -> list[dict]:
 
 
 @pytest.mark.parametrize("override, expected", [
-    ({"name": "Bad", "data_type": "money"}, "money"),
-    ({"name": "Bad", "data_type": "string", "values": []}, "values"),
-    ({"name": "Bad", "data_type": "integer", "range": {"min": 1}}, "range"),
-    ({"name": "Bad", "data_type": "integer", "values": [1], "range": {"min": 1, "max": 2}},
-     "both"),
+    ({"name": "Bad", "data_type": "money", "current_value": 1}, "money"),
+    ({"name": "Bad", "data_type": "string", "current_value": "x", "values": []}, "values"),
+    ({"name": "Bad", "data_type": "integer", "current_value": 1, "range": {"min": 1}},
+     "range"),
+    ({"name": "Bad", "data_type": "integer", "current_value": 1, "values": [1],
+      "range": {"min": 1, "max": 2}}, "both"),
+    ({"name": "Bad", "data_type": "string", "values": ["x"]}, "current_value"),
 ])
 def test_a_malformed_parameter_is_rejected(override, expected):
     """Each message names the parameter and what is wrong with it."""
     assert any(expected in error for error in _errors(parameters=[*PARAMETERS, override]))
+
+
+def test_a_parameter_without_a_current_value_is_never_guessed_at():
+    """The value *is* the column's calculation, so a guessed one silently changes what every
+    calc reading the parameter computes. Validation demands it and the builder skips it."""
+    entry = {"name": "Bad", "data_type": "string", "values": ["x"]}
+
+    assert features.plan_parameters([entry]) == []
 
 
 # --- Actions (AC #2) -----------------------------------------------------------
@@ -649,6 +663,25 @@ def test_a_parameter_action_without_a_field_is_rejected():
     actions[-1].pop("field")
 
     assert any("'field'" in error for error in _errors(actions=actions))
+
+
+@pytest.mark.parametrize("action_type", sorted(manifest.UNBUILDABLE_ACTION_TYPES))
+def test_an_action_this_builder_cannot_emit_is_rejected(action_type):
+    """A 'set' or 'url' action that validated would build a dashboard whose interaction is
+    silently absent - worse than a manifest that fails and names the alternative."""
+    actions = json.loads(json.dumps(ACTIONS))
+    actions[0]["type"] = action_type
+
+    assert any(action_type in error for error in _errors(actions=actions))
+
+
+def test_a_parameter_action_targeting_a_non_string_parameter_is_rejected():
+    """Only a string's clear value has an attested serialization. A non-string target would
+    build an action that never resets - and a DZV panel it reveals would never hide again."""
+    actions = json.loads(json.dumps(ACTIONS))
+    actions[-1]["targets"] = ["Top N"]
+
+    assert any("Top N" in error and "string" in error for error in _errors(actions=actions))
 
 
 # --- Quick filters and parameter controls (AC #3) ------------------------------

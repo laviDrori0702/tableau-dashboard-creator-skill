@@ -113,9 +113,14 @@ name and needs a `field` — the field read off the clicked mark and written int
 Clearing the selection **resets** a parameter action's parameter to its `current_value`, so
 whatever the parameter drives returns to its opening state. That is what makes a parameter
 action safe to use without a control: the viewer cannot get stuck in a state only a control
-could undo.
+could undo. The reset is why **a parameter action's target must be a `string` parameter** —
+that is the only type whose reset value has an attested serialization, and a target that
+could not be reset is rejected rather than built without it. Give it a `values` domain
+(`["All", "West", "East"]`) and open it on the neutral member.
 
-`set` and `url` validate but render nothing yet.
+`set` and `url` actions are **rejected**: the builder emits nothing for them, and a dashboard
+that validated with one would open with the interaction silently missing. A `drill`
+(CONTRACT.md §6) is built as a `parameter` action.
 
 **A filter card** (`objects` entry, `kind: "filter"`) is the UI for **one** worksheet's filter,
 so it names both the `worksheet` and the `field`: `{"element_id": "flt-region", "kind":
@@ -146,7 +151,7 @@ you reach for depends on who decides:
 
 | the viewer decides, with a control | the viewer's *selection* decides |
 |---|---|
-| A two-value parameter and a control zone for it — the usual toggle. `boolean` (`true`/`false`) is the natural type; a `string` with `values: ["on", "off"]` works the same way and is the form this repo has round-tripped through Desktop. Calc: `[Parameters].[Show Detail] = true` / `= "on"`. | A parameter a **parameter action** writes into, compared against its opening value: `[Parameters].[Selected Region] <> "All"`. The panel appears once a region is picked and hides itself when the selection clears (the action resets the parameter). No control zone needed. |
+| A two-value parameter and a control zone for it — the usual toggle. `boolean` (`true`/`false`) is the natural type; a `string` with `values: ["on", "off"]` works the same way and is the form this repo has round-tripped through Desktop. Calc: `[Parameters].[Show Detail] = true` / `= "on"`. | A `string` parameter a **parameter action** writes into, compared against its opening value: `[Parameters].[Selected Region] <> "All"`. The panel appears once a region is picked and hides itself when the selection clears (the action resets the parameter). No control zone needed. |
 
 Both are ordinary DZV; pick by intent. A toggle is right for "let me collapse this"; a
 selection-driven reveal is right for "there is nothing to show until you pick something", and
