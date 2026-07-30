@@ -173,9 +173,9 @@ The case of a filename encodes its role, so a skill can tell handoff artifacts f
 its *own* next stage, never read by another skill. Today there are two, both `tableau-build`'s:
 `mock-version/v_N/build-manifest.json`, the machine-readable translation of
 `IMPLEMENTATION-SPEC.md` + `DATA-MODEL.md` that the workbook generator consumes; and
-`mock-version/v_N/dashboard.twb`, the unpackaged workbook the two validators read before it is
-zipped into the deliverable `.twbx` (it stays on disk after a failed build so the XML can be
-inspected). Because nothing downstream reads them, they are not handoffs and take the lowercase
+`mock-version/v_N/dashboard.twb`, the unpackaged workbook the validation gate's three validators
+read before it is zipped into the deliverable `.twbx` (it stays on disk after a failed gate so
+the XML can be inspected). Because nothing downstream reads them, they are not handoffs and take the lowercase
 casing; they are versioned with the deliverable they produce (§4.3). A skill may add one only
 for a stage boundary inside itself.
 

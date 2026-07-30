@@ -70,11 +70,15 @@ Each step is owned by exactly one skill, reads a known set of artifacts, and wri
 | 5 | `tableau-plan`   | Blueprint: screen size, slots, KPIs, charts, filters, interactions (stable ids) | `DATA-MODEL.md` (+ `PRD.md`, `DESIGN-TOKENS.md`) → `DASHBOARD-PLAN.md` | no |
 | 6 | `tableau-mock`   | Interactive HTML demo from real sample data | `DASHBOARD-PLAN.md`, `data/*.csv` → `mock-version/v_N/mock.html` | no |
 | 7 | `tableau-spec`   | Map every mock element to a concrete Tableau construct | `mock.html`, `DASHBOARD-PLAN.md` → `mock-version/v_N/IMPLEMENTATION-SPEC.md` | no |
-| 8 | `tableau-build` *(views in development)* | Generate the version-aware, XSD-validated workbook | `IMPLEMENTATION-SPEC.md`, `DATA-MODEL.md`, `data/*.csv` → `mock-version/v_N/dashboard.twbx` | no |
+| 8 | `tableau-build` *(experimental)* | Generate the version-aware, XSD-validated workbook | `IMPLEMENTATION-SPEC.md`, `DATA-MODEL.md`, `data/*.csv` → `mock-version/v_N/dashboard.twbx` | no |
 
 > **`tableau-route`** is the compass, not a step: it reads `STATE.md` and reports the single next skill to run. It only recommends — it never runs another skill for you.
 
-> **Status — step 8 is landing in pieces.** Steps 1–7 (`init` → `spec`) are complete. `tableau-build` today derives and validates the build manifest and assembles a workbook that Tableau opens: datasources (live, with the CSVs packaged into the `.twbx`), a dashboard sized from the approved mock, windows, and version targeting, checked by both validators on every build. The worksheet bodies (shelves, encodings, marks) and the dashboard's zone tree are the remaining piece, so the views are still empty. Tableau has announced a **native skill** for generating a workbook from a spec — when it ships we intend to integrate it as the build step rather than maintain a parallel generator, so the exact shape of step 8 may change.
+> **Status — step 8 is experimental, and we want your bug reports.** All eight steps are feature-complete: `tableau-build` derives and validates the build manifest, then assembles a full workbook — datasources (live, with the CSVs packaged into the `.twbx`), worksheets with shelves, encodings and marks across 15 chart patterns, the dashboard's zone tree at the approved mock's geometry, filter/highlight/parameter actions, calculated fields, and worksheet formatting — gated by three validators (semantic, XSD schema, and spec conformance) before anything is packaged.
+>
+> It is marked **experimental** because the validators are not Tableau. Individual constructs are attested against workbooks saved by Tableau Desktop 2025.1, but a generated workbook has not yet been proven across the range of dashboards real analysts will ask for. Tableau's XML is unforgiving and it fails quietly: a workbook can pass every validator and still be silently rewritten, or refused, on open — so the only authority on fidelity is Desktop itself. **If Tableau Desktop reports an error on a generated workbook, or a view renders differently from the mock it was specced from, please [open an issue](../../issues/new) with the error text and the `build-manifest.json` that produced it.** Each report becomes a permanent fix in the builder's templates rather than a one-off patch, so it improves every workbook generated afterwards.
+>
+> One forward-looking note: Tableau has announced a **native skill** for generating a workbook from a spec. When it ships we intend to integrate it as the build step rather than maintain a parallel generator, so the exact shape of step 8 may change.
 
 Skippable steps (`intake`, `brand`) let you go straight from a scaffolded project to planning with sensible fallbacks (the raw request text; neutral styling).
 
@@ -145,7 +149,7 @@ If you used the old single skill: the workflow now lives in this plugin. Install
 - **No box shadows** — not natively supported in Tableau.
 - **Container hierarchy** must follow Tableau's zone model (layout-basic → layout-flow → sheets).
 - **Fallback-driven choices are disclosed** — when a skill uses a Tableau default for missing input, it says so.
-- **`tableau-build` still emits empty views** — the workbook it produces opens cleanly and carries the data, but the shelves/encodings are the remaining piece (see the status note above); always review the generated workbook in Tableau Desktop before publishing.
+- **`tableau-build` is experimental** — the workbook passes three validators before it is packaged, but validators are not Tableau: always open the generated workbook in Tableau Desktop and review it against the mock before publishing, and please report anything Desktop rejects or redraws (see the status note above).
 
 ## Contributing
 

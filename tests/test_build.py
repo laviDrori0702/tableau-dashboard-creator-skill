@@ -1275,6 +1275,144 @@ def test_only_the_referenced_csvs_are_packaged(tmp_path):
         assert "unrelated.csv" not in archive.namelist()
 
 
+# --- The validation gate (issue #38) ------------------------------------------
+
+def test_the_gate_runs_all_three_validators(tmp_path):
+    """One gate, one verdict, and the conformance validator is part of it."""
+    _built_project(tmp_path)
+    version_dir = tmp_path / build.VERSION_DIR / "v_1"
+    document = json.loads(
+        (version_dir / build.MANIFEST_FILENAME).read_text(encoding="utf-8")
+    )
+
+    report = build.run_gate(
+        version_dir / build.TWB_FILENAME, document, TARGET_VERSION
+    )
+
+    assert set(report.results) == set(build.GATE_VALIDATORS)
+    assert report.ok is True, report.errors
+
+
+def test_a_nonconforming_workbook_is_never_packaged(tmp_path, monkeypatch):
+    """AC #2: the gate catches it before the .twbx exists, and names the validator."""
+    import validate_conformance
+
+    monkeypatch.setattr(
+        validate_conformance, "conformance_errors",
+        lambda root, document: ["layout element 'kpi-revenue' has no zone"],
+    )
+
+    result = _built_project(tmp_path)
+
+    assert result.ok is False
+    assert any("conformance" in error for error in result.errors)
+    assert (tmp_path / build.VERSION_DIR / "v_1" / build.TWB_FILENAME).exists()
+    assert not (tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME).exists()
+
+
+def test_gate_revalidates_and_repackages_the_workbook_on_disk(tmp_path):
+    """The revalidate half of the fix loop, after a hand-written block is added."""
+    _built_project(tmp_path)
+    package = tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME
+    package.unlink()
+
+    result = build.gate(tmp_path)
+
+    assert result.ok is True, result.errors
+    assert package.exists()
+
+
+def test_gate_refuses_a_hand_edited_workbook_that_breaks_conformance(tmp_path):
+    """Hand-writing XML is offered, but only the gate decides whether it ships.
+
+    Renaming a sheet everywhere it appears leaves the XML *internally* consistent, so the
+    other two validators pass it - only the manifest knows the sheet is meant to be there.
+    """
+    _built_project(tmp_path)
+    twb_path = tmp_path / build.VERSION_DIR / "v_1" / build.TWB_FILENAME
+    twb_path.write_text(
+        twb_path.read_text(encoding="utf-8").replace(
+            '"Revenue Trend"', '"Ghost Sheet"'
+        ),
+        encoding="utf-8",
+    )
+
+    result = build.gate(tmp_path)
+
+    assert result.ok is False
+    assert any("conformance" in error for error in result.errors), result.errors
+    assert not (tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME).exists()
+
+
+def test_gate_refuses_a_csv_that_is_no_longer_on_disk(tmp_path):
+    """The gate packages too, so it owes the same guard: a .twbx short a CSV opens bound to
+    nothing, and commit would approve it on the package's existence."""
+    _built_project(tmp_path)
+    (tmp_path / "data" / "sales_orders.csv").rename(tmp_path / "data" / "orders.csv")
+
+    result = build.gate(tmp_path)
+
+    assert result.ok is False
+    assert any("sales_orders.csv" in error for error in result.errors)
+    assert not (tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME).exists()
+    assert build.commit(tmp_path).ok is False
+
+
+def test_a_failure_before_the_gate_is_not_reported_as_a_failed_gate(tmp_path):
+    """Sending the analyst to the XML for a manifest problem costs them the real fix."""
+    _ready_project(tmp_path)
+    document = _manifest()
+    document["worksheets"][1]["chart_type"] = "donut"
+    _write_manifest(tmp_path, document)
+
+    result = build.build_workbook(tmp_path)
+
+    assert result.gated is False
+    assert "validation gate failed" not in build.format_build(result)
+
+
+def test_a_gate_failure_says_so(tmp_path):
+    _built_project(tmp_path)
+    twb_path = tmp_path / build.VERSION_DIR / "v_1" / build.TWB_FILENAME
+    twb_path.write_text(
+        twb_path.read_text(encoding="utf-8").replace('"Revenue KPI"', '"Ghost"'),
+        encoding="utf-8",
+    )
+
+    result = build.gate(tmp_path)
+
+    assert result.gated is True
+    assert "validation gate failed" in build.format_build(result)
+
+
+def test_gate_refuses_when_no_workbook_has_been_built(tmp_path):
+    _ready_project(tmp_path)
+    _write_manifest(tmp_path, _manifest())
+
+    result = build.gate(tmp_path)
+
+    assert result.ok is False
+    assert any(build.TWB_FILENAME in error for error in result.errors)
+
+
+def test_an_unsupported_construct_is_named_and_the_rest_still_builds(tmp_path):
+    """AC #3: the build refuses the piece, not the workbook, and offers the way forward."""
+    _ready_project(tmp_path)
+    document = _manifest()
+    document["layout"]["root"]["children"].append({"id": "logo", "size": 10})
+    document["objects"] = [{"element_id": "logo", "kind": "image"}]
+    _write_spec(tmp_path, text=_spec_md(document["layout"]))
+    _write_manifest(tmp_path, document)
+
+    result = build.build_workbook(tmp_path)
+
+    assert result.ok is True, result.errors
+    gap = next(warning for warning in result.warnings if "logo" in warning)
+    assert "image" in gap and ".twb" in gap and "hand-write" in gap
+    # The rest of the deliverable is untouched by the refused piece.
+    assert (tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME).exists()
+
+
 # --- STATE.md transition (CONTRACT.md §4.3) ----------------------------------
 
 def test_commit_refuses_without_a_workbook(tmp_path):
