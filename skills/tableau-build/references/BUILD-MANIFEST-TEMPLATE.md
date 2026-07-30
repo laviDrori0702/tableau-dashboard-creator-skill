@@ -16,9 +16,9 @@ a bad spec-to-manifest translation is fixed row-by-row before any XML is generat
 | `worksheets` | yes | One per layout zone that is a **view**: unique `name`, a known `chart_type`, the `element_id` it fills, its `datasource`, and shelves/encodings whose fields resolve. |
 | `layout` | yes | The spec's `## Layout` container tree, copied as-is (canvas + nested `vert`/`horz` + id leaves with `%` sizes). |
 | `actions` | yes (`[]` if none) | Dashboard actions; `type` from `filter`/`highlight`/`parameter`/`set`/`url`. `source` is always a zone; a target is a zone for `filter`/`highlight`, a declared parameter for `parameter` (see below). |
-| `parameters` | yes (`[]` if none) | Each needs a `name` and a `data_type`. |
-| `objects` | optional | Layout zones no view fills — a filter card, title text, a logo, a legend. `kind` from `filter`/`parameter`/`text`/`image`/`legend`/`button`/`blank`. `text` and `blank` render today; the rest reserve their box as an empty zone until the wiring they need lands. |
-| `calculated_fields` | optional | Fields that legitimately are not in the data model; declaring one makes it usable on a shelf of its `datasource`. |
+| `parameters` | yes (`[]` if none) | Each needs a `name`, a `data_type` (`string`/`integer`/`real`/`boolean`/`date`/`datetime`), and a `current_value`. Give it a domain — a `values` list **or** a `range` (`min`/`max`, optional `step`), never both — or it is a free-entry box. Optional `format`. |
+| `objects` | optional | Layout zones no view fills — a filter card, a parameter control, title text, a logo, a legend. `kind` from `filter`/`parameter`/`text`/`image`/`legend`/`button`/`blank`. `filter`, `parameter`, `text` and `blank` render today; `image`, `button` and `legend` reserve their box as an empty zone until the wiring they need lands. |
+| `calculated_fields` | optional | Fields that legitimately are not in the data model; declaring one makes it usable on a shelf of its `datasource`. Each takes a `name`, a `formula`, a `datasource`, an optional `type` (default `real`) and an optional `format`. |
 
 **Copy the `layout` tree from the spec verbatim** — `validate` diffs the two and rejects any
 zone the manifest drops or invents, so the workbook cannot disagree with the approved mock.
@@ -65,6 +65,11 @@ measure with none of them defaults to `SUM`. Date parts: `year`, `quarter`, `mon
 `day`, `date`. Never write an expression like `"SUM([revenue])"` — that is the spec's prose,
 not a field reference.
 
+A shelf entry may also carry `table_calc` — a quick table calculation over the aggregate:
+`{"field": "revenue", "aggregation": "sum", "table_calc": "CumTotal"}` for a running total.
+One of `CumTotal`, `WindowTotal`, `Difference`, `PctDiff`, `PctValue`, `PctTotal`, `Rank`,
+`PctRank`; it computes across the table (Tableau's "Table (across)" addressing).
+
 Encodings the builder emits: `color`, `size`, `shape`, `text`, `lod`, `wedge-size`,
 `geometry`, `tooltip`. Any other name is a validation error, not a silent drop.
 
@@ -77,6 +82,7 @@ Encodings the builder emits: `color`, `size`, `shape`, `text`, `lod`, `wedge-siz
 | `tooltip` | `[{"label": "Revenue", "field": "revenue", "aggregation": "sum"}]` | A custom tooltip template, one label/value pair per line. |
 | `axis_titles` | `{"rows": "Revenue per category"}` | Overrides the generated axis title. |
 | `number_formats` | `[{"field": "revenue", "format": "$#,##0"}]` | Cell number format for that field. |
+| `reference_lines` | `[{"field": "revenue", "aggregation": "sum", "formula": "average", "scope": "per-table", "label": "<Computation>: <Value>"}]` | A line drawn at an aggregate of the measure. `formula` from `constant`/`total`/`sum`/`min`/`max`/`average`/`median`/`quantiles`/`percentile`/`stdev`/`confidence`/`medianconfidence` (default `average`); `scope` from `per-cell`/`per-pane`/`per-table` (default `per-table`). A `label` string is used verbatim; without one, `label_type` from `none`/`automatic`/`value`/`computation`/`custom` (default `computation`). |
 | `title` | `"Revenue by region"` | Puts a styled text zone above the sheet's zone in the dashboard and suppresses the sheet's own title. Omit to keep Tableau's sheet title. |
 
 An `objects` entry of `kind: "text"` takes its content the same way: `{"element_id":
@@ -89,8 +95,73 @@ data model does not document is rejected, not silently dropped.
 and chart-title size/colour are applied to every worksheet; when it does not, Tableau's own
 defaults apply. Nothing in the manifest sets fonts or colours.
 
-**Action targets depend on the type**: `filter` / `highlight` target layout zones, a
-`parameter` action targets a declared parameter by name. The `source` is always a zone.
+## Interactions
+
+**Actions.** `source` is always a **view** zone (the sheet whose marks are clicked), and so is
+every `filter` / `highlight` target; a `parameter` action targets a declared **parameter** by
+name and needs a `field` — the field read off the clicked mark and written into the parameter.
+`run_on` is `select` (click a mark; the default) or `hover`. One Tableau action is emitted
+**per target**, so a source fanning out to three zones is three actions.
+
+```json
+{"name": "Trend cross-filter", "type": "filter", "source": "chart-trend",
+ "targets": ["chart-detail", "kpi-revenue"], "run_on": "select"}
+{"name": "Pick region", "type": "parameter", "source": "chart-trend",
+ "targets": ["Selected Region"], "field": "region"}
+```
+
+Clearing the selection **resets** a parameter action's parameter to its `current_value`, so
+whatever the parameter drives returns to its opening state. That is what makes a parameter
+action safe to use without a control: the viewer cannot get stuck in a state only a control
+could undo.
+
+`set` and `url` validate but render nothing yet.
+
+**A filter card** (`objects` entry, `kind: "filter"`) is the UI for **one** worksheet's filter,
+so it names both the `worksheet` and the `field`: `{"element_id": "flt-region", "kind":
+"filter", "field": "region", "worksheet": "Revenue Trend", "mode": "checkdropdown"}`. The card
+lists the field's members, so the field must be a `string` or `boolean` field of that
+worksheet's datasource — for a date or a numeric range use the worksheet's own `filters` with
+`min`/`max` instead. `mode` is `checkdropdown` (a dropdown of checkboxes; the default) or
+`typeinlist` (a search box over the list). "Apply to all sheets" is a Desktop-side choice, not
+a manifest key.
+
+**A parameter control** (`kind: "parameter"`) names one declared parameter:
+`{"element_id": "prm-topn", "kind": "parameter", "parameter": "Top N"}`. Reference the
+parameter from a calculated field's formula as `[Parameters].[Top N]` — every worksheet whose
+calculations read it declares it automatically.
+
+### Dynamic Zone Visibility
+
+**Show/hide a zone** with `visibility` on a **layout** node: `{"id": "chart-category",
+"visibility": "Show Breakdown"}`. The value must be the name of a declared **boolean**
+calculated field, and the zone is shown when it is true. For a zone with a generated header or
+legend, the whole wrapper is what shows and hides.
+
+**The one rule the calc must obey: it resolves to a single value, independent of the view.**
+Tableau reads *one* value per view, so a row-level boolean (`SUM([revenue]) > 1000`,
+`[region] = "East"`) is not a visibility field — it splits the marks and the zone stops
+toggling. In practice that means **the calc compares a parameter**, and which parameter shape
+you reach for depends on who decides:
+
+| the viewer decides, with a control | the viewer's *selection* decides |
+|---|---|
+| A two-value parameter and a control zone for it — the usual toggle. `boolean` (`true`/`false`) is the natural type; a `string` with `values: ["on", "off"]` works the same way and is the form this repo has round-tripped through Desktop. Calc: `[Parameters].[Show Detail] = true` / `= "on"`. | A parameter a **parameter action** writes into, compared against its opening value: `[Parameters].[Selected Region] <> "All"`. The panel appears once a region is picked and hides itself when the selection clears (the action resets the parameter). No control zone needed. |
+
+Both are ordinary DZV; pick by intent. A toggle is right for "let me collapse this"; a
+selection-driven reveal is right for "there is nothing to show until you pick something", and
+costs no dashboard real estate.
+
+**Do not write the visibility calc as an LOD expression.** A `{FIXED : …}` or `{MAX(…)}` also
+makes a field view-independent, and Tableau accepts it — but it is hard to reason about, hard
+to fix by hand in Desktop, and silently changes what "single value" means when a filter moves.
+A parameter comparison is the whole vocabulary needed here.
+
+Everything mechanical is the builder's job, not the manifest's: it puts the visibility field on
+the controlled sheet's Detail shelf (Tableau evaluates it off the *view* — the `<datagraph>`
+alone is not enough, and a workbook missing it opens fine and simply never toggles), declares
+the parameter on that sheet and on its datasource, and emits the four document-format flags.
+None of that is expressible in the manifest, and none of it needs to be.
 
 ## Example
 
@@ -110,7 +181,9 @@ defaults apply. Nothing in the manifest sets fonts or colours.
   ],
   "calculated_fields": [
     {"name": "Revenue per Order", "formula": "SUM([revenue]) / COUNTD([order_id])",
-     "datasource": "sales_orders", "type": "real"}
+     "datasource": "sales_orders", "type": "real", "format": "$#,##0"},
+    {"name": "Show Breakdown", "formula": "[Parameters].[Selected Region] <> \"All\"",
+     "datasource": "sales_orders", "type": "boolean"}
   ],
   "worksheets": [
     {
@@ -135,11 +208,26 @@ defaults apply. Nothing in the manifest sets fonts or colours.
       "filters": [{"field": "region", "values": ["West", "East"], "context": true}],
       "sort": {"field": "region", "direction": "DESC",
                "by": {"field": "revenue", "aggregation": "sum"}},
-      "number_formats": [{"field": "revenue", "format": "$#,##0"}]
+      "number_formats": [{"field": "revenue", "format": "$#,##0"}],
+      "reference_lines": [{"field": "revenue", "aggregation": "sum", "formula": "average",
+                           "scope": "per-table", "label": "<Computation>: <Value>"}]
+    },
+    {
+      "name": "Running Revenue",
+      "element_id": "chart-cumulative",
+      "chart_type": "area",
+      "datasource": "sales_orders",
+      "title": "Revenue to date",
+      "shelves": {
+        "columns": [{"field": "order_date", "date_part": "month"}],
+        "rows": [{"field": "revenue", "aggregation": "sum", "table_calc": "CumTotal"}]
+      }
     }
   ],
   "objects": [
-    {"element_id": "flt-region", "kind": "filter"}
+    {"element_id": "flt-region", "kind": "filter", "field": "region",
+     "worksheet": "Revenue Trend", "mode": "checkdropdown"},
+    {"element_id": "prm-topn", "kind": "parameter", "parameter": "Top N"}
   ],
   "layout": {
     "canvas": {"width": 1366, "height": 768},
@@ -147,15 +235,26 @@ defaults apply. Nothing in the manifest sets fonts or colours.
       "type": "vert",
       "children": [
         {"id": "flt-region", "size": 8},
-        {"id": "kpi-revenue", "size": 22},
-        {"id": "chart-trend", "size": 70}
+        {"id": "prm-topn", "size": 8},
+        {"id": "kpi-revenue", "size": 20},
+        {"id": "chart-trend", "size": 34},
+        {"id": "chart-cumulative", "size": 30, "visibility": "Show Breakdown"}
       ]
     }
   },
   "actions": [
     {"name": "Region cross-filter", "type": "filter", "source": "chart-trend",
-     "targets": ["kpi-revenue"], "run_on": "select"}
+     "targets": ["kpi-revenue"], "run_on": "select"},
+    {"name": "Region highlight", "type": "highlight", "source": "chart-trend",
+     "targets": ["chart-cumulative"], "run_on": "hover"},
+    {"name": "Pick region", "type": "parameter", "source": "chart-trend",
+     "targets": ["Selected Region"], "field": "region"}
   ],
-  "parameters": []
+  "parameters": [
+    {"name": "Selected Region", "data_type": "string", "current_value": "All",
+     "values": ["All", "East", "North", "West"]},
+    {"name": "Top N", "data_type": "integer", "current_value": 10,
+     "range": {"min": 5, "max": 50, "step": 5}, "format": "#,##0"}
+  ]
 }
 ```

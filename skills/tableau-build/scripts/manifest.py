@@ -29,10 +29,20 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Optional
+from typing import NamedTuple, Optional
 
+from features import ACTIVATIONS, PARAMETER_TYPES
 # Names, not the module: half the functions below take a parameter called ``worksheet``.
-from worksheet import CHART_SPECS, DATE_PART_DERIVATIONS, ENCODING_ORDER
+from worksheet import (
+    CHART_SPECS,
+    DATE_PART_DERIVATIONS,
+    ENCODING_ORDER,
+    REFERENCE_LINE_FORMULAS,
+    REFERENCE_LINE_LABEL_TYPES,
+    REFERENCE_LINE_SCOPES,
+    TABLE_CALC_PREFIXES,
+)
+from zones import FILTER_MODES
 
 #: Sections a manifest must carry (actions/parameters may be empty lists, never absent -
 #: "None" must be said explicitly so a forgotten section is not mistaken for "no actions").
@@ -74,6 +84,19 @@ AGGREGATIONS = frozenset({
 #: dropped silently, and Tableau shows no sign of the missing encoding.
 DATE_PARTS = frozenset(DATE_PART_DERIVATIONS)
 ENCODING_NAMES = frozenset(ENCODING_ORDER)
+
+#: Table calculations a shelf entry may ask for, and the parameter data types / action
+#: activations the builder can emit - all read off the builder's own tables.
+TABLE_CALCS = frozenset(TABLE_CALC_PREFIXES)
+PARAMETER_DATA_TYPES = frozenset(PARAMETER_TYPES)
+ACTION_RUN_ON = frozenset(ACTIVATIONS)
+
+#: Types a quick-filter card can render: it lists the field's *members*, so a date or numeric
+#: field belongs in a worksheet filter with bounds instead (see :data:`zones.FILTER_MODES`).
+CARD_FILTER_TYPES = frozenset({"string", "boolean"})
+
+#: The type a Dynamic Zone Visibility field must have - a zone is shown or hidden, nothing else.
+VISIBILITY_TYPE = "boolean"
 
 # A data-source heading in DATA-MODEL.md: "## Data source: `sales.csv`" -> "sales.csv".
 _DATASOURCE_HEADING = re.compile(
@@ -172,7 +195,8 @@ def load_manifest(path: Path | str) -> tuple[Optional[dict], Optional[str]]:
 # --- Layout tree --------------------------------------------------------------
 
 def _collect_layout_ids(
-    node: object, path: str, ids: list[str], container_ids: set[str], errors: list[str]
+    node: object, path: str, ids: list[str], container_ids: set[str], errors: list[str],
+    visibility: Optional[list[tuple[str, str]]] = None,
 ) -> None:
     """Walk one layout node, recording every placed id and any structural error.
 
@@ -190,10 +214,22 @@ def _collect_layout_ids(
         ids: Accumulator for placed element ids.
         container_ids: Accumulator for the ids of nodes that hold children.
         errors: Accumulator for validation errors.
+        visibility: Accumulator for ``(path, field name)`` of every node whose zone is shown
+            or hidden by a boolean field (Dynamic Zone Visibility), or ``None`` to ignore them.
     """
     if not isinstance(node, dict):
         errors.append(f"{path}: every layout node must be a JSON object")
         return
+
+    if visibility is not None and node.get("visibility") is not None:
+        shown_by = node.get("visibility")
+        if isinstance(shown_by, str) and shown_by.strip():
+            visibility.append((path, shown_by.strip()))
+        else:
+            errors.append(
+                f"{path}: 'visibility' must be the name of a boolean calculated field "
+                f"(got {shown_by!r})"
+            )
 
     element_id, children = node.get("id"), node.get("children")
     if element_id is None and children is None:
@@ -223,7 +259,7 @@ def _collect_layout_ids(
         return
     for index, child in enumerate(children):
         _collect_layout_ids(
-            child, f"{path}.children[{index}]", ids, container_ids, errors
+            child, f"{path}.children[{index}]", ids, container_ids, errors, visibility
         )
 
 
@@ -247,7 +283,9 @@ def placed_layout_ids(layout: object) -> set[str]:
     return set(ids)
 
 
-def _validate_layout(layout: object, errors: list[str]) -> tuple[list[str], set[str]]:
+def _validate_layout(
+    layout: object, errors: list[str]
+) -> tuple[list[str], set[str], list[tuple[str, str]]]:
     """Validate the layout section and return what it places.
 
     Args:
@@ -255,12 +293,13 @@ def _validate_layout(layout: object, errors: list[str]) -> tuple[list[str], set[
         errors: Accumulator for validation errors.
 
     Returns:
-        ``(placed ids, container ids)``. A container id is filled by its children, so it
-        needs no worksheet or object of its own.
+        ``(placed ids, container ids, visibility bindings)``. A container id is filled by its
+        children, so it needs no worksheet or object of its own; a visibility binding is the
+        ``(path, field name)`` of a zone under Dynamic Zone Visibility.
     """
     if not isinstance(layout, dict):
         errors.append("layout: must be an object with 'canvas' and 'root' (copy the spec's)")
-        return [], set()
+        return [], set(), []
 
     canvas = layout.get("canvas")
     if not (
@@ -272,15 +311,18 @@ def _validate_layout(layout: object, errors: list[str]) -> tuple[list[str], set[
 
     ids: list[str] = []
     container_ids: set[str] = set()
+    visibility: list[tuple[str, str]] = []
     if isinstance(layout.get("root"), dict):
-        _collect_layout_ids(layout["root"], "layout.root", ids, container_ids, errors)
+        _collect_layout_ids(
+            layout["root"], "layout.root", ids, container_ids, errors, visibility
+        )
     else:
         errors.append("layout.root: must be a container object ('type' + 'children')")
 
     duplicates = sorted({placed for placed in ids if ids.count(placed) > 1})
     if duplicates:
         errors.append("layout places id(s) more than once: " + ", ".join(duplicates))
-    return ids, container_ids
+    return ids, container_ids, visibility
 
 
 # --- Datasources / worksheets -------------------------------------------------
@@ -418,7 +460,7 @@ def _worksheet_field_references(worksheet: dict) -> list[tuple[str, object]]:
         for encoding, entry in encodings.items():
             references.append((f"encodings.{encoding}", entry))
 
-    for key in ("filters", "tooltip", "number_formats"):
+    for key in ("filters", "tooltip", "number_formats", "reference_lines"):
         entries = worksheet.get(key)
         if isinstance(entries, list):
             for index, entry in enumerate(entries):
@@ -448,7 +490,10 @@ def _validate_reference(
         errors: Accumulator for validation errors.
     """
     bin_size: object = None
+    table_calc = ""
     if isinstance(entry, dict):
+        raw_calc = entry.get("table_calc")
+        table_calc = raw_calc.strip() if isinstance(raw_calc, str) else ""
         field_name = _bare_field(entry.get("field"))
         # A JSON null (or any other non-string) means "not specified", same as a missing
         # key - never coerce it to a string, or `null` reads as the literal text "none".
@@ -493,6 +538,11 @@ def _validate_reference(
             f"{label}: {where} '{field_name}' has a 'bin' of {bin_size!r} - a bin width "
             f"must be a positive number (e.g. 500 for a histogram of 0-500, 500-1000, ...)"
         )
+    if table_calc and table_calc not in TABLE_CALCS:
+        errors.append(
+            f"{label}: {where} '{field_name}' has unknown table_calc '{table_calc}' "
+            f"(expected one of: {', '.join(sorted(TABLE_CALCS))})"
+        )
 
 
 def _validate_modifiers(label: str, worksheet: dict, errors: list[str]) -> None:
@@ -533,6 +583,26 @@ def _validate_modifiers(label: str, worksheet: dict, errors: list[str]) -> None:
                     f"{label}: filters[{index}] has nothing to filter on - give it "
                     f"'values' (a member list) or 'min'/'max' (a range)"
                 )
+
+    lines = worksheet.get("reference_lines")
+    if isinstance(lines, list):
+        for index, entry in enumerate(lines):
+            if not isinstance(entry, dict):
+                errors.append(
+                    f"{label}: reference_lines[{index}] must be an object with a 'field'"
+                )
+                continue
+            for key, allowed in (
+                ("formula", REFERENCE_LINE_FORMULAS),
+                ("scope", REFERENCE_LINE_SCOPES),
+                ("label_type", REFERENCE_LINE_LABEL_TYPES),
+            ):
+                value = entry.get(key)
+                if isinstance(value, str) and value.strip().lower() not in allowed:
+                    errors.append(
+                        f"{label}: reference_lines[{index}] has unknown {key} "
+                        f"'{value}' (expected one of: {', '.join(sorted(allowed))})"
+                    )
 
     sort = worksheet.get("sort")
     if isinstance(sort, dict):
@@ -634,8 +704,83 @@ def _validate_worksheets(
     return filled
 
 
+class ViewZone(NamedTuple):
+    """One worksheet as the rest of the manifest addresses it.
+
+    Attributes:
+        name: The Tableau sheet name.
+        datasource: The datasource the sheet reads (whose fields a card may filter).
+    """
+
+    name: str
+    datasource: str
+
+
+def _view_zones(worksheets: object) -> dict[str, ViewZone]:
+    """Map ``{element id: ViewZone}`` for the worksheets that name a zone.
+
+    A filter card and a filter/highlight action are both defined in terms of a *view*: the
+    card filters one sheet, and an action runs from one sheet's marks to another's. This is
+    the one place the manifest's element ids are turned into that.
+
+    Args:
+        worksheets: The manifest's ``worksheets`` value.
+
+    Returns:
+        ``{element id: ViewZone}``; malformed entries are skipped (already reported).
+    """
+    views: dict[str, ViewZone] = {}
+    for entry in worksheets if isinstance(worksheets, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        element_id = str(entry.get("element_id", "")).strip()
+        name = str(entry.get("name", "")).strip()
+        if element_id and name:
+            views.setdefault(
+                element_id, ViewZone(name, str(entry.get("datasource", "")).strip())
+            )
+    return views
+
+
+def _field_types(
+    manifest_document: dict, data_model_text: str
+) -> dict[str, dict[str, str]]:
+    """Return ``{datasource name: {field name: type}}`` for every field a sheet can name.
+
+    Merges the CSV's documented types (``DATA-MODEL.md``, the field authority) with the
+    manifest's calculated fields, so a check like "is this field a discrete dimension?" has
+    one place to look.
+
+    Args:
+        manifest_document: The whole manifest.
+        data_model_text: The contents of ``DATA-MODEL.md``.
+
+    Returns:
+        The merged type map.
+    """
+    documented = documented_field_types(data_model_text)
+    types: dict[str, dict[str, str]] = {}
+    for entry in manifest_document.get("datasources") or []:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name", "")).strip()
+        if name:
+            types[name] = dict(documented.get(str(entry.get("csv", "")).strip(), {}))
+    for entry in manifest_document.get("calculated_fields") or []:
+        if not isinstance(entry, dict):
+            continue
+        source = str(entry.get("datasource", "")).strip()
+        name = str(entry.get("name", "")).strip()
+        if source in types and name:
+            # No 'type' means a numeric result - the same default the assembler applies.
+            types[source][name] = str(entry.get("type", "")).strip().lower() or "real"
+    return types
+
+
 def _validate_objects(
-    objects: object, layout_ids: set[str], container_ids: set[str], errors: list[str]
+    objects: object, layout_ids: set[str], container_ids: set[str],
+    views: dict[str, ViewZone], field_types: dict[str, dict[str, str]],
+    parameter_names: set[str], errors: list[str],
 ) -> set[str]:
     """Validate the non-worksheet dashboard objects and return the zones they fill.
 
@@ -644,6 +789,9 @@ def _validate_objects(
         layout_ids: The element ids the layout tree places.
         container_ids: Mapped-container ids (filled by their children, not an object of
             their own - CONTRACT.md §1.1).
+        views: ``{element id: ViewZone}`` - the sheets a filter card may filter.
+        field_types: ``{datasource: {field: type}}``.
+        parameter_names: The declared parameter names.
         errors: Accumulator for validation errors.
 
     Returns:
@@ -677,23 +825,93 @@ def _validate_objects(
                 f"{label}: unknown kind '{kind}' "
                 f"(expected one of: {', '.join(sorted(OBJECT_KINDS))})"
             )
+        elif kind == "filter":
+            _validate_filter_card(
+                label, dashboard_object, views, field_types, errors
+            )
+        elif kind == "parameter":
+            parameter = str(dashboard_object.get("parameter", "")).strip()
+            if parameter not in parameter_names:
+                errors.append(
+                    f"{label}: 'parameter' is {parameter or 'missing'} - a parameter control "
+                    f"names one declared parameter (declared: "
+                    f"{', '.join(sorted(parameter_names)) or 'none'})"
+                )
     return filled
 
 
+def _validate_filter_card(
+    label: str, dashboard_object: dict, views: dict[str, ViewZone],
+    field_types: dict[str, dict[str, str]], errors: list[str],
+) -> None:
+    """Validate one quick-filter card against the worksheet it filters.
+
+    A card is the UI for one worksheet's filter, so it has to name that worksheet *and* a
+    field of the worksheet's datasource. The field also has to be one whose members a card can
+    list - a card over a date or a measure would need bounds, which belong on the worksheet's
+    ``filters`` instead.
+
+    Args:
+        label: The object's error label.
+        dashboard_object: The ``objects`` entry.
+        views: ``{element id: ViewZone}``.
+        field_types: ``{datasource: {field: type}}``.
+        errors: Accumulator for validation errors.
+    """
+    sheet_names = {view.name: view.datasource for view in views.values()}
+    sheet = str(dashboard_object.get("worksheet", "")).strip()
+    field_name = _bare_field(dashboard_object.get("field"))
+
+    if not field_name:
+        errors.append(f"{label}: a filter card needs a 'field' (the field it filters on)")
+    if sheet not in sheet_names:
+        errors.append(
+            f"{label}: a filter card needs a 'worksheet' naming the sheet it filters "
+            f"- '{sheet}' is not one "
+            f"(declared: {', '.join(sorted(sheet_names)) or 'none'})"
+        )
+    elif field_name:
+        datatype = field_types.get(sheet_names[sheet], {}).get(field_name)
+        if datatype is None:
+            errors.append(
+                f"{label}: field '{field_name}' is not a field of worksheet '{sheet}'s "
+                f"datasource '{sheet_names[sheet]}'"
+            )
+        elif datatype not in CARD_FILTER_TYPES:
+            errors.append(
+                f"{label}: field '{field_name}' is a '{datatype}' - a filter card lists a "
+                f"field's members, so it needs one of: "
+                f"{', '.join(sorted(CARD_FILTER_TYPES))}. For a date or numeric range, put "
+                f"'filters' with min/max on worksheet '{sheet}' instead"
+            )
+
+    mode = str(dashboard_object.get("mode", "")).strip()
+    if mode and mode not in FILTER_MODES:
+        errors.append(
+            f"{label}: unknown filter mode '{mode}' "
+            f"(expected one of: {', '.join(sorted(FILTER_MODES))})"
+        )
+
+
 def _validate_actions(
-    actions: object, known_ids: set[str], parameter_names: set[str], errors: list[str]
+    actions: object, known_ids: set[str], parameter_names: set[str],
+    views: dict[str, ViewZone], field_types: dict[str, dict[str, str]],
+    errors: list[str],
 ) -> None:
     """Validate the dashboard actions' types and endpoints.
 
-    The **source** is always a zone (the view whose marks the analyst clicks). What a
-    **target** is depends on the type: ``filter`` / ``highlight`` target other zones, a
-    ``parameter`` action targets a declared parameter, and ``set`` / ``url`` actions target
+    The **source** is always a *view* zone: an action runs off the marks the analyst clicks,
+    and a text or filter zone has none. What a **target** is depends on the type: ``filter`` /
+    ``highlight`` target other view zones, a ``parameter`` action targets a declared parameter
+    (and needs the ``field`` whose value it writes there), and ``set`` / ``url`` actions target
     a set / a URL that this schema does not model - those are left to the builder.
 
     Args:
         actions: The manifest's ``actions`` value.
         known_ids: Element ids an action may point at (the layout's zones).
         parameter_names: Declared parameter names (the targets of a parameter action).
+        views: ``{element id: ViewZone}`` - the zones an action may run from or to.
+        field_types: ``{datasource: {field: type}}``, for a parameter action's source field.
         errors: Accumulator for validation errors.
     """
     if not isinstance(actions, list):
@@ -717,11 +935,35 @@ def _validate_actions(
                 f"(expected one of: {', '.join(sorted(ACTION_TYPES))})"
             )
 
+        run_on = str(action.get("run_on", "")).strip().lower()
+        if run_on and run_on not in ACTION_RUN_ON:
+            errors.append(
+                f"{label}: unknown run_on '{run_on}' "
+                f"(expected one of: {', '.join(sorted(ACTION_RUN_ON))})"
+            )
+
         source = str(action.get("source", "")).strip()
         if not source:
             errors.append(f"{label}: needs a 'source' element id")
         elif source not in known_ids:
             errors.append(f"{label}: source '{source}' is not a zone in the layout tree")
+        elif source not in views:
+            errors.append(
+                f"{label}: source '{source}' is not a view - an action runs off the marks "
+                f"the analyst clicks, so its source must be a zone a worksheet fills"
+            )
+        elif action_type == "parameter":
+            source_field = _bare_field(action.get("field"))
+            if not source_field:
+                errors.append(
+                    f"{label}: a parameter action needs a 'field' - the field whose value "
+                    f"the clicked mark writes into the parameter"
+                )
+            elif source_field not in field_types.get(views[source].datasource, {}):
+                errors.append(
+                    f"{label}: field '{source_field}' is not a field of source "
+                    f"'{source}'s datasource '{views[source].datasource}'"
+                )
 
         targets = action.get("targets", [])
         target_names = [
@@ -736,6 +978,11 @@ def _validate_actions(
             elif action_type in {"filter", "highlight"} and target not in known_ids:
                 errors.append(
                     f"{label}: target '{target}' is not a zone in the layout tree"
+                )
+            elif action_type in {"filter", "highlight"} and target not in views:
+                errors.append(
+                    f"{label}: target '{target}' is not a view - a {action_type} action "
+                    f"acts on a worksheet's marks, not on a text or control zone"
                 )
             elif action_type == "parameter" and target not in parameter_names:
                 errors.append(
@@ -771,9 +1018,68 @@ def _validate_parameters(parameters: object, errors: list[str]) -> set[str]:
         elif name in seen:
             errors.append(f"{label}: duplicate parameter name '{name}'")
         seen.add(name)
-        if not str(parameter.get("data_type", "")).strip():
+
+        data_type = str(parameter.get("data_type", "")).strip().lower()
+        if not data_type:
             errors.append(f"{label}: needs a 'data_type' (string/integer/real/boolean/date)")
+        elif data_type not in PARAMETER_DATA_TYPES:
+            errors.append(
+                f"{label}: unknown data_type '{data_type}' "
+                f"(expected one of: {', '.join(sorted(PARAMETER_DATA_TYPES))})"
+            )
+
+        # A parameter has one domain: a member list, a numeric range, or anything. Two
+        # domains would make the control's behaviour depend on which one the builder read.
+        values, span = parameter.get("values"), parameter.get("range")
+        if values is not None and not (isinstance(values, list) and values):
+            errors.append(
+                f"{label}: 'values' must be a non-empty list of the allowed values"
+            )
+        if span is not None:
+            if not (
+                isinstance(span, dict)
+                and isinstance(span.get("min"), (int, float))
+                and isinstance(span.get("max"), (int, float))
+            ):
+                errors.append(f"{label}: 'range' needs numeric 'min' and 'max'")
+            elif values:
+                errors.append(
+                    f"{label}: has both 'values' and 'range' - a parameter's domain is a "
+                    f"member list or a range, not both"
+                )
     return seen
+
+
+def _validate_visibility(
+    bindings: list[tuple[str, str]], manifest_document: dict, errors: list[str]
+) -> None:
+    """Validate every layout node's ``visibility`` field (Dynamic Zone Visibility).
+
+    Tableau shows or hides a zone on a single boolean value, and the builder qualifies that
+    field against the datasource that declares it - so the field has to be a declared
+    *calculated* field of type ``boolean``. A CSV column would need one value per view, which
+    is not something the manifest can promise.
+
+    Args:
+        bindings: ``(path, field name)`` pairs from the layout walk.
+        manifest_document: The whole manifest.
+        errors: Accumulator for validation errors.
+    """
+    if not bindings:
+        return
+    booleans = {
+        str(entry.get("name", "")).strip()
+        for entry in manifest_document.get("calculated_fields") or []
+        if isinstance(entry, dict)
+        and str(entry.get("type", "")).strip().lower() == VISIBILITY_TYPE
+    }
+    for path, field_name in bindings:
+        if field_name not in booleans:
+            errors.append(
+                f"{path}: visibility '{field_name}' is not a declared calculated field of "
+                f"type '{VISIBILITY_TYPE}' (declared boolean: "
+                f"{', '.join(sorted(booleans)) or 'none'})"
+            )
 
 
 def validate_manifest(
@@ -809,7 +1115,9 @@ def validate_manifest(
             f"'{target_tableau_version}' - copy STATE.md's value"
         )
 
-    layout_ids, container_ids = _validate_layout(manifest_document.get("layout"), errors)
+    layout_ids, container_ids, visibility = _validate_layout(
+        manifest_document.get("layout"), errors
+    )
     zone_ids = {
         element_id for element_id in layout_ids
         if not element_id.startswith(INTERACTION_PREFIX)
@@ -829,9 +1137,14 @@ def validate_manifest(
         container_ids, errors
     )
 
+    views = _view_zones(manifest_document.get("worksheets"))
+    field_types = _field_types(manifest_document, data_model_text)
+    parameter_names = _validate_parameters(manifest_document.get("parameters", []), errors)
     filled |= _validate_objects(
-        manifest_document.get("objects", []), zone_ids, container_ids, errors
+        manifest_document.get("objects", []), zone_ids, container_ids, views, field_types,
+        parameter_names, errors,
     )
+    _validate_visibility(visibility, manifest_document, errors)
 
     # A leaf zone nothing fills would build an empty container - the spec mapped it to
     # something, so the translation dropped it.
@@ -843,8 +1156,8 @@ def validate_manifest(
             "filter card / text / image zone)"
         )
 
-    parameter_names = _validate_parameters(manifest_document.get("parameters", []), errors)
     _validate_actions(
-        manifest_document.get("actions", []), zone_ids, parameter_names, errors
+        manifest_document.get("actions", []), zone_ids, parameter_names, views, field_types,
+        errors,
     )
     return errors

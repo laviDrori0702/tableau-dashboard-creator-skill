@@ -22,7 +22,11 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import NamedTuple, Optional
+
+# A worksheet that reads a parameter has to declare it; :mod:`features` owns what a parameter
+# column looks like and imports nothing back, so no cycle.
+from features import PARAMETERS_DATASOURCE, Parameter, render_parameter_column
 
 # --- CDATA -------------------------------------------------------------------
 # ponytail: ElementTree cannot emit CDATA, and Tableau *requires* it around field
@@ -191,8 +195,40 @@ def is_aggregate_formula(formula: str) -> bool:
         True when the formula calls an aggregate function, so the field must reach a shelf
         un-aggregated. A row-level formula (``[quantity] * [unit_price]``) returns False and
         is treated like any other measure.
+
+    An **LOD expression** (``{FIXED [region]: SUM([revenue])}``) returns False even though it
+    contains ``SUM(``: an LOD produces one row-level value per its own grain, so Tableau
+    aggregates it again on the shelf (``SUM([Regional Revenue])``). Treating it as
+    pre-aggregated is what put the ``User`` derivation on it and made the shelf read one
+    arbitrary member's value.
     """
-    return bool(formula) and _AGGREGATE_CALL.search(formula) is not None
+    if not formula or "{" in formula:
+        return False
+    return _AGGREGATE_CALL.search(formula) is not None
+
+
+#: manifest ``table_calc`` -> the column-instance name's extra prefix. The keys are the
+#: XSD's ``TCType-ST`` enumeration (minus ``None``, which is "no table calc"); the prefixes
+#: are cosmetic identifiers - ``cum:sum:revenue:qk`` is what Tableau writes for a running
+#: total, and ``manifest.TABLE_CALCS`` reads this table so an unknown type fails validation
+#: rather than rendering a calc Tableau does not have.
+#: ponytail: only ``PctTotal`` -> ``pcto`` is attested (Desktop 2025.1 renamed ours on save).
+#: The rest are inferred; a wrong one costs nothing but a rewrite on open, and is fixed by
+#: reading the name out of a Desktop-saved workbook that uses that calc.
+TABLE_CALC_PREFIXES: dict[str, str] = {
+    "CumTotal": "cum",
+    "WindowTotal": "wnd",
+    "Difference": "diff",
+    "PctDiff": "pctdiff",
+    "PctValue": "pctval",
+    "PctTotal": "pcto",
+    "Rank": "rank",
+    "PctRank": "pctrank",
+}
+
+#: How a table calc walks the view. ``Rows`` is Tableau's default "Table (across)" addressing
+#: - the one a running total or percent-of-total means on a normal chart.
+TABLE_CALC_ORDERING = "Rows"
 
 
 #: manifest date_part -> (prefix, derivation). ``date`` is the exact date: no truncation,
@@ -233,6 +269,22 @@ def caption_for(field_name: str) -> str:
     return field_name.replace("_", " ").title()
 
 
+class CalculatedField(NamedTuple):
+    """One declared calculated field, as the resolver needs it.
+
+    Attributes:
+        formula: The Tableau formula.
+        datatype: The result's type (``real`` when the manifest declares none).
+        number_format: A ``default-format`` pattern for the column, or ``""``. Set on the
+            *column* rather than as a worksheet style rule, so every sheet that uses the
+            field - and the data pane - shows it the same way.
+    """
+
+    formula: str
+    datatype: str
+    number_format: str = ""
+
+
 @dataclass(frozen=True)
 class FieldRef:
     """One resolved shelf/encoding entry: the column, its instance, and how to name both.
@@ -246,8 +298,12 @@ class FieldRef:
         prefix: The instance-name prefix (``sum``, ``tmn``, ``none``, ...).
         derivation: The instance's ``derivation`` attribute.
         formula: A calculated field's formula, else ``""``.
+        number_format: A calculated field's ``default-format`` pattern, else ``""``.
         bin_size: Bin width when the entry asked for a binned column, else ``None``.
         bin_source: The measure a bin is computed from, else ``""``.
+        table_calc: A :data:`TABLE_CALC_PREFIXES` key when the entry asked for a table
+            calculation, else ``""``. A table calc lives on the *instance*, not on a column
+            of its own - the same measure can be plain on one shelf and cumulative on another.
     """
 
     field_name: str
@@ -258,8 +314,10 @@ class FieldRef:
     prefix: str
     derivation: str
     formula: str = ""
+    number_format: str = ""
     bin_size: Optional[float] = None
     bin_source: str = ""
+    table_calc: str = ""
 
     @property
     def column_name(self) -> str:
@@ -268,8 +326,11 @@ class FieldRef:
 
     @property
     def instance_name(self) -> str:
-        """str: The bracketed column-instance name (``[sum:revenue:qk]``)."""
-        return f"[{self.prefix}:{self.field_name}:{_TYPE_SUFFIX[self.instance_type]}]"
+        """str: The bracketed column-instance name (``[sum:revenue:qk]``, ``[cum:sum:...]``)."""
+        prefix = self.prefix
+        if self.table_calc:
+            prefix = f"{TABLE_CALC_PREFIXES[self.table_calc]}:{prefix}"
+        return f"[{prefix}:{self.field_name}:{_TYPE_SUFFIX[self.instance_type]}]"
 
     @property
     def caption(self) -> str:
@@ -288,7 +349,7 @@ class FieldResolver:
         datasource_id: The ``federated.*`` id every reference is qualified with.
         datasource_caption: The datasource's manifest name, as the view declares it.
         field_types: ``{field name: DATA-MODEL.md type}`` for the datasource's CSV.
-        calculated: ``{name: (formula, type)}`` for the datasource's calculated fields.
+        calculated: ``{name: CalculatedField}`` for the datasource's calculated fields.
         type_facts: ``{type: (role, column type)}`` - :mod:`twb`'s type table, passed in so
             this module stays free of a circular import.
     """
@@ -298,7 +359,7 @@ class FieldResolver:
         datasource_id: str,
         datasource_caption: str,
         field_types: dict[str, str],
-        calculated: dict[str, tuple[str, str]],
+        calculated: dict[str, CalculatedField],
         type_facts: dict[str, tuple[str, str]],
     ) -> None:
         self.datasource_id = datasource_id
@@ -322,6 +383,7 @@ class FieldResolver:
             The resolved :class:`FieldRef`, or ``None`` when the entry names no field
             (``manifest.validate_manifest`` has already rejected that case).
         """
+        table_calc = ""
         if isinstance(entry, dict):
             field_name = str(entry.get("field", "")).strip().strip("[]").strip()
             aggregation = _lower(entry.get("aggregation"))
@@ -332,13 +394,18 @@ class FieldResolver:
                 if isinstance(raw_bin, (int, float)) and not isinstance(raw_bin, bool)
                 else None
             )
+            raw_calc = entry.get("table_calc")
+            if isinstance(raw_calc, str) and raw_calc.strip() in TABLE_CALC_PREFIXES:
+                table_calc = raw_calc.strip()
         else:
             field_name = str(entry or "").strip().strip("[]").strip()
             aggregation, date_part, bin_size = "", "", None
         if not field_name:
             return None
 
-        formula, declared_type = self.calculated.get(field_name, ("", ""))
+        formula, declared_type, number_format = self.calculated.get(
+            field_name, CalculatedField("", "")
+        )
         datatype = declared_type or self.field_types.get(field_name, "string")
         role, column_type = self.type_facts.get(datatype, ("dimension", "nominal"))
 
@@ -384,6 +451,8 @@ class FieldResolver:
             prefix=prefix,
             derivation=derivation,
             formula=formula,
+            number_format=number_format,
+            table_calc=table_calc,
         )
 
     def references(self, entries: object) -> list[FieldRef]:
@@ -478,6 +547,8 @@ class FilterPlan:
         minimum: Lower bound of a range filter, or ``None``.
         maximum: Upper bound of a range filter, or ``None``.
         context: Whether Tableau evaluates it first.
+        all_members: Filter *on* the field with nothing excluded - the worksheet side of a
+            quick-filter card, whose whole job is to let the viewer do the excluding.
     """
 
     reference: FieldRef
@@ -485,6 +556,7 @@ class FilterPlan:
     minimum: Optional[str] = None
     maximum: Optional[str] = None
     context: bool = False
+    all_members: bool = False
 
 
 @dataclass(frozen=True)
@@ -502,6 +574,45 @@ class SortPlan:
     by: Optional[FieldRef] = None
     order: tuple[str, ...] = ()
     direction: str = "DESC"
+
+
+#: A reference line's ``formula`` - the aggregation of the field it draws at (XSD enum).
+REFERENCE_LINE_FORMULAS: frozenset[str] = frozenset({
+    "constant", "total", "sum", "min", "max", "average", "median", "quantiles",
+    "percentile", "stdev", "confidence", "medianconfidence",
+})
+
+#: How far a reference line's computation reaches (XSD enum).
+REFERENCE_LINE_SCOPES: frozenset[str] = frozenset({"per-cell", "per-pane", "per-table"})
+
+#: The confidence probability Desktop writes on every reference line (only the ``confidence``
+#: and ``percentile`` formulas read it; the rest carry it and ignore it).
+REFERENCE_LINE_PROBABILITY = "95"
+
+#: What a reference line labels itself with (XSD enum). ``custom`` is implied by a ``label``.
+REFERENCE_LINE_LABEL_TYPES: frozenset[str] = frozenset({
+    "none", "automatic", "value", "computation", "custom",
+})
+
+
+@dataclass(frozen=True)
+class ReferenceLinePlan:
+    """One resolved reference line: the measure it draws at, and how it computes and labels.
+
+    Attributes:
+        reference: The measure the line is drawn against (it is both the line's axis and its
+            value - a reference line always lives on the axis of the field it summarises).
+        formula: The aggregation drawn (``average``, ``median``, ...).
+        scope: ``per-cell`` / ``per-pane`` / ``per-table``.
+        label_type: What the line labels itself with; ``custom`` when :attr:`label` is set.
+        label: A custom label template (``<Computation>: <Value>``), or ``""``.
+    """
+
+    reference: FieldRef
+    formula: str = "average"
+    scope: str = "per-table"
+    label_type: str = "computation"
+    label: str = ""
 
 
 @dataclass
@@ -527,6 +638,18 @@ class WorksheetPlan:
         number_formats: ``(field, format pattern)`` pairs for the cell style rule.
         axis_titles: ``{"rows"|"columns": title}`` overrides.
         geo_role: A map's geographic semantic role, or ``""``.
+        reference_lines: Resolved reference lines, in manifest order.
+        parameters: Parameters the worksheet's calculations read - the view must declare them
+            or Tableau cannot resolve the calculation. Filled in by :mod:`twb`, which owns
+            the manifest's parameter list.
+        declared: Fields the worksheet must declare without placing them on the view - a
+            parameter action's source field, which is read off the clicked mark. Filled in by
+            :mod:`twb` when it resolves the actions.
+        detail: Fields pinned to the Detail shelf that no encoding names - the boolean a
+            zone's Dynamic Zone Visibility reads, which Tableau evaluates off the *view* of a
+            sheet in the dashboard. Filled in by :mod:`twb` from the layout's ``visibility``
+            keys. A DZV field is a single value (a parameter comparison), so it never splits
+            the marks.
     """
 
     name: str
@@ -536,6 +659,10 @@ class WorksheetPlan:
     rows: list[FieldRef] = field(default_factory=list)
     encodings: dict[str, FieldRef] = field(default_factory=dict)
     filters: list[FilterPlan] = field(default_factory=list)
+    reference_lines: list[ReferenceLinePlan] = field(default_factory=list)
+    parameters: list[Parameter] = field(default_factory=list)
+    declared: list[FieldRef] = field(default_factory=list)
+    detail: list[FieldRef] = field(default_factory=list)
     sort: Optional[SortPlan] = None
     tooltip: list[tuple[str, FieldRef]] = field(default_factory=list)
     number_formats: list[tuple[FieldRef, str]] = field(default_factory=list)
@@ -561,6 +688,9 @@ class WorksheetPlan:
                 references.append(self.sort.by)
         references += [reference for _, reference in self.tooltip]
         references += [reference for reference, _ in self.number_formats]
+        references += [line.reference for line in self.reference_lines]
+        references += self.declared
+        references += self.detail
         return references
 
 
@@ -596,6 +726,7 @@ def plan_worksheet(entry: dict, resolver: FieldResolver) -> WorksheetPlan:
         rows=resolver.references(shelves.get("rows")),
         encodings=encodings,
         filters=_plan_filters(entry.get("filters"), resolver),
+        reference_lines=_plan_reference_lines(entry.get("reference_lines"), resolver),
         sort=_plan_sort(entry.get("sort"), resolver),
         tooltip=_plan_tooltip(entry.get("tooltip"), resolver),
         number_formats=_plan_number_formats(entry.get("number_formats"), resolver),
@@ -638,6 +769,30 @@ def _plan_filters(entries: object, resolver: FieldResolver) -> list[FilterPlan]:
             context=entry.get("context") is True,
         ))
     return plans
+
+
+def _plan_reference_lines(
+    entries: object, resolver: FieldResolver
+) -> list[ReferenceLinePlan]:
+    """Resolve the ``reference_lines`` list into :class:`ReferenceLinePlan`s."""
+    if not isinstance(entries, list):
+        return []
+    lines: list[ReferenceLinePlan] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        reference = resolver.reference(entry)
+        if reference is None:
+            continue
+        label = str(entry.get("label", "")).strip()
+        lines.append(ReferenceLinePlan(
+            reference=reference,
+            formula=_lower(entry.get("formula")) or "average",
+            scope=_lower(entry.get("scope")) or "per-table",
+            label_type="custom" if label else (_lower(entry.get("label_type")) or "computation"),
+            label=label,
+        ))
+    return lines
 
 
 def _plan_sort(entry: object, resolver: FieldResolver) -> Optional[SortPlan]:
@@ -768,13 +923,35 @@ def _render_dependencies(parent: ET.Element, plan: WorksheetPlan) -> None:
         )
 
     for name in sorted(by_instance):
-        reference = by_instance[name]
-        ET.SubElement(dependencies, "column-instance", {
-            "column": reference.column_name,
-            "derivation": reference.derivation,
-            "name": name,
-            "pivot": "key",
-            "type": reference.instance_type,
+        render_column_instance(dependencies, by_instance[name])
+
+
+def render_column_instance(parent: ET.Element, reference: FieldRef) -> None:
+    """Render one ``<column-instance>`` - how a column is derived onto a shelf.
+
+    Used inside a worksheet's ``<datasource-dependencies>``, at the datasource level (where a
+    table calc's instance must also be declared) and in a dashboard's own dependencies.
+
+    Args:
+        parent: The element to append the instance to.
+        reference: The resolved field.
+    """
+    instance = ET.SubElement(parent, "column-instance", {
+        "column": reference.column_name,
+        "derivation": reference.derivation,
+        "name": reference.instance_name,
+        "pivot": "key",
+        "type": reference.instance_type,
+    })
+    if reference.table_calc:
+        # A table calc is a property of the instance: the same measure can be plain on one
+        # shelf and a running total on another.
+        # No 'aggregation': Desktop 2025.1 strips it on save (the aggregation is already the
+        # instance's own 'derivation'), and a workbook it rewrites on open is one whose calc
+        # may not be the calc that was asked for.
+        ET.SubElement(instance, "table-calc", {
+            "ordering-type": TABLE_CALC_ORDERING,
+            "type": reference.table_calc,
         })
 
 
@@ -796,6 +973,10 @@ def render_column(parent: ET.Element, reference: FieldRef, semantic_role: str = 
         "role": reference.role,
         "type": reference.column_type,
     }
+    if reference.number_format:
+        # On the column, not as a worksheet style rule: a ratio formatted as a percentage
+        # once is formatted that way on every sheet and in the data pane.
+        attributes["default-format"] = reference.number_format
     if semantic_role:
         attributes["semantic-role"] = semantic_role
     column = ET.SubElement(parent, "column", dict(sorted(attributes.items())))
@@ -842,15 +1023,24 @@ def _render_filters(parent: ET.Element, plan: WorksheetPlan) -> list[str]:
             # A context filter runs before FIXED LODs and every other filter.
             attributes["context"] = "true"
 
-        if entry.members:
-            _render_categorical(
-                ET.SubElement(
-                    parent, "filter",
-                    dict(sorted({"class": "categorical", **attributes}.items())),
-                ),
-                entry.reference.instance_name,
-                list(entry.members),
+        if entry.members or entry.all_members:
+            categorical = ET.SubElement(
+                parent, "filter",
+                dict(sorted({"class": "categorical", **attributes}.items())),
             )
+            if entry.all_members:
+                # "Every member, including ones added later" - the filter a quick-filter card
+                # controls. An enumerated member list would freeze today's domain into it.
+                ET.SubElement(categorical, "groupfilter", {
+                    "function": "level-members",
+                    "level": entry.reference.instance_name,
+                    "user:ui-enumeration": "all",
+                    "user:ui-marker": "enumerate",
+                })
+            else:
+                _render_categorical(
+                    categorical, entry.reference.instance_name, list(entry.members)
+                )
         else:
             range_filter = ET.SubElement(parent, "filter", dict(sorted({
                 "class": "quantitative", "included-values": "in-range", **attributes,
@@ -985,7 +1175,9 @@ def _render_panes(parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens)
     if plan.spec.dual and len(plan.rows) > 1:
         # Pane 0 is the shared default; panes 1..n each own one measure's axis, in the same
         # order the measures sit on Rows.
-        _render_pane(panes, plan, tokens, {}, plan.spec.mark_class)
+        # ponytail: a dual chart's reference lines go on the shared pane, not per axis - one
+        # line per measure needs the manifest to say which axis, which no spec has asked for.
+        _render_pane(panes, plan, tokens, {}, plan.spec.mark_class, True)
         for index, reference in enumerate(plan.rows):
             mark = (
                 plan.spec.pane_marks[index]
@@ -1000,17 +1192,19 @@ def _render_panes(parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens)
                 mark,
             )
         return
-    _render_pane(panes, plan, tokens, {}, plan.spec.mark_class)
+    _render_pane(panes, plan, tokens, {}, plan.spec.mark_class, True)
 
 
 def _render_pane(
     parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens,
-    attributes: dict, mark_class: str,
+    attributes: dict, mark_class: str, with_reference_lines: bool = False,
 ) -> None:
-    """Render one pane: its mark class, encodings, tooltip, label and mark style.
+    """Render one pane: its mark class, encodings, reference lines, tooltip, label and style.
 
     The child order is the XSD's ``PaneSpecification-G`` sequence - view, mark, encodings,
-    customized-tooltip, customized-label, style - not the order they were decided in.
+    reference-line, customized-tooltip, customized-label, style - not the order they were
+    decided in. (The legacy ``FEATURES.md`` puts ``reference-line`` in ``<view>``; the XSD and
+    Tableau's own output both put it here.)
     """
     pane = ET.SubElement(
         parent, "pane", dict(sorted({**attributes, **PANE_RELAXATION}.items()))
@@ -1030,11 +1224,15 @@ def _render_pane(
     if plan.spec.geographic:
         columns["geometry"] = plan.qualify(GENERATED_GEOMETRY)
 
-    if columns or plan.tooltip:
+    if columns or plan.tooltip or plan.detail:
         block = ET.SubElement(pane, "encodings")
         for name in ENCODING_ORDER:
             if name in columns:
                 ET.SubElement(block, name, {"column": columns[name]})
+        # Detail-shelf fields carry no visual role - <lod> is repeatable, so a zone's
+        # visibility field joins whatever the manifest put on Detail.
+        for reference in plan.detail:
+            ET.SubElement(block, "lod", {"column": plan.reference_of(reference)})
         # Every field the tooltip template names must also be registered as an encoding,
         # or Tableau has no value to substitute into it.
         for _, reference in plan.tooltip:
@@ -1042,6 +1240,8 @@ def _render_pane(
                 "column": plan.reference_of(reference)
             })
 
+    if with_reference_lines:
+        _render_reference_lines(pane, plan)
     if plan.tooltip:
         _render_tooltip(pane, plan, tokens)
     if plan.spec.kpi_card and "text" in plan.encodings:
@@ -1051,6 +1251,37 @@ def _render_pane(
         rule = ET.SubElement(style, "style-rule", {"element": "mark"})
         for attribute in ("mark-labels-show", "mark-labels-cull"):
             ET.SubElement(rule, "format", {"attr": attribute, "value": "true"})
+
+
+def _render_reference_lines(parent: ET.Element, plan: WorksheetPlan) -> None:
+    """Render the pane's reference lines.
+
+    A line's axis and value are the same field: a reference line summarises the measure whose
+    axis it is drawn on, and both references must be **fully qualified** (unlike the
+    unqualified ``level`` a filter carries).
+
+    Args:
+        parent: The ``<pane>`` element.
+        plan: The worksheet plan.
+    """
+    for index, line in enumerate(plan.reference_lines):
+        column = plan.reference_of(line.reference)
+        attributes = {
+            "axis-column": column,
+            "enable-instant-analytics": "true",
+            "formula": line.formula,
+            "id": f"refline{index}",
+            "label-type": line.label_type,
+            # Desktop writes the confidence probability on every reference line, whatever the
+            # formula, and adds it on save when it is missing.
+            "probability": REFERENCE_LINE_PROBABILITY,
+            "scope": line.scope,
+            "value-column": column,
+            "z-order": "1",
+        }
+        if line.label:
+            attributes["label"] = line.label
+        ET.SubElement(parent, "reference-line", dict(sorted(attributes.items())))
 
 
 def _render_tooltip(
@@ -1132,10 +1363,20 @@ def render_worksheet(parent: ET.Element, plan: WorksheetPlan, tokens: DesignToke
         "caption": plan.resolver.datasource_caption,
         "name": plan.resolver.datasource_id,
     })
+    if plan.parameters:
+        # A calculation that reads a parameter is unresolvable unless the view declares the
+        # Parameters datasource too - Tableau opens the sheet with the field greyed out.
+        ET.SubElement(datasources, "datasource", {"name": PARAMETERS_DATASOURCE})
     if plan.spec.geographic:
         ET.SubElement(
             ET.SubElement(view, "mapsources"), "mapsource", {"name": MAPSOURCE_NAME}
         )
+    if plan.parameters:
+        parameter_dependencies = ET.SubElement(
+            view, "datasource-dependencies", {"datasource": PARAMETERS_DATASOURCE}
+        )
+        for parameter in plan.parameters:
+            render_parameter_column(parameter_dependencies, parameter, with_domain=False)
     _render_dependencies(view, plan)
     filtered = _render_filters(view, plan)
     _render_sort(view, plan)
