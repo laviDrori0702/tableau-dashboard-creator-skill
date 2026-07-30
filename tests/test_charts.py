@@ -518,19 +518,23 @@ def test_no_map_means_no_workbook_mapsources():
     assert ET.fromstring(_render(document)).find("mapsources") is None
 
 
-def test_a_sheet_no_dashboard_zone_shows_keeps_its_tab():
-    """Tableau renders no tab for hidden='true', so hiding a sheet the dashboard does not
-    embed makes it unreachable - the workbook opens with nothing in it. Until the zone tree
-    lands, no sheet is embedded, so no sheet may be hidden."""
-    hidden = [
+def test_every_chart_type_gets_a_dashboard_zone_and_a_hidden_tab():
+    """Tableau renders no tab for hidden='true', so a sheet may only be hidden once a zone
+    shows it. With the zone tree in place, every one of the 15 sheets is embedded - so every
+    one is hidden, and the analyst opens on the dashboard rather than on a wall of tabs."""
+    hidden = {
         window.get("name")
         for window in ALL_CHARTS_ROOT.find("windows")
         if window.get("class") == "worksheet" and window.get("hidden") == "true"
-    ]
-    assert hidden == []
+    }
+    embedded = {
+        zone.get("name")
+        for zone in ALL_CHARTS_ROOT.findall("dashboards/dashboard/zones//zone")
+        if zone.get("name")
+    }
+    sheets = {sheet.get("name") for sheet in ALL_CHARTS_ROOT.findall("worksheets/worksheet")}
 
-    zones = ALL_CHARTS_ROOT.findall("dashboards/dashboard/zones//zone")
-    assert not [zone.get("name") for zone in zones if zone.get("name")]
+    assert embedded == sheets == hidden
 
 
 def test_a_sorted_workbook_carries_the_sort_format_flag():
@@ -716,11 +720,25 @@ def test_token_hex_colours_are_lower_cased():
 
 
 def test_without_tokens_no_styling_is_invented():
-    """No branding step means Tableau's own defaults - not a made-up font or colour."""
+    """No branding step means Tableau's own defaults - not a made-up font or colour. The
+    worksheet rule still carries the field-label switches, which are layout, not branding."""
     root = ET.fromstring(_render(tokens=""))
     element = _worksheet_element("Bar", root)
     assert element.find("layout-options") is None
-    assert element.find("table/style/style-rule[@element='worksheet']") is None
+    rule = element.find("table/style/style-rule[@element='worksheet']")
+    assert [format.get("attr") for format in rule] == ["display-field-labels"] * 2
+
+
+def test_field_labels_are_off_on_every_sheet():
+    """A field label repeats the zone's header and costs the chart a whole band of the
+    sheet - and on a crosstab it is the band the analyst notices."""
+    for element in ALL_CHARTS_ROOT.findall("worksheets/worksheet"):
+        rule = element.find("table/style/style-rule[@element='worksheet']")
+        scopes = {
+            format.get("scope") for format in rule.findall("format")
+            if format.get("attr") == "display-field-labels" and format.get("value") == "false"
+        }
+        assert scopes == {"cols", "rows"}, element.get("name")
 
 
 def test_an_unfilled_token_template_is_ignored():

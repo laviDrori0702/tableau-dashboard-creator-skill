@@ -134,10 +134,27 @@ invented zone is caught rather than silently built.
   version is created by re-running `tableau-mock` (which bumps and stales spec and build).
 - **Live connection, always.** The workbook never carries an extract: the `.twbx` embeds the
   CSVs, and the analyst points it at the real database with Data → Replace Data Source.
-- **The dashboard's zone tree is still coming.** Today's assembler emits the datasources,
-  fully populated worksheets, a dashboard sized from the mock's canvas, and the windows.
-  Nesting the layout tree into dashboard zones is the next ticket, so every view renders but
-  the dashboard itself is still a single container.
+- **The zones are computed and the dashboard is range-sized.** The `layout` tree becomes the
+  dashboard's zone hierarchy one-to-one: sibling `size` values are proportions of the parent
+  along its flow axis, mapped into Tableau's 0–100000 space at the canvas dimensions. Because
+  that space is normalised, the approved proportions hold at any window size, so the dashboard
+  is `sizing-mode='range'` at a fixed **1100 × 800** minimum with **no maximum**. The canvas
+  is the design surface the tree was laid out against, not the size the analyst is stuck
+  with — who can change either bound in Desktop.
+- **Every view zone's header is a text object.** A sheet's *own* title is always off: Tableau
+  draws it inside the zone out of the sheet's own height, so a short zone (a KPI card) loses
+  its number to it. Give every `worksheets[]` entry a `title` — it becomes a text zone above
+  the sheet zone — or have the layout place a `text` object beside it; a view with neither
+  gets no header at all. A colour-encoded chart also gets a legend zone below it. Both
+  generated zones stack *inside* the element's own box, so they never disturb its siblings.
+- **Field labels are off on every sheet.** They repeat what the zone's header already says
+  and cost the chart a whole band of the sheet.
+- **A filter / parameter / image / button / legend object reserves its box, empty.** Each of
+  those zone types needs a reference the manifest does not carry yet (a field plus the
+  dashboard's own `<datasource-dependencies>`, a parameter, a filename, an action, a sheet +
+  colour field), and Tableau does not treat those as optional — so the layout keeps the
+  geometry and the features-and-actions ticket turns each into its real zone. `text` and
+  `blank` objects render fully today.
 
 > The full `STATE.md` schema and the ordering / staleness / versioning rules live in
 > `CONTRACT.md` at the repo root. This skill restates only its own slice; `build.py`,

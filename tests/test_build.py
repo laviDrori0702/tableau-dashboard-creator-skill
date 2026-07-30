@@ -974,12 +974,12 @@ def test_every_viewpoint_has_entire_view_zoom():
         assert viewpoint.find("zoom").get("type") == "entire-view"
 
 
-def test_every_worksheet_has_a_matching_visible_window():
+def test_every_worksheet_has_a_matching_window():
     """validate_twb's worksheet<->window check is bidirectional; both sides come from here.
 
-    The windows are *visible*: a sheet is hidden only once a dashboard zone embeds it, and
-    the zone tree is the next ticket. Hiding a sheet nothing shows leaves Tableau with no tab
-    to render it on, which is a workbook the analyst cannot see into at all."""
+    A window is hidden only when a dashboard zone embeds its sheet: Tableau renders no tab
+    for hidden='true', so hiding a sheet nothing shows leaves the analyst a workbook with
+    nothing to see."""
     root = _render()
     worksheets = [sheet.get("name") for sheet in root.findall("worksheets/worksheet")]
     windows = [
@@ -988,18 +988,42 @@ def test_every_worksheet_has_a_matching_visible_window():
     ]
 
     assert worksheets == windows == ["Revenue KPI", "Revenue Trend"]
-    assert not [
+    assert [
         window.get("name") for window in root.findall("windows/window")
+        if window.get("class") == "worksheet" and window.get("hidden") == "true"
+    ] == ["Revenue KPI", "Revenue Trend"]  # both fill a zone in the layout tree
+
+
+def test_a_sheet_no_dashboard_zone_shows_keeps_its_tab():
+    """The other half of the rule: an un-embedded sheet stays reachable through its tab."""
+    document = _manifest()
+    # A second sheet on the same zone: only one zone exists, so one of them is embedded.
+    document["worksheets"].append({
+        "name": "Revenue Detail",
+        "element_id": "chart-trend",
+        "chart_type": "table",
+        "datasource": "sales_orders",
+        "shelves": {"columns": ["region"], "rows": ["revenue"]},
+    })
+
+    hidden = [
+        window.get("name") for window in _render(document).findall("windows/window")
         if window.get("class") == "worksheet" and window.get("hidden") == "true"
     ]
 
+    assert "Revenue Detail" not in hidden
 
-def test_dashboard_is_sized_from_the_layout_canvas():
-    """The mock's approved canvas is the workbook's dashboard size."""
+
+def test_dashboard_is_range_sized_above_the_standard_floor():
+    """The zone proportions hold at any window size, so the dashboard gets the standard
+    minimum and no maximum - not the mock's canvas, which is a design surface: pinning the
+    minimum to a 1366px-wide mock would make it unopenable on a smaller laptop."""
     size = _render().find("dashboards/dashboard/size")
 
     assert size.attrib == {
-        "maxheight": "768", "maxwidth": "1366", "minheight": "768", "minwidth": "1366",
+        "minheight": str(twb.MIN_DASHBOARD_HEIGHT),
+        "minwidth": str(twb.MIN_DASHBOARD_WIDTH),
+        "sizing-mode": "range",
     }
 
 

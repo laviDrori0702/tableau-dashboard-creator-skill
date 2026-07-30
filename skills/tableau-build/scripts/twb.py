@@ -21,8 +21,8 @@ Two authorities, deliberately kept apart:
 The manifest's own ``fields[].type`` is validated but not read here: one authority, no drift.
 
 Scope: datasources, worksheet bodies (:mod:`worksheet` owns the shelves, encodings, marks
-and styling), a one-zone dashboard sized from the layout canvas, windows, and version
-targeting. The dashboard's zone tree is the next ticket.
+and styling), the dashboard's size and zone tree (:mod:`zones` owns the geometry), windows,
+and version targeting.
 """
 
 from __future__ import annotations
@@ -31,8 +31,10 @@ import hashlib
 import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import worksheet
+import zones
 from manifest import documented_field_types
 
 # --- Version targeting (CONTRACT.md §2 values) -------------------------------
@@ -70,22 +72,18 @@ FORMAT_CHANGE_FLAGS: tuple[str, ...] = (
 #: (WORKSHEETS.md:512, seen in ``bar-chart-sorted.twb`` and ``custom-tooltip.twb``).
 SORT_FORMAT_FLAG = "SortTagCleanup"
 
-#: The single dashboard this ticket emits (the zone tree from ``layout.root`` is next).
+#: The single dashboard the builder emits.
 DASHBOARD_NAME = "Dashboard 1"
-
-#: Dashboard zones live in a 100,000 x 100,000 virtual coordinate space.
-ZONE_SPACE = "100000"
-
-#: The root zone's id. Zone ids are sequential integers from 1; with a single zone there is
-#: nothing to count yet.
-ROOT_ZONE_ID = "1"
-
-#: Margin (in the zone coordinate space) on the root zone, as Tableau writes it.
-ROOT_ZONE_MARGIN = "8"
 
 #: Dashboard size when the layout carries no canvas. ``manifest.validate_manifest`` requires
 #: numeric ``canvas.width``/``height``, so this only guards a direct call to the assembler.
 DEFAULT_CANVAS = {"width": 1000, "height": 800}
+
+#: The dashboard's minimum size in px, whatever the mock's canvas: the smallest window a
+#: business dashboard still reads on. The canvas drives the zone *proportions*, not this floor
+#: - see :func:`_render_dashboard`.
+MIN_DASHBOARD_WIDTH = 1100
+MIN_DASHBOARD_HEIGHT = 800
 
 
 # --- Column types -------------------------------------------------------------
@@ -377,31 +375,78 @@ def _render_datasource(
 
 # --- Worksheets, dashboard, windows --------------------------------------------
 
-def _render_zone_style(parent: ET.Element, margin: str) -> None:
-    """Append the four-format ``<zone-style>`` block Tableau writes on every zone."""
-    zone_style = ET.SubElement(parent, "zone-style")
-    for attribute, value in (
-        ("border-color", "#000000"), ("border-style", "none"), ("border-width", "0"),
-        ("margin", margin),
-    ):
-        ET.SubElement(zone_style, "format", {"attr": attribute, "value": value})
+def _dashboard_leaves(
+    plans: list[PlannedWorksheet], objects: object
+) -> dict[str, zones.Leaf]:
+    """Map every layout element id to what fills its zone.
+
+    The manifest addresses zones by ``element_id`` - the mock's language - while Tableau
+    addresses them by sheet name and zone type; this is where the two meet, once, for both
+    the views and the non-view objects.
+
+    Args:
+        plans: The resolved worksheets.
+        objects: The manifest's optional ``objects`` list.
+
+    Returns:
+        ``{element id: Leaf}`` for :func:`zones.render_zones`.
+    """
+    leaves: dict[str, zones.Leaf] = {}
+    for _, entry, plan in plans:
+        element_id = str(entry.get("element_id", "")).strip()
+        if not element_id:
+            continue
+        # Only the colour legend is placed in the dashboard; size/shape keys stay on the
+        # worksheet's own right edge, where they do not compete for the element's box.
+        legend = next(
+            (zones.Legend(reference, pane_id)
+             for card_type, reference, pane_id in worksheet.legend_cards(plan)
+             if card_type == "color"),
+            None,
+        )
+        # First claimant wins: two views on one zone is a manifest bug, and picking the
+        # later one would silently move the analyst's chart.
+        leaves.setdefault(element_id, zones.Leaf(
+            worksheet=plan.name,
+            title=str(entry.get("title", "") or "").strip(),
+            legend=legend,
+        ))
+
+    for entry in objects if isinstance(objects, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        element_id = str(entry.get("element_id", "")).strip()
+        if not element_id:
+            continue
+        leaves.setdefault(element_id, zones.Leaf(
+            kind=str(entry.get("kind", "") or "").strip().lower(),
+            title=str(entry.get("title", "") or "").strip(),
+            text=str(entry.get("text", "") or "").strip(),
+        ))
+    return leaves
 
 
-def _render_dashboard(parent: ET.Element, canvas: dict, root_zone_id: str) -> set[str]:
-    """Render the dashboard: its size from the mock's canvas, and one root zone.
-
-    The zone *tree* (``layout.root``) is the next ticket; what this pins is the geometry
-    the mock was approved at, so the workbook opens at the right size.
+def _render_dashboard(
+    parent: ET.Element,
+    canvas: dict,
+    root: object,
+    leaves: dict[str, zones.Leaf],
+    tokens: worksheet.DesignTokens,
+) -> tuple[str, set[str]]:
+    """Render the dashboard: range-sized above a fixed floor, with the spec's zone tree.
 
     Args:
         parent: The ``<dashboards>`` element.
-        canvas: The layout's ``canvas`` object (``width`` / ``height`` in px).
-        root_zone_id: The id of the root zone (the dashboard window's ``active`` target).
+        canvas: The layout's ``canvas`` object (``width`` / ``height`` in px) - what px
+            measures inside the tree are scaled against, not the dashboard's size.
+        root: The layout tree's ``root`` node.
+        leaves: ``{element id: Leaf}`` - what fills each leaf zone.
+        tokens: The design tokens, for the generated title zones.
 
     Returns:
-        The names of the worksheets this dashboard embeds in a zone - empty until the zone
-        tree lands. :func:`_render_windows` hides exactly these, so a sheet that is embedded
-        nowhere keeps its tab instead of leaving the analyst a blank workbook.
+        ``(root zone id, embedded sheet names)``. The root id is the dashboard window's
+        ``active`` target; :func:`_render_windows` hides exactly the embedded sheets, so a
+        sheet that is embedded nowhere keeps its tab instead of becoming unreachable.
     """
     dashboard = ET.SubElement(parent, "dashboard", {
         "enable-sort-zone-taborder": "true", "name": DASHBOARD_NAME,
@@ -409,20 +454,24 @@ def _render_dashboard(parent: ET.Element, canvas: dict, root_zone_id: str) -> se
     ET.SubElement(dashboard, "style")
     width = str(int(canvas.get("width", DEFAULT_CANVAS["width"])))
     height = str(int(canvas.get("height", DEFAULT_CANVAS["height"])))
+    # Range-sized, no maximum: zone geometry is in a normalised 100,000-unit space, so the
+    # proportions the analyst approved hold at any window size, while a hard maximum (a fixed
+    # size) only forces the viewer to scroll a wide screen's worth of empty margin. The floor
+    # is the standard minimum, not the mock's canvas - the canvas is a design surface, and
+    # pinning the minimum to it would make a wide mock unopenable on a laptop.
     ET.SubElement(dashboard, "size", {
-        "maxheight": height, "maxwidth": width, "minheight": height, "minwidth": width,
+        "minheight": str(MIN_DASHBOARD_HEIGHT), "minwidth": str(MIN_DASHBOARD_WIDTH),
+        "sizing-mode": "range",
     })
-    zones = ET.SubElement(dashboard, "zones")
-    root_zone = ET.SubElement(zones, "zone", {
-        "h": ZONE_SPACE, "id": root_zone_id, "type-v2": "layout-basic",
-        "w": ZONE_SPACE, "x": "0", "y": "0",
-    })
-    # TODO(next ticket): nest the manifest's layout.root tree inside this zone, one child
-    # zone per element id, with each worksheet zone naming its sheet - and return those
-    # sheet names here, which is all _render_windows needs to start hiding tabs again.
-    _render_zone_style(root_zone, ROOT_ZONE_MARGIN)  # zone-style is the zone's last child
+    root_zone_id, embedded = zones.render_zones(
+        ET.SubElement(dashboard, "zones"),
+        root if isinstance(root, dict) else {"type": "vert", "children": []},
+        {"width": int(width), "height": int(height)},
+        leaves,
+        tokens,
+    )
     ET.SubElement(dashboard, "simple-id", {"uuid": simple_id("dashboard", DASHBOARD_NAME)})
-    return set()
+    return root_zone_id, embedded
 
 
 def _render_windows(
@@ -553,11 +602,30 @@ def _build_resolvers(
     return resolvers
 
 
+class PlannedWorksheet(NamedTuple):
+    """One resolved worksheet and the two things about it the plan does not carry.
+
+    The manifest entry travels alongside the plan because the *dashboard* needs what a
+    :class:`worksheet.WorksheetPlan` deliberately knows nothing about - the ``element_id`` the
+    sheet fills and its title - while the datasource name is what the derived-column pass
+    groups by.
+
+    Attributes:
+        datasource: The datasource name the worksheet reads.
+        entry: The raw ``worksheets`` entry from the manifest.
+        plan: The resolved plan the worksheet body is rendered from.
+    """
+
+    datasource: str
+    entry: dict
+    plan: worksheet.WorksheetPlan
+
+
 def _plan_worksheets(
     manifest_document: dict, resolvers: dict[str, worksheet.FieldResolver]
-) -> list[tuple[str, worksheet.WorksheetPlan]]:
-    """Resolve every manifest worksheet, paired with its datasource name."""
-    plans: list[tuple[str, worksheet.WorksheetPlan]] = []
+) -> list[PlannedWorksheet]:
+    """Resolve every manifest worksheet into a :class:`PlannedWorksheet`."""
+    plans: list[PlannedWorksheet] = []
     for entry in manifest_document.get("worksheets", []) or []:
         if not isinstance(entry, dict):
             continue
@@ -565,14 +633,16 @@ def _plan_worksheets(
         resolver = resolvers.get(source)
         if resolver is None:  # validate_manifest already named this worksheet
             continue
-        plans.append((source, worksheet.plan_worksheet(entry, resolver)))
+        plans.append(
+            PlannedWorksheet(source, entry, worksheet.plan_worksheet(entry, resolver))
+        )
     return plans
 
 
 def _collect_derived_columns(
     manifest_document: dict,
     resolvers: dict[str, worksheet.FieldResolver],
-    plans: list[tuple[str, worksheet.WorksheetPlan]],
+    plans: list[PlannedWorksheet],
 ) -> dict[str, list[worksheet.FieldRef]]:
     """Collect the non-CSV columns each datasource must declare.
 
@@ -601,9 +671,11 @@ def _collect_derived_columns(
         if reference is not None:
             derived.setdefault(source, {}).setdefault(reference.column_name, reference)
 
-    for source, plan in plans:
-        for reference in worksheet.bin_columns(plan):
-            derived.setdefault(source, {}).setdefault(reference.column_name, reference)
+    for planned in plans:
+        for reference in worksheet.bin_columns(planned.plan):
+            derived.setdefault(planned.datasource, {}).setdefault(
+                reference.column_name, reference
+            )
 
     return {source: list(columns.values()) for source, columns in derived.items()}
 
@@ -670,7 +742,7 @@ def render_workbook(
             derived.get(name, []),
         )
 
-    if any(plan.spec.geographic for _, plan in plans):
+    if any(planned.plan.spec.geographic for planned in plans):
         # A map needs its <mapsources> at *both* levels: the workbook's declares the source,
         # each map worksheet's view references it. One without the other renders no basemap.
         ET.SubElement(
@@ -679,17 +751,25 @@ def render_workbook(
 
     if plans:  # the XSD requires >=1 <worksheet>; omit the element otherwise
         worksheets = ET.SubElement(workbook, "worksheets")
-        for _, plan in plans:
+        for planned in plans:
             worksheet.render_worksheet(
-                worksheets, plan, tokens, simple_id("worksheet", plan.name)
+                worksheets, planned.plan, tokens,
+                simple_id("worksheet", planned.plan.name),
             )
 
     layout = manifest_document.get("layout")
-    canvas = layout.get("canvas", {}) if isinstance(layout, dict) else {}
-    embedded = _render_dashboard(
-        ET.SubElement(workbook, "dashboards"), canvas, ROOT_ZONE_ID
+    if not isinstance(layout, dict):
+        layout = {}
+    root_zone_id, embedded = _render_dashboard(
+        ET.SubElement(workbook, "dashboards"),
+        layout.get("canvas", {}),
+        layout.get("root"),
+        _dashboard_leaves(plans, manifest_document.get("objects", [])),
+        tokens,
     )
-    _render_windows(workbook, [plan for _, plan in plans], ROOT_ZONE_ID, embedded)
+    _render_windows(
+        workbook, [planned.plan for planned in plans], root_zone_id, embedded
+    )
 
     if target == TARGET_2026:
         explain_data = ET.SubElement(workbook, "explain-data", {

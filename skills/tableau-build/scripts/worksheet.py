@@ -926,6 +926,13 @@ def _render_style(parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens)
     if tokens.present:
         add("worksheet", "format", {"attr": "font-family", "value": tokens.font_family})
 
+    # Field labels repeat what the zone's header already says, and Tableau reserves a whole
+    # band of the sheet for them - on a dashboard that band is stolen from the chart.
+    for scope in ("cols", "rows"):
+        add("worksheet", "format", {
+            "attr": "display-field-labels", "scope": scope, "value": "false",
+        })
+
     for shelf, scope, references in (
         ("rows", "rows", plan.rows), ("columns", "cols", plan.columns)
     ):
