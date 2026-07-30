@@ -54,6 +54,7 @@ from pathlib import Path
 from typing import Optional
 
 import twb
+import validate_conformance  # stdlib-only, same scripts/ dir (unlike the two lazy imports)
 from manifest import load_manifest, placed_layout_ids, validate_manifest
 
 logger = logging.getLogger(__name__)
@@ -596,6 +597,9 @@ class BuildResult:
             failure, so the XML can be inspected).
         twbx_path: Project-relative path of the package; ``""`` when nothing was packaged.
         warnings: Non-fatal notes (a skipped XSD check, the documented version shift).
+        gated: Whether the validation gate actually ran. A failure *before* it - an invalid
+            manifest, a missing CSV, no ``.twb`` to gate - must not be reported as a failed
+            gate, or the analyst debugs the wrong thing.
     """
 
     ok: bool
@@ -604,6 +608,7 @@ class BuildResult:
     twb_path: str = ""
     twbx_path: str = ""
     warnings: list[str] = field(default_factory=list)
+    gated: bool = False
 
 
 def _semantic_errors(twb_path: Path) -> list[str]:
@@ -665,7 +670,7 @@ def _xsd_errors(twb_path: Path, target_tableau_version: str) -> tuple[list[str],
 
 
 #: The three validators of the gate, in the order they run: the XML's internal consistency,
-#: its agreement with the schema, and its agreement with the manifest (CONTRACT.md §8 gate).
+#: its agreement with the schema, and its agreement with the manifest.
 GATE_VALIDATORS: tuple[str, ...] = ("semantic", "schema", "conformance")
 
 
@@ -706,8 +711,6 @@ def _conformance_errors(twb_path: Path, document: dict) -> list[str]:
     Returns:
         One message per disagreement between the two; empty when they agree.
     """
-    import validate_conformance  # same scripts/ dir, stdlib-only
-
     try:
         root = ET.parse(twb_path).getroot()
     except ET.ParseError as error:
@@ -736,8 +739,6 @@ def run_gate(
     Returns:
         A :class:`GateReport`.
     """
-    import validate_conformance  # same scripts/ dir, stdlib-only
-
     xsd_errors, warnings = _xsd_errors(twb_path, target_tableau_version)
     return GateReport(
         results={
@@ -790,14 +791,20 @@ def gate(project_dir: Path | str) -> BuildResult:
     # left behind by an earlier passing build would be approved despite this gate failing.
     (version_dir / WORKBOOK_FILENAME).unlink(missing_ok=True)
 
+    # The same binding the build packaged from, re-resolved: a CSV renamed since then would
+    # otherwise be dropped from the archive and the workbook would open bound to nothing.
+    binding = bind_csvs(project_root, document)
+    if binding.errors:
+        return BuildResult(False, binding.errors, validation.version, twb_relative)
+
     report = run_gate(twb_path, document, target)
     if not report.ok:
         return BuildResult(
             False, report.errors, validation.version, twb_relative,
-            warnings=report.warnings,
+            warnings=report.warnings, gated=True,
         )
 
-    create_twbx(twb_path, _packaged_csvs(project_root, document))
+    create_twbx(twb_path, binding.paths)
     return BuildResult(
         ok=True,
         errors=[],
@@ -805,38 +812,66 @@ def gate(project_dir: Path | str) -> BuildResult:
         twb_path=twb_relative,
         twbx_path=f"{VERSION_DIR}/{validation.version}/{WORKBOOK_FILENAME}",
         warnings=report.warnings,
+        gated=True,
     )
 
 
-def _packaged_csvs(project_root: Path, document: dict) -> list[Path]:
-    """Return the CSVs the manifest binds to, in manifest order and de-duplicated.
+@dataclass(frozen=True)
+class CsvBinding:
+    """The CSVs a manifest binds to, resolved against what is on disk.
 
-    Only those: an unrelated file in ``data/`` has no business shipping inside the analyst's
-    deliverable.
+    Attributes:
+        paths: The files to package, in manifest order and de-duplicated. Only the ones the
+            manifest binds to: an unrelated file in ``data/`` has no business shipping inside
+            the analyst's deliverable.
+        headers: ``{filename: header row}`` for every CSV found, the physical schema the
+            assembler needs.
+        errors: One message per bound CSV that is not on disk. Both the build and the gate
+            refuse on these - a package missing a CSV opens in Tableau bound to nothing.
+    """
+
+    paths: list[Path]
+    headers: dict[str, list[str]]
+    errors: list[str]
+
+
+def bind_csvs(project_root: Path, document: dict) -> CsvBinding:
+    """Resolve the manifest's datasource CSVs against ``data/`` (or the scaffold).
 
     Args:
         project_root: The analyst's project directory.
         document: The build manifest.
 
     Returns:
-        Absolute paths of the CSVs to package.
+        A :class:`CsvBinding`.
     """
     on_disk = {
         (project_root / relative).name: project_root / relative
         for relative in _sample_csvs(project_root)
     }
-    wanted = [
+    headers = {name: read_csv_header(path) for name, path in on_disk.items()}
+    wanted = list(dict.fromkeys(
         str(source.get("csv", "")).strip() for source in document.get("datasources", [])
-    ]
-    return [on_disk[name] for name in dict.fromkeys(wanted) if name in on_disk]
+    ))
+    return CsvBinding(
+        paths=[on_disk[name] for name in wanted if name in on_disk],
+        headers=headers,
+        errors=[
+            f"datasource csv '{name}' is not on disk (found: "
+            f"{', '.join(sorted(headers)) or 'none'}) - the workbook would bind to "
+            f"nothing. Re-run 'tableau-data' or fix the manifest's 'csv'."
+            for name in sorted(set(wanted) - set(headers))
+        ],
+    )
 
 
 def build_workbook(project_dir: Path | str) -> BuildResult:
     """Assemble, validate, and package the workbook from the validated manifest.
 
     The manifest must validate first (:func:`validate`), so the assembler never sees an
-    entry it cannot build. The XML then goes through both migrated validators before it is
-    packaged: a workbook that fails either is left on disk unpackaged, for debugging.
+    entry it cannot build. The XML then goes through the validation gate (:func:`run_gate`)
+    before it is packaged: a workbook that fails any of the three validators is left on disk
+    unpackaged, for debugging.
 
     Args:
         project_dir: The analyst's project directory.
@@ -857,26 +892,9 @@ def build_workbook(project_dir: Path | str) -> BuildResult:
     # .twbx's existence, so a stale one left behind by a failed build would be approved.
     (version_dir / WORKBOOK_FILENAME).unlink(missing_ok=True)
 
-    on_disk = {
-        (project_root / relative).name: project_root / relative
-        for relative in _sample_csvs(project_root)
-    }
-    headers = {name: read_csv_header(path) for name, path in on_disk.items()}
-    wanted = [
-        str(source.get("csv", "")).strip() for source in document.get("datasources", [])
-    ]
-    missing = sorted({name for name in wanted if name not in headers})
-    if missing:
-        return BuildResult(
-            False,
-            [
-                f"datasource csv '{name}' is not on disk (found: "
-                f"{', '.join(sorted(headers)) or 'none'}) - the workbook would bind to "
-                f"nothing. Re-run 'tableau-data' or fix the manifest's 'csv'."
-                for name in missing
-            ],
-            version,
-        )
+    binding = bind_csvs(project_root, document)
+    if binding.errors:
+        return BuildResult(False, binding.errors, version)
 
     twb_path = version_dir / TWB_FILENAME
     tokens_path = project_root / DESIGN_TOKENS_FILENAME
@@ -884,7 +902,7 @@ def build_workbook(project_dir: Path | str) -> BuildResult:
         twb.render_workbook(
             document,
             (project_root / DATA_MODEL_FILENAME).read_text(encoding="utf-8-sig"),
-            headers,
+            binding.headers,
             # Optional read (CONTRACT.md §4.1): no branding step, no styling overrides.
             tokens_path.read_text(encoding="utf-8-sig") if tokens_path.exists() else "",
         ),
@@ -899,10 +917,11 @@ def build_workbook(project_dir: Path | str) -> BuildResult:
     if not report.ok:
         # Leave the .twb for inspection, but never package a workbook that failed the gate.
         return BuildResult(
-            False, report.errors, version, twb_relative, warnings=report.warnings
+            False, report.errors, version, twb_relative, warnings=report.warnings,
+            gated=True,
         )
 
-    create_twbx(twb_path, _packaged_csvs(project_root, document))
+    create_twbx(twb_path, binding.paths)
     logger.info(f"Built {twb_relative} and its .twbx from the validated manifest.")
     return BuildResult(
         ok=True,
@@ -911,6 +930,7 @@ def build_workbook(project_dir: Path | str) -> BuildResult:
         twb_path=twb_relative,
         twbx_path=f"{VERSION_DIR}/{version}/{WORKBOOK_FILENAME}",
         warnings=report.warnings,
+        gated=True,
     )
 
 
@@ -1027,15 +1047,16 @@ def format_validation(result: ValidationResult) -> str:
     return "\n".join(lines)
 
 
-def format_build(result: BuildResult, verb: str = "build") -> str:
+def format_build(result: BuildResult) -> str:
     """Render a :class:`BuildResult` as the assembly / gate report.
 
     Args:
         result: The outcome to render.
-        verb: What was attempted, for the failure line (``build`` or ``gate``).
 
     Returns:
-        A plain-ASCII block with the single pass/fail summary of all three validators.
+        A plain-ASCII block carrying the gate's single pass/fail summary. A failure that
+        never reached the gate says so, so the analyst does not go looking in the XML for a
+        problem that is in the manifest.
     """
     # Plain ASCII only (see format_precheck).
     lines: list[str]
@@ -1047,9 +1068,12 @@ def format_build(result: BuildResult, verb: str = "build") -> str:
             f"  workbook xml : {result.twb_path}",
         ]
     else:
-        lines = [f"[INVALID] the workbook did not {verb} - the validation gate failed:"]
+        lines = [
+            "[INVALID] the validation gate failed:" if result.gated
+            else "[INVALID] nothing was gated - the build could not get that far:"
+        ]
         lines += [f"  - {error}" for error in result.errors]
-        if result.twb_path:
+        if result.twb_path and result.gated:
             lines.append(f"  the XML is at {result.twb_path} for inspection; nothing packaged.")
     lines += [f"  [WARN] {warning}" for warning in result.warnings]
     return "\n".join(lines)
@@ -1119,7 +1143,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.command == "gate":
         gate_result = gate(project_dir)
-        print(format_build(gate_result, verb="pass the gate"))
+        print(format_build(gate_result))
         return 0 if gate_result.ok else 2
 
     commit_result = commit(project_dir)

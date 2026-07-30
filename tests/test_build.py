@@ -1344,6 +1344,47 @@ def test_gate_refuses_a_hand_edited_workbook_that_breaks_conformance(tmp_path):
     assert not (tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME).exists()
 
 
+def test_gate_refuses_a_csv_that_is_no_longer_on_disk(tmp_path):
+    """The gate packages too, so it owes the same guard: a .twbx short a CSV opens bound to
+    nothing, and commit would approve it on the package's existence."""
+    _built_project(tmp_path)
+    (tmp_path / "data" / "sales_orders.csv").rename(tmp_path / "data" / "orders.csv")
+
+    result = build.gate(tmp_path)
+
+    assert result.ok is False
+    assert any("sales_orders.csv" in error for error in result.errors)
+    assert not (tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME).exists()
+    assert build.commit(tmp_path).ok is False
+
+
+def test_a_failure_before_the_gate_is_not_reported_as_a_failed_gate(tmp_path):
+    """Sending the analyst to the XML for a manifest problem costs them the real fix."""
+    _ready_project(tmp_path)
+    document = _manifest()
+    document["worksheets"][1]["chart_type"] = "donut"
+    _write_manifest(tmp_path, document)
+
+    result = build.build_workbook(tmp_path)
+
+    assert result.gated is False
+    assert "validation gate failed" not in build.format_build(result)
+
+
+def test_a_gate_failure_says_so(tmp_path):
+    _built_project(tmp_path)
+    twb_path = tmp_path / build.VERSION_DIR / "v_1" / build.TWB_FILENAME
+    twb_path.write_text(
+        twb_path.read_text(encoding="utf-8").replace('"Revenue KPI"', '"Ghost"'),
+        encoding="utf-8",
+    )
+
+    result = build.gate(tmp_path)
+
+    assert result.gated is True
+    assert "validation gate failed" in build.format_build(result)
+
+
 def test_gate_refuses_when_no_workbook_has_been_built(tmp_path):
     _ready_project(tmp_path)
     _write_manifest(tmp_path, _manifest())

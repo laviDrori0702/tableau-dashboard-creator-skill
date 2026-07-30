@@ -103,6 +103,14 @@ invented zone is caught rather than silently built.
    from a manifest that does not validate. When it prints `[OK]`, present the manifest
    summary (worksheets, layout zones, actions) for approval.
 
+   An `[INVALID]` naming an **unknown `chart_type`** is not a typo but a construct the
+   builder has no template for. Unlike an object kind it cannot be reduced to an empty box —
+   a worksheet with no template renders nothing — so validation refuses fail-fast, before any
+   XML exists. Say so plainly and offer the same two ways forward as any other gap (see the
+   unsupported-construct note below): the closest supported chart type for now, plus either a
+   reference `.twb` from Desktop or a hand-written block. Never silently substitute a
+   different chart type — the spec is what the analyst approved.
+
 5. **Build the workbook:**
 
    ```bash

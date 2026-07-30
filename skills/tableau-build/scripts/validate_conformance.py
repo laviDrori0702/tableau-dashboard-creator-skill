@@ -12,8 +12,10 @@ Four checks (issue #38):
 
 1. Every element id the manifest's layout places became a zone.
 2. Every zone that names a sheet names one that exists.
-3. Every worksheet the manifest declares exists **and** has a ``<window>``.
-4. Every sheet a dashboard embeds has a ``<viewpoint>`` in the dashboard's window.
+3. Every worksheet the manifest declares exists, is drawn by a zone, **and** has a
+   ``<window>``.
+4. A dashboard's window and its embedded sheets agree both ways - no sheet without a
+   ``<viewpoint>``, no viewpoint without a sheet.
 
 Plus the **unsupported-construct policy** (:func:`unsupported_notes`): a construct the
 builder has no template for reserves its box and is *named*, with the two ways forward the
@@ -27,6 +29,7 @@ the contract test drives it directly.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from typing import Callable, Iterable, Optional
 
 from manifest import placed_layout_ids
 from zones import CONTAINER_PREFIXES, DEFERRED_KINDS
@@ -39,43 +42,31 @@ _ID_PREFIXES: tuple[str, ...] = ("",) + tuple(
 )
 
 
-def _zone_friendly_names(root: ET.Element) -> set[str]:
-    """Return every ``friendly-name`` in every dashboard's zone tree."""
-    return {
-        name
-        for zone in root.iterfind(".//dashboards/dashboard/zones//zone")
-        for name in [zone.get("friendly-name")]
-        if name
-    }
+def _attributes(
+    elements: Iterable[ET.Element],
+    attribute: str,
+    keep: Optional[Callable[[ET.Element], bool]] = None,
+) -> set[str]:
+    """Collect one attribute off a run of elements, dropping the ones that lack it.
 
+    Args:
+        elements: The elements to read.
+        attribute: The attribute name to collect.
+        keep: An optional extra predicate an element must satisfy.
 
-def _referenced_sheet_names(root: ET.Element) -> set[str]:
-    """Return every sheet name the dashboards' zones reference.
-
-    A sheet zone, a filter card and a legend zone all name the sheet they belong to; nothing
-    else in a zone tree carries ``name``.
+    Returns:
+        The non-empty attribute values.
     """
     return {
-        name
-        for zone in root.iterfind(".//dashboards/dashboard/zones//zone")
-        for name in [zone.get("name")]
-        if name
+        value for element in elements
+        for value in [element.get(attribute)]
+        if value and (keep is None or keep(element))
     }
 
 
-def _sheet_zone_names(root: ET.Element) -> set[str]:
-    """Return the sheet names actually *drawn* by a zone.
-
-    A sheet zone is the one identified by its ``name`` alone (:mod:`zones` gives it no
-    ``type-v2``); a filter card or a legend also names its sheet but does not render it, so
-    counting those as placement would pass a chart whose own zone went missing.
-    """
-    return {
-        name
-        for zone in root.iterfind(".//dashboards/dashboard/zones//zone")
-        for name in [zone.get("name")]
-        if name and zone.get("type-v2") is None
-    }
+def _zones(parent: ET.Element) -> Iterable[ET.Element]:
+    """Return every zone in a dashboard's (or the workbook's) zone tree, at any depth."""
+    return parent.iterfind(".//zones//zone")
 
 
 def conformance_errors(root: ET.Element, document: dict) -> list[str]:
@@ -91,18 +82,18 @@ def conformance_errors(root: ET.Element, document: dict) -> list[str]:
     """
     errors: list[str] = []
 
-    sheet_names = {
-        name for sheet in root.iterfind("worksheets/worksheet")
-        for name in [sheet.get("name")] if name
-    }
-    window_names = {
-        name for window in root.iterfind("windows/window")
-        for name in [window.get("name")]
-        if name and window.get("class") == "worksheet"
-    }
+    sheet_names = _attributes(root.iterfind("worksheets/worksheet"), "name")
+    window_names = _attributes(
+        root.iterfind("windows/window"), "name",
+        keep=lambda window: window.get("class") == "worksheet",
+    )
+    dashboard_zones = [
+        zone for dashboard in root.iterfind("dashboards/dashboard")
+        for zone in _zones(dashboard)
+    ]
 
     # 1. Every zone the analyst approved is in the workbook.
-    friendly_names = _zone_friendly_names(root)
+    friendly_names = _attributes(dashboard_zones, "friendly-name")
     for element_id in sorted(placed_layout_ids(document.get("layout"))):
         if not any(f"{prefix}{element_id}" in friendly_names for prefix in _ID_PREFIXES):
             errors.append(
@@ -110,9 +101,14 @@ def conformance_errors(root: ET.Element, document: dict) -> list[str]:
                 f"analyst approved it in the mock, so the workbook must place it."
             )
 
-    # 2. No zone points at a sheet that is not there (Tableau renders an error tile).
-    referenced = _referenced_sheet_names(root)
-    drawn = _sheet_zone_names(root)
+    # 2. No zone points at a sheet that is not there (Tableau renders an error tile). A sheet
+    # zone, a filter card and a legend zone all name their sheet; nothing else carries 'name'.
+    referenced = _attributes(dashboard_zones, "name")
+    # Only a sheet zone *draws* the sheet - :mod:`zones` gives it no 'type-v2'. Counting a
+    # filter card or a legend as placement would pass a chart whose own zone went missing.
+    drawn = _attributes(
+        dashboard_zones, "name", keep=lambda zone: zone.get("type-v2") is None
+    )
     for name in sorted(referenced - sheet_names):
         errors.append(
             f"dashboard zone references sheet '{name}', which is not a "
@@ -144,23 +140,29 @@ def conformance_errors(root: ET.Element, document: dict) -> list[str]:
                 f"embeds it - the element's box would render blank."
             )
 
-    # 4. An embedded sheet with no viewpoint opens at the wrong zoom in the dashboard.
+    # 4. The dashboard window's viewpoints and its sheets must match, both ways: a sheet with
+    # no viewpoint opens at the wrong fit, and a viewpoint naming no sheet is a stale entry a
+    # hand-written block leaves behind.
     for dashboard in root.iterfind("dashboards/dashboard"):
         dashboard_name = dashboard.get("name", "")
         window = root.find(f"windows/window[@name='{dashboard_name}']")
-        viewpoints = {
-            name for viewpoint in (
-                [] if window is None else window.iterfind("viewpoints/viewpoint")
+        if window is None:
+            errors.append(
+                f"dashboard '{dashboard_name}' has no <window name='{dashboard_name}'> - "
+                f"Tableau opens the workbook with no dashboard tab."
             )
-            for name in [viewpoint.get("name")] if name
-        }
-        for name in sorted(
-            {zone.get("name") for zone in dashboard.iterfind("zones//zone")
-             if zone.get("name")} & sheet_names - viewpoints
-        ):
+            continue
+        viewpoints = _attributes(window.iterfind("viewpoints/viewpoint"), "name")
+        embedded = _attributes(_zones(dashboard), "name") & sheet_names
+        for name in sorted(embedded - viewpoints):
             errors.append(
                 f"dashboard '{dashboard_name}' embeds sheet '{name}' but its window has no "
                 f"<viewpoint name='{name}'> - the sheet opens at the wrong fit."
+            )
+        for name in sorted(viewpoints - sheet_names):
+            errors.append(
+                f"dashboard '{dashboard_name}' has a <viewpoint name='{name}'> for a sheet "
+                f"that does not exist - a stale viewpoint Tableau rewrites on save."
             )
 
     return errors

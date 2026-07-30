@@ -180,6 +180,29 @@ def test_embedded_sheet_with_no_viewpoint_is_caught():
     ), errors
 
 
+def test_stale_viewpoint_naming_no_sheet_is_caught():
+    """The other direction: a hand-written block can leave a viewpoint behind."""
+    root = _built()
+    ET.SubElement(
+        root.find("windows/window[@class='dashboard']/viewpoints"),
+        "viewpoint", {"name": "Deleted Sheet"},
+    )
+
+    errors = _errors(root=root)
+    assert any(
+        "Deleted Sheet" in error and "viewpoint" in error for error in errors
+    ), errors
+
+
+def test_dashboard_with_no_window_is_caught():
+    root = _built()
+    windows = root.find("windows")
+    windows.remove(windows.find("window[@class='dashboard']"))
+
+    errors = _errors(root=root)
+    assert any("no dashboard tab" in error for error in errors), errors
+
+
 # --- The unsupported-construct policy ----------------------------------------
 
 @pytest.mark.parametrize("kind", ["image", "button", "legend"])
