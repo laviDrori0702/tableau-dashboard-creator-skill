@@ -427,7 +427,7 @@ def _render_dashboard(
     leaves: dict[str, zones.Leaf],
     tokens: worksheet.DesignTokens,
 ) -> tuple[str, set[str]]:
-    """Render the dashboard: fixed-size at the mock's canvas, with the spec's zone tree.
+    """Render the dashboard: range-sized from the mock's canvas, with the spec's zone tree.
 
     Args:
         parent: The ``<dashboards>`` element.
@@ -447,10 +447,12 @@ def _render_dashboard(
     ET.SubElement(dashboard, "style")
     width = str(int(canvas.get("width", DEFAULT_CANVAS["width"])))
     height = str(int(canvas.get("height", DEFAULT_CANVAS["height"])))
-    # A fixed-size dashboard is what makes the mock's geometry hold: with sizing-mode
-    # 'automatic' Tableau re-flows the zones to the viewer's window instead.
+    # Range-sized at the mock's canvas as the floor, with no maximum: zone geometry is in a
+    # normalised 100,000-unit space, so the proportions the analyst approved hold at any
+    # window size, while a hard maximum (a fixed size) only forces the viewer to scroll a
+    # wide screen's worth of empty margin. The analyst can lower the minimum in Desktop.
     ET.SubElement(dashboard, "size", {
-        "maxheight": height, "maxwidth": width, "minheight": height, "minwidth": width,
+        "minheight": height, "minwidth": width, "sizing-mode": "range",
     })
     root_zone_id, embedded = zones.render_zones(
         ET.SubElement(dashboard, "zones"),

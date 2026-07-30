@@ -112,8 +112,9 @@ class Leaf:
     Attributes:
         worksheet: The Tableau sheet name for a view zone.
         kind: The manifest object kind for a non-view zone (see :data:`OBJECT_ZONE_TYPES`).
-        title: Title text; when set, a text zone is stacked above the content and the
-            sheet's own title is suppressed.
+        title: Title text; when set, a text zone is stacked above the content. Without it a
+            view zone has no header at all - the sheet's own title never renders on a
+            dashboard (see :meth:`_ZoneWriter._content`).
         text: The text a ``text`` object zone displays.
         legend: The colour legend to stack below the content, or ``None`` for no legend.
     """
@@ -359,10 +360,7 @@ class _ZoneWriter:
         if title_height:
             self._title(wrapper, leaf.title, Box(box.x, cursor, box.w, title_height), label)
             cursor += title_height
-        self._content(
-            wrapper, leaf, Box(box.x, cursor, box.w, content_height), label,
-            show_title=False,
-        )
+        self._content(wrapper, leaf, Box(box.x, cursor, box.w, content_height), label)
         cursor += content_height
         if legend_height:
             self._legend(
@@ -370,25 +368,23 @@ class _ZoneWriter:
             )
         render_zone_style(wrapper, ZONE_MARGIN)
 
-    def _content(
-        self, parent: ET.Element, leaf: Leaf, box: Box, label: str, show_title: bool = True
-    ) -> None:
+    def _content(self, parent: ET.Element, leaf: Leaf, box: Box, label: str) -> None:
         """Render the leaf's own zone: a sheet zone, an object zone, or a blank.
+
+        A sheet's *own* title is always suppressed: Tableau draws it inside the zone, over
+        the sheet's own height, so a short zone (a KPI card) loses its number to it. A
+        dashboard header is a text object's job - either the element's ``title`` or a text
+        object the layout places beside it.
 
         Args:
             parent: The zone to append to.
             leaf: What fills the element.
             box: The rectangle for the content itself.
             label: The zone's friendly name.
-            show_title: False when a generated title zone already labels the element, which
-                is what suppresses the sheet's own duplicate title.
         """
         if leaf.worksheet:
             # A sheet zone is identified by its 'name' and carries no type-v2.
-            zone = self._zone(
-                parent, box, label, name=leaf.worksheet,
-                show_title=None if show_title else "false",
-            )
+            zone = self._zone(parent, box, label, name=leaf.worksheet, show_title="false")
             self.embedded.add(leaf.worksheet)
         else:
             kind = leaf.kind.strip().lower()

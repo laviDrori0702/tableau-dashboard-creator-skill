@@ -5,7 +5,7 @@ workbook's zone tree has to *be* that tree - not an approximation of it. What is
 is everything the mock's geometry depends on and an LLM checklist got wrong:
 
 * the zone hierarchy is the container tree one-to-one (a test walks both);
-* the dashboard is fixed-size at the mock's canvas, and sibling zones reproduce the declared
+* the dashboard's minimum size is the mock's canvas, and sibling zones reproduce the declared
   ``size`` percentages within rounding, tiling their parent exactly;
 * zone ids are sequential and unique, every zone carries a ``friendly-name``, and
   ``<zone-style>`` is the last child everywhere;
@@ -332,8 +332,10 @@ def test_a_titled_element_gets_a_text_zone_above_its_sheet():
     assert sheet_zone.get("name") == "Trend" and sheet_zone.get("show-title") == "false"
 
 
-def test_an_untitled_sheet_keeps_its_own_title_and_needs_no_wrapper():
-    """No title in the manifest means Tableau's own styled sheet title - and one zone less."""
+def test_a_sheets_own_title_is_always_off_titled_or_not():
+    """Tableau draws a sheet's own title inside the zone, out of the sheet's own height: a
+    KPI card 30px shorter than its number is a card that shows no number. The header is a
+    text zone's job, so an untitled element gets no header - and one zone less."""
     container, _, _ = _render(
         {"type": "vert", "children": [{"id": "chart", "size": 100}]},
         {"chart": zones.Leaf(worksheet="Trend")},
@@ -341,7 +343,7 @@ def test_an_untitled_sheet_keeps_its_own_title_and_needs_no_wrapper():
     zone = container.find("zone/zone/zone")
 
     assert zone.get("name") == "Trend"
-    assert zone.get("show-title") is None
+    assert zone.get("show-title") == "false"
     assert zone.findall("zone") == []
 
 
@@ -535,13 +537,14 @@ def test_a_layout_rich_manifest_validates():
     ) == []
 
 
-def test_the_dashboard_is_fixed_size_at_the_canvas(layout_rich_workbook):
-    """Without a fixed size Tableau re-flows the zones and the mock's geometry is lost."""
+def test_the_dashboard_is_range_sized_from_the_canvas(layout_rich_workbook):
+    """The canvas is the floor, not a cage: zone units are normalised, so the mock's
+    proportions survive a larger window, and no maximum means no dead scrollable margin."""
     _, root = layout_rich_workbook
     size = root.find("dashboards/dashboard/size")
 
     assert size.attrib == {
-        "maxheight": "768", "maxwidth": "1366", "minheight": "768", "minwidth": "1366",
+        "minheight": "768", "minwidth": "1366", "sizing-mode": "range",
     }
 
 

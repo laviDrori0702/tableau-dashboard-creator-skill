@@ -134,12 +134,20 @@ invented zone is caught rather than silently built.
   version is created by re-running `tableau-mock` (which bumps and stales spec and build).
 - **Live connection, always.** The workbook never carries an extract: the `.twbx` embeds the
   CSVs, and the analyst points it at the real database with Data → Replace Data Source.
-- **The dashboard is fixed-size and its zones are computed.** The `layout` tree becomes the
-  dashboard's zone hierarchy one-to-one: sibling `size` values are proportions of the parent
-  along its flow axis, mapped into Tableau's 0–100000 space at the canvas dimensions. A
-  worksheet's optional `title` becomes a text zone above its sheet zone (and suppresses the
-  sheet's own title); a colour-encoded chart gets a legend zone below it. Both stack *inside*
-  the element's own box, so they never disturb its siblings.
+- **The zones are computed and the canvas is the dashboard's minimum size.** The `layout`
+  tree becomes the dashboard's zone hierarchy one-to-one: sibling `size` values are
+  proportions of the parent along its flow axis, mapped into Tableau's 0–100000 space at the
+  canvas dimensions. Because that space is normalised, the approved proportions hold at any
+  window size, so the dashboard is `sizing-mode='range'` with the canvas as `minwidth` /
+  `minheight` and **no maximum** — the analyst can lower the minimum in Desktop.
+- **Every view zone's header is a text object.** A sheet's *own* title is always off: Tableau
+  draws it inside the zone out of the sheet's own height, so a short zone (a KPI card) loses
+  its number to it. Give every `worksheets[]` entry a `title` — it becomes a text zone above
+  the sheet zone — or have the layout place a `text` object beside it; a view with neither
+  gets no header at all. A colour-encoded chart also gets a legend zone below it. Both
+  generated zones stack *inside* the element's own box, so they never disturb its siblings.
+- **Field labels are off on every sheet.** They repeat what the zone's header already says
+  and cost the chart a whole band of the sheet.
 - **A filter / parameter / image / button / legend object reserves its box, empty.** Each of
   those zone types needs a reference the manifest does not carry yet (a field plus the
   dashboard's own `<datasource-dependencies>`, a parameter, a filename, an action, a sheet +

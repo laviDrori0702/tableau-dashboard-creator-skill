@@ -1015,11 +1015,12 @@ def test_a_sheet_no_dashboard_zone_shows_keeps_its_tab():
 
 
 def test_dashboard_is_sized_from_the_layout_canvas():
-    """The mock's approved canvas is the workbook's dashboard size."""
+    """The mock's approved canvas is the dashboard's *minimum*: the zone proportions hold at
+    any window size, so a maximum would only pad a wide screen with scrollable margin."""
     size = _render().find("dashboards/dashboard/size")
 
     assert size.attrib == {
-        "maxheight": "768", "maxwidth": "1366", "minheight": "768", "minwidth": "1366",
+        "minheight": "768", "minwidth": "1366", "sizing-mode": "range",
     }
 
 

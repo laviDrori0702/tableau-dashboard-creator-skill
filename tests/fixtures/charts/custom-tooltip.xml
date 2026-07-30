@@ -23,6 +23,8 @@
         <style>
           <style-rule element="worksheet">
             <format attr="font-family" value="Open Sans" />
+            <format attr="display-field-labels" scope="cols" value="false" />
+            <format attr="display-field-labels" scope="rows" value="false" />
           </style-rule>
         </style>
         <panes>

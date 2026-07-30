@@ -720,11 +720,25 @@ def test_token_hex_colours_are_lower_cased():
 
 
 def test_without_tokens_no_styling_is_invented():
-    """No branding step means Tableau's own defaults - not a made-up font or colour."""
+    """No branding step means Tableau's own defaults - not a made-up font or colour. The
+    worksheet rule still carries the field-label switches, which are layout, not branding."""
     root = ET.fromstring(_render(tokens=""))
     element = _worksheet_element("Bar", root)
     assert element.find("layout-options") is None
-    assert element.find("table/style/style-rule[@element='worksheet']") is None
+    rule = element.find("table/style/style-rule[@element='worksheet']")
+    assert [format.get("attr") for format in rule] == ["display-field-labels"] * 2
+
+
+def test_field_labels_are_off_on_every_sheet():
+    """A field label repeats the zone's header and costs the chart a whole band of the
+    sheet - and on a crosstab it is the band the analyst notices."""
+    for element in ALL_CHARTS_ROOT.findall("worksheets/worksheet"):
+        rule = element.find("table/style/style-rule[@element='worksheet']")
+        scopes = {
+            format.get("scope") for format in rule.findall("format")
+            if format.get("attr") == "display-field-labels" and format.get("value") == "false"
+        }
+        assert scopes == {"cols", "rows"}, element.get("name")
 
 
 def test_an_unfilled_token_template_is_ignored():
