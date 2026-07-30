@@ -39,10 +39,11 @@ stray field name or datasource id can leak into the analyst's workbook. Pick the
 `pie`, `scatter`, `map`, `text` = KPI card, `table` = text table, `histogram`, `dual-axis`,
 `combo`, plus `heatmap` / `treemap` / `bullet` / `gantt` / `boxplot`).
 
-Four things the spec may ask for are **not** chart types — they are optional keys on any
-worksheet: `sort`, `filters`, `tooltip`, and `axis_titles` / `number_formats`. A *stacked*
-bar is a `bar` with a `color` encoding. Reach for a modifier before reaching for a new
-chart type.
+Several things the spec may ask for are **not** chart types — they are optional keys on any
+worksheet: `sort`, `filters`, `tooltip`, `reference_lines`, and `axis_titles` /
+`number_formats`; a running total or percent-of-total is a `table_calc` on the shelf entry. A
+*stacked* bar is a `bar` with a `color` encoding. Reach for a modifier before reaching for a
+new chart type.
 
 Styling comes from `DESIGN-TOKENS.md` when the analyst ran `tableau-brand`: its font family
 and chart-title size/colour are applied to every worksheet automatically. When it is absent,
@@ -149,12 +150,29 @@ invented zone is caught rather than silently built.
   generated zones stack *inside* the element's own box, so they never disturb its siblings.
 - **Field labels are off on every sheet.** They repeat what the zone's header already says
   and cost the chart a whole band of the sheet.
-- **A filter / parameter / image / button / legend object reserves its box, empty.** Each of
-  those zone types needs a reference the manifest does not carry yet (a field plus the
-  dashboard's own `<datasource-dependencies>`, a parameter, a filename, an action, a sheet +
-  colour field), and Tableau does not treat those as optional — so the layout keeps the
-  geometry and the features-and-actions ticket turns each into its real zone. `text` and
-  `blank` objects render fully today.
+- **The dashboard is interactive** (CONTRACT.md §6). An `actions` entry of type `filter`
+  cross-filters its target zones from the marks clicked in its source view, `highlight` brushes
+  related marks, and `parameter` writes a clicked mark's `field` into a declared parameter;
+  `run_on` chooses click (`select`) or `hover`, and one Tableau action is emitted per target. A
+  `filter` object is a quick-filter card over one worksheet's field, and a `parameter` object is
+  that parameter's control. Endpoints are validated: an action source and its filter/highlight
+  targets must be **view** zones, a parameter action's target a declared parameter.
+- **A `visibility` key on a layout node is Dynamic Zone Visibility**, and its boolean
+  calculated field must resolve to **one value, independent of the view** — so the calc compares
+  a parameter. Either shape is normal: a two-value parameter with a control (`= true` / `=
+  "on"`, the collapse-this-panel toggle) or a parameter a parameter action writes into,
+  compared against its opening value (`<> "All"`, the nothing-to-show-until-you-pick reveal,
+  which needs no control because clearing the selection resets it). **Never write a *visibility*
+  calc as an LOD expression** — `{FIXED : …}` is view-independent too and Tableau accepts it,
+  but it is hard to reason about and hard to repair by hand. That is the only place LODs are
+  ruled out; elsewhere they are ordinary `calculated_fields`. A row-level boolean is not a
+  visibility field at all: it splits the marks and the zone stops toggling. The Detail-shelf
+  placement the field needs, the parameter declarations and the format flags are the builder's
+  job.
+- **An image / button / legend object reserves its box, empty.** Each of those zone types needs
+  a reference the manifest does not carry (a filename, an action, a sheet + colour field), and
+  Tableau does not treat those as optional — so the layout keeps the geometry until the wiring
+  lands. `filter`, `parameter`, `text` and `blank` objects render fully today.
 
 > The full `STATE.md` schema and the ordering / staleness / versioning rules live in
 > `CONTRACT.md` at the repo root. This skill restates only its own slice; `build.py`,

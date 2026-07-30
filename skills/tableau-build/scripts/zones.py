@@ -13,10 +13,11 @@ The module is pure and stdlib-only: it takes the layout tree, the canvas, and a
 filesystem, no manifest parsing - that is :mod:`twb`'s job, and it is why the contract test
 can drive :func:`render_zones` directly.
 
-Not here: the *wiring* of a filter / parameter / button zone to the field, parameter or sheet
-behind it. A zone of the right type at the right place is what the layout owes; the
-dashboard-level ``<datasource-dependencies>`` and button actions that make one live belong to
-the features-and-actions ticket (#37).
+A filter card and a parameter control are rendered as real zones once the leaf carries the
+reference they need (:class:`Leaf`'s ``param`` / ``sheet`` / ``mode``); :mod:`twb` resolves
+those and emits the dashboard-level ``<datasource-dependencies>`` they also require. An image,
+a button and a standalone legend still reserve their box as an empty zone - see
+:data:`DEFERRED_KINDS`.
 """
 
 from __future__ import annotations
@@ -48,23 +49,32 @@ LEGEND_HEIGHT_PX = 22
 #: the whole reason the header is a horizontal container rather than a bare text zone.
 HEADER_TEXT_SHARE = 75.0
 
-#: manifest ``objects[].kind`` -> the zone's ``type-v2``, for the kinds a layout can render
-#: on its own: a text block and a spacer need nothing beyond their box and their text.
+#: manifest ``objects[].kind`` -> the zone's ``type-v2``. A text block and a spacer need
+#: nothing beyond their box; a filter card and a parameter control need the ``param`` the
+#: leaf carries (an unreferenced one falls back to :data:`EMPTY_ZONE_TYPE`).
 OBJECT_ZONE_TYPES: dict[str, str] = {
     "text": "text",
     "blank": "empty",
+    "filter": "filter",
+    "parameter": "paramctrl",
 }
 
-#: The other kinds. Each one's real zone type (``filter``, ``paramctrl``, ``bitmap``,
-#: ``dashboard-object``, ``color``) needs a reference the manifest does not carry yet - a
-#: filter's field plus the dashboard's own ``<datasource-dependencies>``, a parameter control's
-#: parameter, an image's filename (which the ``.twbx`` would also have to embed), a button's
-#: action, a legend's sheet and colour field - and Tableau does not treat those as optional.
-#: So the layout reserves the box as an empty zone, keeping the geometry the analyst approved,
-#: until the ticket that adds the wiring can emit the real zone.
-DEFERRED_KINDS: frozenset[str] = frozenset({
-    "filter", "parameter", "image", "button", "legend",
-})
+#: The default control mode per kind: a dimension filter card is a checkbox dropdown, a
+#: parameter control is the compact widget.
+DEFAULT_ZONE_MODES: dict[str, str] = {"filter": "checkdropdown", "parameter": "compact"}
+
+#: The modes a filter card may ask for. Only the two the legacy mode table documents for a
+#: *dimension* are here: a card renders the field's members, so a date or numeric range card
+#: (``daterange`` / ``range``) needs bounds the manifest expresses as a worksheet filter
+#: instead. ``manifest`` reads this table, so an unrenderable mode fails validation.
+FILTER_MODES: frozenset[str] = frozenset({"checkdropdown", "typeinlist"})
+
+#: The remaining kinds. Each one's real zone type (``bitmap``, ``dashboard-object``,
+#: ``color``) needs a reference the manifest does not carry - an image's filename (which the
+#: ``.twbx`` would also have to embed), a button's action, a standalone legend's sheet and
+#: colour field - and Tableau does not treat those as optional. So the layout reserves the box
+#: as an empty zone, keeping the geometry the analyst approved.
+DEFERRED_KINDS: frozenset[str] = frozenset({"image", "button", "legend"})
 
 #: The zone type of a leaf nothing fills, of a deferred kind, and of an unknown one.
 EMPTY_ZONE_TYPE = "empty"
@@ -122,6 +132,12 @@ class Leaf:
             dashboard (see :meth:`_ZoneWriter._content`).
         text: The text a ``text`` object zone displays.
         legend: The colour legend to stack below the content, or ``None`` for no legend.
+        param: What a ``filter`` / ``parameter`` zone controls - a qualified column-instance
+            (``[federated.x].[none:region:nk]``) or a qualified parameter
+            (``[Parameters].[Top N]``). Without it the kind falls back to an empty zone.
+        sheet: The worksheet a filter card filters (its ``name``); the card is the UI for that
+            sheet's own filter, so the two must agree.
+        mode: The control's mode, defaulting to :data:`DEFAULT_ZONE_MODES`.
     """
 
     worksheet: str = ""
@@ -129,6 +145,9 @@ class Leaf:
     title: str = ""
     text: str = ""
     legend: Optional[Legend] = None
+    param: str = ""
+    sheet: str = ""
+    mode: str = ""
 
 
 def render_zone_style(parent: ET.Element, margin: str) -> None:
@@ -185,6 +204,8 @@ class _ZoneWriter:
         embedded: The sheet names the tree places in a zone - what the caller hides in
             ``<windows>``, since hiding a sheet no zone shows leaves Tableau no tab to
             render it on.
+        visibility: ``{zone id: boolean field name}`` for every node carrying a
+            ``visibility`` key - what the workbook's ``<datagraph>`` wires up.
     """
 
     def __init__(
@@ -204,6 +225,7 @@ class _ZoneWriter:
         self._tokens = tokens
         self._last_id = 0
         self.embedded: set[str] = set()
+        self.visibility: dict[str, str] = {}
 
     # --- helpers ---------------------------------------------------------------
 
@@ -284,9 +306,10 @@ class _ZoneWriter:
             return  # validate_manifest already rejected it; keep the rest of the tree
 
         element_id = str(node.get("id") or "").strip()
+        visibility = str(node.get("visibility") or "").strip()
         children = node.get("children")
         if not (isinstance(children, list) and children):
-            self._leaf(parent, element_id, box, path)
+            self._leaf(parent, element_id, box, path, visibility)
             return
 
         orientation = "vert" if str(node.get("type", "")).strip().lower() == "vert" else "horz"
@@ -294,11 +317,17 @@ class _ZoneWriter:
             parent, box, f"{CONTAINER_PREFIXES[orientation]}-{element_id or path}",
             type_v2="layout-flow", param=orientation,
         )
+        self._record_visibility(container, visibility)
         for index, (child, child_box) in enumerate(
             zip(children, self._divide(box, orientation, child_sizes(children))), start=1
         ):
             self._node(container, child, child_box, f"{path}.{index}")
         render_zone_style(container, ZONE_MARGIN)
+
+    def _record_visibility(self, zone: ET.Element, field: str) -> None:
+        """Note that ``zone``'s visibility is controlled by the boolean field ``field``."""
+        if field:
+            self.visibility[zone.get("id")] = field
 
     def _divide(self, box: Box, orientation: str, sizes: list[float]) -> list[Box]:
         """Split ``box`` along the flow axis into one rectangle per proportion.
@@ -333,7 +362,10 @@ class _ZoneWriter:
 
     # --- leaves ------------------------------------------------------------------
 
-    def _leaf(self, parent: ET.Element, element_id: str, box: Box, path: str) -> None:
+    def _leaf(
+        self, parent: ET.Element, element_id: str, box: Box, path: str,
+        visibility: str = "",
+    ) -> None:
         """Render one leaf element, wrapping it when it carries a title or a legend.
 
         Args:
@@ -341,6 +373,9 @@ class _ZoneWriter:
             element_id: The leaf's element id (``""`` for an unnamed node).
             box: The rectangle the element occupies.
             path: Its position in the tree, the fallback friendly name.
+            visibility: The boolean field controlling the element's visibility, or ``""``.
+                A titled or legended element is controlled at its **wrapper**: hiding only the
+                content zone would leave its title and legend behind.
         """
         label = element_id or path
         leaf = self._leaves.get(element_id, Leaf())
@@ -348,7 +383,7 @@ class _ZoneWriter:
         legend_height = self._units_y(LEGEND_HEIGHT_PX) if leaf.legend else 0
 
         if not (title_height or legend_height):
-            self._content(parent, leaf, box, label)
+            self._record_visibility(self._content(parent, leaf, box, label), visibility)
             return
 
         # The extra zones stack inside the element's own box, so its siblings are untouched.
@@ -356,6 +391,7 @@ class _ZoneWriter:
             parent, box, f"{CONTAINER_PREFIXES['vert']}-{label}",
             type_v2="layout-flow", param="vert",
         )
+        self._record_visibility(wrapper, visibility)
         # A box too short for both fixed zones is squeezed, never overflowed: a zone written
         # past the wrapper's bottom edge would overlap the sibling below it.
         title_height = min(title_height, box.h)
@@ -373,7 +409,9 @@ class _ZoneWriter:
             )
         render_zone_style(wrapper, ZONE_MARGIN)
 
-    def _content(self, parent: ET.Element, leaf: Leaf, box: Box, label: str) -> None:
+    def _content(
+        self, parent: ET.Element, leaf: Leaf, box: Box, label: str
+    ) -> ET.Element:
         """Render the leaf's own zone: a sheet zone, an object zone, or a blank.
 
         A sheet's *own* title is always suppressed: Tableau draws it inside the zone, over
@@ -386,19 +424,38 @@ class _ZoneWriter:
             leaf: What fills the element.
             box: The rectangle for the content itself.
             label: The zone's friendly name.
+
+        Returns:
+            The zone element, so the caller can record what controls its visibility.
         """
         if leaf.worksheet:
             # A sheet zone is identified by its 'name' and carries no type-v2.
             zone = self._zone(parent, box, label, name=leaf.worksheet, show_title="false")
             self.embedded.add(leaf.worksheet)
-        else:
-            kind = leaf.kind.strip().lower()
+            render_zone_style(zone, ZONE_MARGIN)
+            return zone
+
+        kind = leaf.kind.strip().lower()
+        controlled = kind in DEFAULT_ZONE_MODES
+        if controlled and leaf.param:
+            # A filter card names the sheet it filters; a parameter control names nothing but
+            # the parameter, which every sheet reads the same value of.
             zone = self._zone(
-                parent, box, label, type_v2=OBJECT_ZONE_TYPES.get(kind, EMPTY_ZONE_TYPE),
+                parent, box, label, type_v2=OBJECT_ZONE_TYPES[kind],
+                mode=leaf.mode or DEFAULT_ZONE_MODES[kind], param=leaf.param,
+                name=leaf.sheet or None, show_title="false",
             )
+        else:
+            # A control with nothing to control would crash Tableau, so it reserves its box.
+            zone_type = (
+                EMPTY_ZONE_TYPE if controlled
+                else OBJECT_ZONE_TYPES.get(kind, EMPTY_ZONE_TYPE)
+            )
+            zone = self._zone(parent, box, label, type_v2=zone_type)
             if kind == "text" and leaf.text:
                 self._formatted_text(zone, leaf.text, bold=False)
         render_zone_style(zone, ZONE_MARGIN)
+        return zone
 
     def _title(self, parent: ET.Element, text: str, box: Box, label: str) -> None:
         """Render the element's header row: a fixed-height horizontal container holding the
@@ -457,13 +514,29 @@ class _ZoneWriter:
         run.text = text
 
 
+class RenderedZones(NamedTuple):
+    """What the caller needs back after the zone tree is written.
+
+    Attributes:
+        root_zone_id: The root zone's id - the dashboard window's ``<active>`` target.
+        embedded: The sheet names the tree placed in a zone, which the caller hides in
+            ``<windows>``.
+        visibility: ``{zone id: boolean field name}`` for the zones a ``visibility`` key
+            controls - the input to the workbook's ``<datagraph>``.
+    """
+
+    root_zone_id: str
+    embedded: set[str]
+    visibility: dict[str, str]
+
+
 def render_zones(
     parent: ET.Element,
     root: dict,
     canvas: dict,
     leaves: dict[str, Leaf],
     tokens: DesignTokens,
-) -> tuple[str, set[str]]:
+) -> RenderedZones:
     """Render a layout tree into a dashboard's ``<zones>``.
 
     Args:
@@ -474,8 +547,8 @@ def render_zones(
         tokens: The parsed :class:`worksheet.DesignTokens`, for title zone styling.
 
     Returns:
-        ``(root zone id, embedded sheet names)``. The root id is the dashboard window's
-        ``<active>`` target; the sheet names are the ones the caller hides in ``<windows>``.
+        The :class:`RenderedZones` triple.
     """
     writer = _ZoneWriter(canvas, leaves, tokens)
-    return writer.render_root(parent, root), writer.embedded
+    root_zone_id = writer.render_root(parent, root)
+    return RenderedZones(root_zone_id, writer.embedded, writer.visibility)

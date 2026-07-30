@@ -30,9 +30,10 @@ from __future__ import annotations
 import hashlib
 import uuid
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import NamedTuple
 
+import features
 import worksheet
 import zones
 from manifest import documented_field_types
@@ -179,6 +180,22 @@ def object_id(datasource_name: str, csv_name: str) -> str:
     return f"{csv_name}_{_hashed(f'obj:{datasource_name}:{csv_name}').upper()}"
 
 
+def action_name(index: int, seed: str) -> str:
+    """Return the ``name`` attribute of one dashboard action.
+
+    Tableau's own shape is ``[Action<n>_<32 upper-case hex>]``. The index makes it unique
+    even for two actions with the same caption and target; the hash makes it stable.
+
+    Args:
+        index: The action's 1-based position among all the workbook's actions.
+        seed: What the action does (its caption and endpoints).
+
+    Returns:
+        The bracketed action name.
+    """
+    return f"[Action{index}_{_hashed(f'action:{seed}')[:32].upper()}]"
+
+
 def simple_id(kind: str, name: str) -> str:
     """Return the braced, upper-case UUID a ``<simple-id>`` carries.
 
@@ -305,7 +322,8 @@ def _render_metadata_records(
 
 def _render_datasource(
     parent: ET.Element, name: str, csv_name: str, columns: list[Column], version: str,
-    derived: list[worksheet.FieldRef],
+    derived: list[worksheet.FieldRef], instances: list[worksheet.FieldRef],
+    parameters: list[features.Parameter],
 ) -> None:
     """Render one inline, live-connection datasource over a single CSV.
 
@@ -318,6 +336,11 @@ def _render_datasource(
         derived: Calculated and binned columns the worksheets introduce. They are not in
             the CSV, so they appear only among the UI-level columns - but they must appear
             *here* as well as in each worksheet, or Tableau drops them on save.
+        instances: Column-instances the datasource itself must declare. Only table calcs
+            need this: the calc lives on the instance, and a datasource that does not carry
+            it loses the field from the data pane on save.
+        parameters: Parameters this datasource's own calculations read - the datasource
+            declares the dependency, domain-less, the way Desktop writes it.
     """
     datasource = ET.SubElement(parent, "datasource", {
         "caption": name,
@@ -359,10 +382,21 @@ def _render_datasource(
         })
     for reference in derived:
         worksheet.render_column(datasource, reference)
+    for reference in instances:
+        worksheet.render_column_instance(datasource, reference)
     ET.SubElement(datasource, "layout", {
         "dim-ordering": "alphabetic", "measure-ordering": "alphabetic",
         "show-structure": "true",
     })
+    if parameters:
+        # A calculation here reads [Parameters].[x], so the datasource declares that
+        # dependency itself - between <layout> and <object-graph>, where Desktop writes it.
+        dependencies = ET.SubElement(
+            datasource, "datasource-dependencies",
+            {"datasource": features.PARAMETERS_DATASOURCE},
+        )
+        for parameter in parameters:
+            features.render_parameter_column(dependencies, parameter, with_domain=False)
 
     object_graph = ET.SubElement(datasource, "object-graph")
     objects = ET.SubElement(object_graph, "objects")
@@ -371,6 +405,214 @@ def _render_datasource(
     })
     properties = ET.SubElement(graph_object, "properties", {"context": ""})
     _render_relation(properties, name, csv_name, columns)          # location 3
+
+
+# --- Interactions (CONTRACT.md §6) ---------------------------------------------
+
+@dataclass
+class Interactions:
+    """Everything the manifest's ``objects`` and ``actions`` add to the workbook.
+
+    Resolved in one pass because the four outputs are the same few facts seen from different
+    elements: a quick filter is a zone *and* a worksheet filter *and* a dashboard-level
+    declaration, and an action is only renderable once every element id has been turned into
+    the sheet name Tableau addresses it by.
+
+    Attributes:
+        leaves: ``{element id: Leaf}`` for the control zones (filter cards, parameter
+            controls) - merged into the dashboard's leaf map.
+        declarations: ``{datasource name: [FieldRef]}`` - the fields a filter card needs the
+            *dashboard* to declare as well as the worksheet.
+        controlled_parameters: The parameters a control zone puts on the dashboard - the only
+            ones the dashboard declares. A parameter a *sheet* reads is that sheet's business
+            (Desktop drops it from the dashboard's declarations on save).
+        sheet_actions: The filter / highlight actions.
+        parameter_actions: The parameter actions.
+    """
+
+    leaves: dict[str, zones.Leaf] = field(default_factory=dict)
+    declarations: dict[str, list[worksheet.FieldRef]] = field(default_factory=dict)
+    controlled_parameters: list[features.Parameter] = field(default_factory=list)
+    sheet_actions: list[features.SheetAction] = field(default_factory=list)
+    parameter_actions: list[features.ParameterAction] = field(default_factory=list)
+
+
+def _plan_interactions(
+    manifest_document: dict,
+    plans: list[PlannedWorksheet],
+    parameters: list[features.Parameter],
+) -> Interactions:
+    """Resolve the manifest's control objects and actions against the planned worksheets.
+
+    Mutates the worksheet plans: a quick filter injects the filter it is the UI for, and a
+    parameter action's source field is added to the sheet's declared fields (an action
+    referencing an instance the worksheet never declared is one Tableau drops).
+
+    Args:
+        manifest_document: The parsed build manifest.
+        plans: The resolved worksheets (mutated).
+        parameters: The resolved parameters.
+
+    Returns:
+        The :class:`Interactions`.
+    """
+    interactions = Interactions()
+    by_element = {
+        str(planned.entry.get("element_id", "")).strip(): planned
+        for planned in plans if str(planned.entry.get("element_id", "")).strip()
+    }
+    by_sheet = {planned.plan.name: planned for planned in plans}
+    by_parameter = {parameter.name: parameter for parameter in parameters}
+
+    for entry in manifest_document.get("objects") or []:
+        if not isinstance(entry, dict):
+            continue
+        element_id = str(entry.get("element_id", "")).strip()
+        kind = str(entry.get("kind", "")).strip().lower()
+        if kind == "filter":
+            _plan_quick_filter(entry, element_id, by_sheet, interactions)
+        elif kind == "parameter":
+            parameter = by_parameter.get(str(entry.get("parameter", "")).strip())
+            if parameter is not None:
+                interactions.leaves[element_id] = zones.Leaf(
+                    kind=kind, param=parameter.reference,
+                    # The widget follows the domain: Desktop writes 'slider' for a range and
+                    # 'compact' for a member list, and rewrites the workbook otherwise.
+                    mode="slider" if parameter.domain_type == "range" else "compact",
+                    title=str(entry.get("title", "") or "").strip(),
+                )
+                interactions.controlled_parameters.append(parameter)
+
+    _plan_actions(manifest_document.get("actions") or [], by_element, by_parameter,
+                  interactions)
+    return interactions
+
+
+def _plan_quick_filter(
+    entry: dict, element_id: str, by_sheet: dict[str, PlannedWorksheet],
+    interactions: Interactions,
+) -> None:
+    """Resolve one filter card: its zone, its worksheet filter, and its declaration.
+
+    A card is injected into the *named* worksheet only. "Apply to all sheets using this data
+    source" is a Desktop-side choice the analyst makes on the built workbook - a manifest that
+    wants two sheets filtered declares two cards.
+
+    Args:
+        entry: The manifest ``objects`` entry.
+        element_id: The zone the card fills.
+        by_sheet: ``{sheet name: PlannedWorksheet}``.
+        interactions: The accumulator (mutated).
+    """
+    planned = by_sheet.get(str(entry.get("worksheet", "")).strip())
+    field_name = str(entry.get("field", "")).strip()
+    if planned is None or not field_name:
+        return  # validate_manifest has already named this entry
+    reference = planned.plan.resolver.reference(field_name)
+    if reference is None:
+        return
+
+    interactions.leaves[element_id] = zones.Leaf(
+        kind="filter",
+        param=planned.plan.reference_of(reference),
+        sheet=planned.plan.name,
+        mode=str(entry.get("mode", "")).strip(),
+        title=str(entry.get("title", "") or "").strip(),
+    )
+    # The card is the UI for a worksheet filter; without the filter there is nothing to
+    # control. A filter the manifest already declared on that field stays as it is - an
+    # explicit member list is a narrower filter than "all members", not a duplicate.
+    already_filtered = any(
+        existing.reference.instance_name == reference.instance_name
+        for existing in planned.plan.filters
+    )
+    if not already_filtered:
+        planned.plan.filters.append(
+            worksheet.FilterPlan(reference=reference, all_members=True)
+        )
+    interactions.declarations.setdefault(planned.datasource, []).append(reference)
+
+
+def _plan_actions(
+    entries: list, by_element: dict[str, PlannedWorksheet],
+    by_parameter: dict[str, features.Parameter], interactions: Interactions,
+) -> None:
+    """Resolve the manifest's actions into renderable ones, numbering them as it goes.
+
+    Args:
+        entries: The manifest's ``actions`` list.
+        by_element: ``{element id: PlannedWorksheet}`` - how an action's endpoints become
+            the sheet names Tableau addresses.
+        by_parameter: ``{parameter name: Parameter}``.
+        interactions: The accumulator (mutated).
+    """
+    index = 0
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        caption = str(entry.get("name", "")).strip()
+        kind = str(entry.get("type", "")).strip().lower()
+        source = by_element.get(str(entry.get("source", "")).strip())
+        if source is None or not (kind in features.ACTION_COMMANDS or kind == "parameter"):
+            continue  # validate_manifest has already named this entry
+        activation = features.ACTIVATIONS.get(
+            str(entry.get("run_on", "")).strip().lower(), "on-select"
+        )
+        targets = entry.get("targets")
+        for target in targets if isinstance(targets, list) else [targets]:
+            target_name = str(target or "").strip()
+            index += 1
+            name = action_name(index, f"{caption}:{target_name}")
+            if kind == "parameter":
+                parameter = by_parameter.get(target_name)
+                reference = source.plan.resolver.reference(
+                    str(entry.get("field", "")).strip()
+                )
+                if parameter is None or reference is None:
+                    continue
+                # The action reads a field off the clicked mark, so the sheet has to declare
+                # it even when it is not on a shelf.
+                source.plan.declared.append(reference)
+                interactions.parameter_actions.append(features.ParameterAction(
+                    name=name, caption=caption, source=source.plan.name,
+                    source_field=source.plan.reference_of(reference),
+                    target_parameter=parameter.reference,
+                    clear_value=parameter.clear_value, activation=activation,
+                ))
+                continue
+            target_planned = by_element.get(target_name)
+            if target_planned is None:
+                continue
+            interactions.sheet_actions.append(features.SheetAction(
+                name=name, caption=caption, kind=kind, source=source.plan.name,
+                target=target_planned.plan.name, activation=activation,
+            ))
+
+
+def _parameters_read_by(
+    references: list[worksheet.FieldRef], parameters: list[features.Parameter]
+) -> list[features.Parameter]:
+    """Return the parameters any of the given fields' formulas reference, in declared order."""
+    formulas = " ".join(
+        reference.formula for reference in references if reference.formula
+    )
+    return [parameter for parameter in parameters if parameter.reference in formulas]
+
+
+def _attach_parameters(
+    plans: list[PlannedWorksheet], parameters: list[features.Parameter]
+) -> None:
+    """Give each worksheet the parameters its calculations read.
+
+    A calculated field's formula is the only place a worksheet can reference a parameter, so
+    the formulas are what decide it - no manifest key to keep in sync.
+
+    Args:
+        plans: The resolved worksheets (mutated).
+        parameters: The resolved parameters.
+    """
+    for planned in plans:
+        planned.plan.parameters = _parameters_read_by(planned.plan.all_refs, parameters)
 
 
 # --- Worksheets, dashboard, windows --------------------------------------------
@@ -432,7 +674,8 @@ def _render_dashboard(
     root: object,
     leaves: dict[str, zones.Leaf],
     tokens: worksheet.DesignTokens,
-) -> tuple[str, set[str]]:
+    interactions: Interactions,
+) -> zones.RenderedZones:
     """Render the dashboard: range-sized above a fixed floor, with the spec's zone tree.
 
     Args:
@@ -442,11 +685,13 @@ def _render_dashboard(
         root: The layout tree's ``root`` node.
         leaves: ``{element id: Leaf}`` - what fills each leaf zone.
         tokens: The design tokens, for the generated title zones.
+        interactions: The resolved control objects - what the dashboard must declare,
+            parameter controls included.
 
     Returns:
-        ``(root zone id, embedded sheet names)``. The root id is the dashboard window's
-        ``active`` target; :func:`_render_windows` hides exactly the embedded sheets, so a
-        sheet that is embedded nowhere keeps its tab instead of becoming unreachable.
+        The :class:`zones.RenderedZones`. The root id is the dashboard window's ``active``
+        target; :func:`_render_windows` hides exactly the embedded sheets, so a sheet that is
+        embedded nowhere keeps its tab instead of becoming unreachable.
     """
     dashboard = ET.SubElement(parent, "dashboard", {
         "enable-sort-zone-taborder": "true", "name": DASHBOARD_NAME,
@@ -463,7 +708,8 @@ def _render_dashboard(
         "minheight": str(MIN_DASHBOARD_HEIGHT), "minwidth": str(MIN_DASHBOARD_WIDTH),
         "sizing-mode": "range",
     })
-    root_zone_id, embedded = zones.render_zones(
+    _render_dashboard_declarations(dashboard, interactions)
+    rendered = zones.render_zones(
         ET.SubElement(dashboard, "zones"),
         root if isinstance(root, dict) else {"type": "vert", "children": []},
         {"width": int(width), "height": int(height)},
@@ -471,7 +717,52 @@ def _render_dashboard(
         tokens,
     )
     ET.SubElement(dashboard, "simple-id", {"uuid": simple_id("dashboard", DASHBOARD_NAME)})
-    return root_zone_id, embedded
+    return rendered
+
+
+def _render_dashboard_declarations(
+    dashboard: ET.Element, interactions: Interactions,
+) -> None:
+    """Declare the datasources and fields the dashboard's own control zones read.
+
+    A filter card or a parameter control is evaluated by the *dashboard*, not by the sheet it
+    filters, so a card whose field only the worksheet declares crashes Tableau on open. The
+    blocks go between ``<size>`` and ``<zones>`` - the XSD's order.
+
+    Args:
+        dashboard: The ``<dashboard>`` element.
+        interactions: The resolved control objects, including the parameters its control zones
+            put on the dashboard - the only parameters declared here.
+    """
+    if not (interactions.declarations or interactions.controlled_parameters):
+        return
+    declared = ET.SubElement(dashboard, "datasources")
+    for name in sorted(interactions.declarations):
+        ET.SubElement(
+            declared, "datasource", {"caption": name, "name": datasource_id(name)}
+        )
+    if interactions.controlled_parameters:
+        ET.SubElement(declared, "datasource", {"name": features.PARAMETERS_DATASOURCE})
+
+    for name in sorted(interactions.declarations):
+        dependencies = ET.SubElement(
+            dashboard, "datasource-dependencies", {"datasource": datasource_id(name)}
+        )
+        by_instance = {
+            reference.instance_name: reference
+            for reference in interactions.declarations[name]
+        }
+        for instance_name in sorted(by_instance):
+            reference = by_instance[instance_name]
+            worksheet.render_column(dependencies, reference)
+            worksheet.render_column_instance(dependencies, reference)
+    if interactions.controlled_parameters:
+        dependencies = ET.SubElement(
+            dashboard, "datasource-dependencies",
+            {"datasource": features.PARAMETERS_DATASOURCE},
+        )
+        for parameter in interactions.controlled_parameters:
+            features.render_parameter_column(dependencies, parameter)
 
 
 def _render_windows(
@@ -567,7 +858,7 @@ def _build_resolvers(
         ``{datasource name: resolver}``. Each resolver knows the datasource's federated id,
         its CSV's field types, and its calculated fields' formulas.
     """
-    calculated: dict[str, dict[str, tuple[str, str]]] = {}
+    calculated: dict[str, dict[str, worksheet.CalculatedField]] = {}
     for entry in manifest_document.get("calculated_fields", []) or []:
         if not isinstance(entry, dict):
             continue
@@ -576,9 +867,10 @@ def _build_resolvers(
         if not (name and source):
             continue
         # No 'type' means a numeric result - the overwhelmingly common calculated field.
-        calculated.setdefault(source, {})[name] = (
-            str(entry.get("formula", "")).strip(),
-            str(entry.get("type", "")).strip().lower() or "real",
+        calculated.setdefault(source, {})[name] = worksheet.CalculatedField(
+            formula=str(entry.get("formula", "")).strip(),
+            datatype=str(entry.get("type", "")).strip().lower() or "real",
+            number_format=str(entry.get("format", "")).strip(),
         )
 
     # The resolver only needs the role and the UI type from each DATA-MODEL.md type; passing
@@ -680,6 +972,121 @@ def _collect_derived_columns(
     return {source: list(columns.values()) for source, columns in derived.items()}
 
 
+def _collect_table_calc_instances(
+    plans: list[PlannedWorksheet],
+) -> dict[str, list[worksheet.FieldRef]]:
+    """Collect the table-calc column-instances each datasource must declare.
+
+    Args:
+        plans: The resolved worksheets.
+
+    Returns:
+        ``{datasource name: [FieldRef]}``, de-duplicated by instance name and in a stable
+        order. A plain instance is not included: only a table calc carries state (its type and
+        addressing) that the datasource has to remember.
+    """
+    instances: dict[str, dict[str, worksheet.FieldRef]] = {}
+    for planned in plans:
+        for reference in planned.plan.all_refs:
+            if reference.table_calc:
+                instances.setdefault(planned.datasource, {}).setdefault(
+                    reference.instance_name, reference
+                )
+    return {source: list(found.values()) for source, found in instances.items()}
+
+
+def _plan_zone_visibility(
+    manifest_document: dict, controlled: dict[str, str]
+) -> list[features.ZoneVisibility]:
+    """Qualify each ``visibility`` field against the datasource that declares it.
+
+    Args:
+        manifest_document: The parsed build manifest.
+        controlled: ``{zone id: calculated field name}`` from the layout walk.
+
+    Returns:
+        One :class:`features.ZoneVisibility` per controlled zone, in zone order. A field no
+        ``calculated_fields`` entry declares is dropped - ``validate_manifest`` has already
+        named it, and a datagraph pointing at a field Tableau cannot find hides the zone for
+        good.
+    """
+    owner: dict[str, str] = {}
+    for entry in manifest_document.get("calculated_fields") or []:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name", "")).strip()
+        source = str(entry.get("datasource", "")).strip()
+        if name and source:
+            owner.setdefault(name, source)
+
+    visibilities: list[features.ZoneVisibility] = []
+    for zone_id in sorted(controlled, key=int):
+        field_name = controlled[zone_id]
+        source = owner.get(field_name)
+        if source:
+            visibilities.append(features.ZoneVisibility(
+                zone_id=zone_id, field=f"[{datasource_id(source)}].[{field_name}]"
+            ))
+    return visibilities
+
+
+def _visibility_requests(node: object) -> list[tuple[dict, str]]:
+    """Collect ``(layout node, field name)`` for every node carrying a ``visibility`` key."""
+    if not isinstance(node, dict):
+        return []
+    requests = []
+    field_name = str(node.get("visibility", "") or "").strip()
+    if field_name:
+        requests.append((node, field_name))
+    for child in node.get("children") or []:
+        requests.extend(_visibility_requests(child))
+    return requests
+
+
+def _element_ids(node: dict) -> list[str]:
+    """Return the node's own element id first, then its descendants' - the search order."""
+    ids = []
+    element_id = str(node.get("id", "") or "").strip()
+    if element_id:
+        ids.append(element_id)
+    for child in node.get("children") or []:
+        if isinstance(child, dict):
+            ids.extend(_element_ids(child))
+    return ids
+
+
+def _attach_visibility_fields(layout: dict, plans: list[PlannedWorksheet]) -> None:
+    """Put every zone-visibility field on the Detail shelf of a sheet that can resolve it.
+
+    Dynamic Zone Visibility evaluates the field off the *view*: a boolean no sheet in the
+    dashboard places is one Tableau cannot read, and the zone silently never toggles - the
+    ``<datagraph>`` alone is not enough. A Desktop-saved DZV workbook puts the field on the
+    controlled sheet's Detail shelf, so that is the sheet preferred here; a controlled
+    container (or a controlled object zone) falls back to any sheet on the field's datasource,
+    which is all Tableau needs to evaluate it.
+
+    Args:
+        layout: The manifest's ``layout`` value.
+        plans: The resolved worksheets (mutated).
+    """
+    by_element = {
+        str(planned.entry.get("element_id", "")).strip(): planned
+        for planned in plans if str(planned.entry.get("element_id", "")).strip()
+    }
+    for node, field_name in _visibility_requests(layout.get("root")):
+        candidates = [by_element[element_id] for element_id in _element_ids(node)
+                      if element_id in by_element]
+        candidates += [planned for planned in plans if planned not in candidates]
+        for planned in candidates:
+            reference = planned.plan.resolver.reference(field_name)
+            if reference is None:
+                continue
+            if not any(existing.instance_name == reference.instance_name
+                       for existing in planned.plan.detail):
+                planned.plan.detail.append(reference)
+            break
+
+
 def render_workbook(
     manifest_document: dict,
     data_model_text: str,
@@ -715,21 +1122,52 @@ def render_workbook(
         "xmlns:user": "http://www.tableausoftware.com/xml/user",
     })
 
-    worksheet_entries = manifest_document.get("worksheets") or []
-    flags = FORMAT_CHANGE_FLAGS
-    if any(entry.get("sort") for entry in worksheet_entries):
-        flags = tuple(sorted(flags + (SORT_FORMAT_FLAG,)))
-
-    format_manifest = ET.SubElement(workbook, "document-format-change-manifest")
-    for flag in flags:
-        ET.SubElement(format_manifest, flag)
-
     field_types = documented_field_types(data_model_text)
     resolvers = _build_resolvers(manifest_document, field_types)
     plans = _plan_worksheets(manifest_document, resolvers)
+    parameters = features.plan_parameters(manifest_document.get("parameters"))
+    layout = manifest_document.get("layout")
+    if not isinstance(layout, dict):
+        layout = {}
+
+    interactions = _plan_interactions(manifest_document, plans, parameters)
+    # Before _attach_parameters: a visibility field's formula reads a parameter, and the sheet
+    # it lands on has to declare that parameter or Tableau cannot resolve the calculation.
+    _attach_visibility_fields(layout, plans)
+    _attach_parameters(plans, parameters)
     derived = _collect_derived_columns(manifest_document, resolvers, plans)
 
+    # The zone tree is rendered into a detached element first: whether the workbook carries a
+    # <datagraph> (and its four format flags) is only known once the layout has been walked,
+    # and the format manifest is the workbook's *first* child.
+    dashboards = ET.Element("dashboards")
+    rendered = _render_dashboard(
+        dashboards,
+        layout.get("canvas", {}),
+        layout.get("root"),
+        {
+            **_dashboard_leaves(plans, manifest_document.get("objects", [])),
+            **interactions.leaves,
+        },
+        tokens,
+        interactions,
+    )
+    visibilities = _plan_zone_visibility(manifest_document, rendered.visibility)
+
+    worksheet_entries = manifest_document.get("worksheets") or []
+    flags = FORMAT_CHANGE_FLAGS
+    if any(entry.get("sort") for entry in worksheet_entries):
+        flags = flags + (SORT_FORMAT_FLAG,)
+    if visibilities:
+        flags = flags + features.DZV_FORMAT_FLAGS
+    if interactions.parameter_actions:
+        flags = flags + features.PARAMETER_ACTION_FORMAT_FLAGS
+    format_manifest = ET.SubElement(workbook, "document-format-change-manifest")
+    for flag in sorted(flags):  # Tableau writes them alphabetically
+        ET.SubElement(format_manifest, flag)
+
     datasources = ET.SubElement(workbook, "datasources")
+    table_calcs = _collect_table_calc_instances(plans)
     for entry in manifest_document.get("datasources", []):
         csv_name = str(entry.get("csv", "")).strip()
         name = str(entry.get("name", "")).strip()
@@ -740,7 +1178,10 @@ def render_workbook(
             _columns_for(csv_headers.get(csv_name, []), field_types.get(csv_name, {})),
             version,
             derived.get(name, []),
+            table_calcs.get(name, []),
+            _parameters_read_by(derived.get(name, []), parameters),
         )
+    features.render_parameters_datasource(datasources, parameters, version)
 
     if any(planned.plan.spec.geographic for planned in plans):
         # A map needs its <mapsources> at *both* levels: the workbook's declares the source,
@@ -748,6 +1189,11 @@ def render_workbook(
         ET.SubElement(
             ET.SubElement(workbook, "mapsources"), "mapsource", {"name": worksheet.MAPSOURCE_NAME}
         )
+
+    features.render_actions(
+        workbook, DASHBOARD_NAME, interactions.sheet_actions,
+        interactions.parameter_actions,
+    )
 
     if plans:  # the XSD requires >=1 <worksheet>; omit the element otherwise
         worksheets = ET.SubElement(workbook, "worksheets")
@@ -757,18 +1203,13 @@ def render_workbook(
                 simple_id("worksheet", planned.plan.name),
             )
 
-    layout = manifest_document.get("layout")
-    if not isinstance(layout, dict):
-        layout = {}
-    root_zone_id, embedded = _render_dashboard(
-        ET.SubElement(workbook, "dashboards"),
-        layout.get("canvas", {}),
-        layout.get("root"),
-        _dashboard_leaves(plans, manifest_document.get("objects", [])),
-        tokens,
-    )
+    workbook.append(dashboards)
     _render_windows(
-        workbook, [planned.plan for planned in plans], root_zone_id, embedded
+        workbook, [planned.plan for planned in plans], rendered.root_zone_id,
+        rendered.embedded,
+    )
+    features.render_datagraph(
+        workbook, visibilities, simple_id("dashboard", DASHBOARD_NAME)
     )
 
     if target == TARGET_2026:

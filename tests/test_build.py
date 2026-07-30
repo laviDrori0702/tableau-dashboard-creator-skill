@@ -325,7 +325,10 @@ def test_object_zone_fills_a_non_worksheet_zone():
     """Not every zone is a view - a filter card / text zone is declared under 'objects'."""
     document = _manifest()
     document["layout"]["root"]["children"].insert(0, {"id": "flt-region", "size": 10})
-    document["objects"] = [{"element_id": "flt-region", "kind": "filter"}]
+    document["objects"] = [{
+        "element_id": "flt-region", "kind": "filter",
+        "field": "region", "worksheet": "Revenue Trend",
+    }]
 
     assert _errors(document) == []
 
@@ -526,11 +529,12 @@ def test_parameter_action_targets_a_parameter_not_a_zone():
     """A parameter action targets a declared parameter - not every action targets a zone."""
     document = _manifest()
     document["parameters"] = [
-        {"name": "Measure", "data_type": "string", "allowed_values": ["Revenue"]}
+        {"name": "Measure", "data_type": "string", "current_value": "Revenue",
+         "values": ["Revenue"]}
     ]
     document["actions"] = [
         {"name": "Pick measure", "type": "parameter", "source": "chart-trend",
-         "targets": ["Measure"]}
+         "targets": ["Measure"], "field": "region"}
     ]
 
     assert _errors(document) == []

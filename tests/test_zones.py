@@ -42,14 +42,14 @@ INSET_Y = round(zones.ROOT_MARGIN_PX / CANVAS["height"] * zones.ZONE_SPACE)
 def _render(root, leaves=None, canvas=None, tokens=None):
     """Render one layout tree and return ``(<zones> element, root zone id, embedded)``."""
     container = ET.Element("zones")
-    root_id, embedded = zones.render_zones(
+    rendered = zones.render_zones(
         container,
         root,
         canvas or CANVAS,
         leaves or {},
         tokens or worksheet.DesignTokens(),
     )
-    return container, root_id, embedded
+    return container, rendered.root_zone_id, rendered.embedded
 
 
 def _tree(node):
@@ -412,10 +412,12 @@ def test_a_box_too_short_for_its_title_and_legend_is_squeezed_not_overflowed():
 
 @pytest.mark.parametrize("kind, type_v2", [
     ("text", "text"), ("blank", "empty"),
-    # Deferred to #37: each needs a reference the manifest does not carry yet, so the layout
-    # reserves the box rather than emitting a zone Tableau cannot resolve.
-    ("image", "empty"), ("filter", "empty"), ("legend", "empty"),
-    ("button", "empty"), ("parameter", "empty"),
+    # An image / button / standalone legend needs a reference the manifest does not carry, so
+    # the layout reserves the box rather than emitting a zone Tableau cannot resolve.
+    ("image", "empty"), ("legend", "empty"), ("button", "empty"),
+    # A filter card or a parameter control renders for real - but only once the leaf carries
+    # the 'param' it controls (see test_features.py); without one it also reserves its box.
+    ("filter", "empty"), ("parameter", "empty"),
     ("nonsense", "empty"),
 ])
 def test_object_kinds_map_to_their_zone_type(kind, type_v2):
@@ -495,8 +497,9 @@ LAYOUT_RICH_MANIFEST = {
     "objects": [
         {"element_id": "txt-title", "kind": "text", "text": "Sales Performance"},
         {"element_id": "img-logo", "kind": "image"},
-        {"element_id": "flt-region", "kind": "filter"},
-        {"element_id": "prm-target", "kind": "parameter"},
+        {"element_id": "flt-region", "kind": "filter",
+         "field": "region", "worksheet": "Revenue by Region"},
+        {"element_id": "prm-target", "kind": "parameter", "parameter": "Target"},
         {"element_id": "leg-region", "kind": "legend"},
         {"element_id": "btn-reset", "kind": "button"},
         {"element_id": "spc-gap", "kind": "blank"},
@@ -524,7 +527,10 @@ LAYOUT_RICH_MANIFEST = {
         },
     },
     "actions": [],
-    "parameters": [],
+    "parameters": [
+        {"name": "Target", "data_type": "real", "current_value": 100000,
+         "range": {"min": 0, "max": 500000, "step": 50000}},
+    ],
 }
 
 
