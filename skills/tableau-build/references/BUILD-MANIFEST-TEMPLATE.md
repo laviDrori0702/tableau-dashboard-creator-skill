@@ -17,11 +17,14 @@ a bad spec-to-manifest translation is fixed row-by-row before any XML is generat
 | `layout` | yes | The spec's `## Layout` container tree, copied as-is (canvas + nested `vert`/`horz` + id leaves with `%` sizes). |
 | `actions` | yes (`[]` if none) | Dashboard actions; `type` from `filter`/`highlight`/`parameter`/`set`/`url`. `source` is always a zone; a target is a zone for `filter`/`highlight`, a declared parameter for `parameter` (see below). |
 | `parameters` | yes (`[]` if none) | Each needs a `name` and a `data_type`. |
-| `objects` | optional | Layout zones no view fills — a filter card, title text, a logo, a legend. `kind` from `filter`/`parameter`/`text`/`image`/`legend`/`button`/`blank`. |
+| `objects` | optional | Layout zones no view fills — a filter card, title text, a logo, a legend. `kind` from `filter`/`parameter`/`text`/`image`/`legend`/`button`/`blank`. `text` and `blank` render today; the rest reserve their box as an empty zone until the wiring they need lands. |
 | `calculated_fields` | optional | Fields that legitimately are not in the data model; declaring one makes it usable on a shelf of its `datasource`. |
 
 **Copy the `layout` tree from the spec verbatim** — `validate` diffs the two and rejects any
 zone the manifest drops or invents, so the workbook cannot disagree with the approved mock.
+The tree *is* the dashboard's zone hierarchy: each node becomes one zone, sibling `size`
+values are proportions of the parent along its flow axis, and the dashboard is fixed at
+`canvas` px. A child with no `size` shares whatever its siblings leave.
 
 **Every leaf zone must be filled** by exactly one worksheet or one `objects` entry — an
 unfilled zone would build an empty container. A *mapped container* (a node with both an `id`
@@ -68,6 +71,10 @@ Encodings the builder emits: `color`, `size`, `shape`, `text`, `lod`, `wedge-siz
 | `tooltip` | `[{"label": "Revenue", "field": "revenue", "aggregation": "sum"}]` | A custom tooltip template, one label/value pair per line. |
 | `axis_titles` | `{"rows": "Revenue per category"}` | Overrides the generated axis title. |
 | `number_formats` | `[{"field": "revenue", "format": "$#,##0"}]` | Cell number format for that field. |
+| `title` | `"Revenue by region"` | Puts a styled text zone above the sheet's zone in the dashboard and suppresses the sheet's own title. Omit to keep Tableau's sheet title. |
+
+An `objects` entry of `kind: "text"` takes its content the same way: `{"element_id":
+"txt-title", "kind": "text", "text": "Sales Performance"}`.
 
 Every modifier's field is resolved as strictly as a shelf field — a filter on a field the
 data model does not document is rejected, not silently dropped.
@@ -113,6 +120,7 @@ defaults apply. Nothing in the manifest sets fonts or colours.
       "element_id": "chart-trend",
       "chart_type": "line",
       "datasource": "sales_orders",
+      "title": "Revenue over time",
       "shelves": {
         "columns": [{"field": "order_date", "date_part": "month"}],
         "rows": [{"field": "revenue", "aggregation": "sum"}]

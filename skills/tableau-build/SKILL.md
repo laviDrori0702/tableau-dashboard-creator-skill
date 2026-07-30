@@ -134,10 +134,18 @@ invented zone is caught rather than silently built.
   version is created by re-running `tableau-mock` (which bumps and stales spec and build).
 - **Live connection, always.** The workbook never carries an extract: the `.twbx` embeds the
   CSVs, and the analyst points it at the real database with Data → Replace Data Source.
-- **The dashboard's zone tree is still coming.** Today's assembler emits the datasources,
-  fully populated worksheets, a dashboard sized from the mock's canvas, and the windows.
-  Nesting the layout tree into dashboard zones is the next ticket, so every view renders but
-  the dashboard itself is still a single container.
+- **The dashboard is fixed-size and its zones are computed.** The `layout` tree becomes the
+  dashboard's zone hierarchy one-to-one: sibling `size` values are proportions of the parent
+  along its flow axis, mapped into Tableau's 0–100000 space at the canvas dimensions. A
+  worksheet's optional `title` becomes a text zone above its sheet zone (and suppresses the
+  sheet's own title); a colour-encoded chart gets a legend zone below it. Both stack *inside*
+  the element's own box, so they never disturb its siblings.
+- **A filter / parameter / image / button / legend object reserves its box, empty.** Each of
+  those zone types needs a reference the manifest does not carry yet (a field plus the
+  dashboard's own `<datasource-dependencies>`, a parameter, a filename, an action, a sheet +
+  colour field), and Tableau does not treat those as optional — so the layout keeps the
+  geometry and the features-and-actions ticket turns each into its real zone. `text` and
+  `blank` objects render fully today.
 
 > The full `STATE.md` schema and the ordering / staleness / versioning rules live in
 > `CONTRACT.md` at the repo root. This skill restates only its own slice; `build.py`,

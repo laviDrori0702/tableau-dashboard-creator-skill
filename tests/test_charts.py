@@ -518,19 +518,23 @@ def test_no_map_means_no_workbook_mapsources():
     assert ET.fromstring(_render(document)).find("mapsources") is None
 
 
-def test_a_sheet_no_dashboard_zone_shows_keeps_its_tab():
-    """Tableau renders no tab for hidden='true', so hiding a sheet the dashboard does not
-    embed makes it unreachable - the workbook opens with nothing in it. Until the zone tree
-    lands, no sheet is embedded, so no sheet may be hidden."""
-    hidden = [
+def test_every_chart_type_gets_a_dashboard_zone_and_a_hidden_tab():
+    """Tableau renders no tab for hidden='true', so a sheet may only be hidden once a zone
+    shows it. With the zone tree in place, every one of the 15 sheets is embedded - so every
+    one is hidden, and the analyst opens on the dashboard rather than on a wall of tabs."""
+    hidden = {
         window.get("name")
         for window in ALL_CHARTS_ROOT.find("windows")
         if window.get("class") == "worksheet" and window.get("hidden") == "true"
-    ]
-    assert hidden == []
+    }
+    embedded = {
+        zone.get("name")
+        for zone in ALL_CHARTS_ROOT.findall("dashboards/dashboard/zones//zone")
+        if zone.get("name")
+    }
+    sheets = {sheet.get("name") for sheet in ALL_CHARTS_ROOT.findall("worksheets/worksheet")}
 
-    zones = ALL_CHARTS_ROOT.findall("dashboards/dashboard/zones//zone")
-    assert not [zone.get("name") for zone in zones if zone.get("name")]
+    assert embedded == sheets == hidden
 
 
 def test_a_sorted_workbook_carries_the_sort_format_flag():
