@@ -387,7 +387,7 @@ def _render_zone_style(parent: ET.Element, margin: str) -> None:
         ET.SubElement(zone_style, "format", {"attr": attribute, "value": value})
 
 
-def _render_dashboard(parent: ET.Element, canvas: dict, root_zone_id: str) -> None:
+def _render_dashboard(parent: ET.Element, canvas: dict, root_zone_id: str) -> set[str]:
     """Render the dashboard: its size from the mock's canvas, and one root zone.
 
     The zone *tree* (``layout.root``) is the next ticket; what this pins is the geometry
@@ -397,6 +397,11 @@ def _render_dashboard(parent: ET.Element, canvas: dict, root_zone_id: str) -> No
         parent: The ``<dashboards>`` element.
         canvas: The layout's ``canvas`` object (``width`` / ``height`` in px).
         root_zone_id: The id of the root zone (the dashboard window's ``active`` target).
+
+    Returns:
+        The names of the worksheets this dashboard embeds in a zone - empty until the zone
+        tree lands. :func:`_render_windows` hides exactly these, so a sheet that is embedded
+        nowhere keeps its tab instead of leaving the analyst a blank workbook.
     """
     dashboard = ET.SubElement(parent, "dashboard", {
         "enable-sort-zone-taborder": "true", "name": DASHBOARD_NAME,
@@ -413,29 +418,37 @@ def _render_dashboard(parent: ET.Element, canvas: dict, root_zone_id: str) -> No
         "w": ZONE_SPACE, "x": "0", "y": "0",
     })
     # TODO(next ticket): nest the manifest's layout.root tree inside this zone, one child
-    # zone per element id, with each worksheet zone naming its sheet.
+    # zone per element id, with each worksheet zone naming its sheet - and return those
+    # sheet names here, which is all _render_windows needs to start hiding tabs again.
     _render_zone_style(root_zone, ROOT_ZONE_MARGIN)  # zone-style is the zone's last child
     ET.SubElement(dashboard, "simple-id", {"uuid": simple_id("dashboard", DASHBOARD_NAME)})
+    return set()
 
 
 def _render_windows(
-    parent: ET.Element, plans: list[worksheet.WorksheetPlan], root_zone_id: str
+    parent: ET.Element,
+    plans: list[worksheet.WorksheetPlan],
+    root_zone_id: str,
+    embedded: set[str],
 ) -> None:
-    """Render one hidden window per worksheet plus the dashboard window.
+    """Render one window per worksheet plus the dashboard window.
 
     Args:
         parent: The ``<workbook>`` element.
         plans: The resolved worksheets, in manifest order.
         root_zone_id: The zone the dashboard window opens on.
+        embedded: Names of worksheets the dashboard embeds in a zone; only those get
+            ``hidden='true'``. Hiding a sheet no zone shows makes it unreachable - Tableau
+            renders no tab for it, so the analyst opens a workbook with nothing in it.
     """
     windows = ET.SubElement(parent, "windows", {"source-height": "30"})
     worksheet_names = [plan.name for plan in plans]
 
     for plan in plans:
-        # hidden: these sheets only ever appear embedded in the dashboard.
-        window = ET.SubElement(
-            windows, "window", {"class": "worksheet", "hidden": "true", "name": plan.name}
-        )
+        attributes = {"class": "worksheet", "name": plan.name}
+        if plan.name in embedded:
+            attributes["hidden"] = "true"
+        window = ET.SubElement(windows, "window", dict(sorted(attributes.items())))
         cards = ET.SubElement(window, "cards")
         left = ET.SubElement(cards, "edge", {"name": "left"})
         left_strip = ET.SubElement(left, "strip", {"size": "160"})
@@ -673,8 +686,10 @@ def render_workbook(
 
     layout = manifest_document.get("layout")
     canvas = layout.get("canvas", {}) if isinstance(layout, dict) else {}
-    _render_dashboard(ET.SubElement(workbook, "dashboards"), canvas, ROOT_ZONE_ID)
-    _render_windows(workbook, [plan for _, plan in plans], ROOT_ZONE_ID)
+    embedded = _render_dashboard(
+        ET.SubElement(workbook, "dashboards"), canvas, ROOT_ZONE_ID
+    )
+    _render_windows(workbook, [plan for _, plan in plans], ROOT_ZONE_ID, embedded)
 
     if target == TARGET_2026:
         explain_data = ET.SubElement(workbook, "explain-data", {

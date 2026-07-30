@@ -974,8 +974,12 @@ def test_every_viewpoint_has_entire_view_zoom():
         assert viewpoint.find("zoom").get("type") == "entire-view"
 
 
-def test_every_worksheet_has_a_matching_hidden_window():
-    """validate_twb's worksheet<->window check is bidirectional; both sides come from here."""
+def test_every_worksheet_has_a_matching_visible_window():
+    """validate_twb's worksheet<->window check is bidirectional; both sides come from here.
+
+    The windows are *visible*: a sheet is hidden only once a dashboard zone embeds it, and
+    the zone tree is the next ticket. Hiding a sheet nothing shows leaves Tableau with no tab
+    to render it on, which is a workbook the analyst cannot see into at all."""
     root = _render()
     worksheets = [sheet.get("name") for sheet in root.findall("worksheets/worksheet")]
     windows = [
@@ -984,10 +988,10 @@ def test_every_worksheet_has_a_matching_hidden_window():
     ]
 
     assert worksheets == windows == ["Revenue KPI", "Revenue Trend"]
-    assert all(
-        window.get("hidden") == "true" for window in root.findall("windows/window")
-        if window.get("class") == "worksheet"
-    )
+    assert not [
+        window.get("name") for window in root.findall("windows/window")
+        if window.get("class") == "worksheet" and window.get("hidden") == "true"
+    ]
 
 
 def test_dashboard_is_sized_from_the_layout_canvas():
