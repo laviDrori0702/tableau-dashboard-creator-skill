@@ -26,6 +26,9 @@
           <style-rule element="cell">
             <format attr="text-format" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" value="$#,##0" />
           </style-rule>
+          <style-rule element="mark">
+            <format attr="mark-color" value="#1b4f72" />
+          </style-rule>
           <style-rule element="worksheet">
             <format attr="font-family" value="Open Sans" />
             <format attr="display-field-labels" scope="cols" value="false" />
@@ -38,6 +41,15 @@
               <breakdown value="auto" />
             </view>
             <mark class="Automatic" />
+            <encodings>
+              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
+            </encodings>
+            <style>
+              <style-rule element="mark">
+                <format attr="mark-labels-show" value="true" />
+                <format attr="mark-labels-cull" value="true" />
+              </style-rule>
+            </style>
           </pane>
         </panes>
         <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]</rows>

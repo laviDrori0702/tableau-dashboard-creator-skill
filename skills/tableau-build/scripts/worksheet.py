@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Callable, NamedTuple, Optional
 
 # A worksheet that reads a parameter has to declare it; :mod:`features` owns what a parameter
@@ -686,12 +686,9 @@ class ReferenceLinePlan:
     label: str = ""
 
 
-#: What a ``format`` block may carry, and the horizontal / vertical alignments it accepts.
-#: ``manifest`` reads all three, so a typo'd key or value fails validation instead of
+#: The horizontal / vertical alignments a ``format`` block accepts. ``manifest`` reads these
+#: (and :data:`SHEET_FORMAT_KEYS`), so a typo'd key or value fails validation instead of
 #: silently rendering an unformatted sheet.
-SHEET_FORMAT_KEYS: frozenset[str] = frozenset({
-    "shading", "borders", "gridlines", "zero_lines", "align", "vertical_align",
-})
 TEXT_ALIGNMENTS: frozenset[str] = frozenset({"left", "center", "right"})
 VERTICAL_ALIGNMENTS: frozenset[str] = frozenset({"top", "center", "bottom"})
 
@@ -730,6 +727,12 @@ class SheetFormat:
     zero_lines: str = ""
     align: str = ""
     vertical_align: str = ""
+
+
+#: What a ``format`` block may carry - derived from the dataclass, because
+#: :func:`_plan_sheet_format` splats the surviving keys straight into ``SheetFormat(**values)``
+#: and a hand-kept copy that drifts is a TypeError.
+SHEET_FORMAT_KEYS: frozenset[str] = frozenset(field.name for field in fields(SheetFormat))
 
 
 @dataclass
@@ -885,12 +888,12 @@ def _plan_fit(value: object, chart_type: str) -> str:
     return "standard" if chart_type in STANDARD_FIT_CHART_TYPES else DEFAULT_FIT
 
 
-def _plan_sheet_format(entry: object) -> SheetFormat:
+def _plan_sheet_format(block: object) -> SheetFormat:
     """Resolve the ``format`` block into a :class:`SheetFormat`, ignoring unknown keys."""
-    if not isinstance(entry, dict):
+    if not isinstance(block, dict):
         return SheetFormat()
     values = {
-        key: _lower(value) for key, value in entry.items() if key in SHEET_FORMAT_KEYS
+        key: _lower(value) for key, value in block.items() if key in SHEET_FORMAT_KEYS
     }
     return SheetFormat(**values)
 
@@ -1343,9 +1346,10 @@ def _add_palette(add: AddRule, plan: WorksheetPlan, tokens: DesignTokens) -> Non
     """Add the brand palette to whatever the worksheet colours its marks by.
 
     The colours ride along inline (see :class:`DesignTokens`), so no data member has to be
-    known. Two shapes, decided by what is on Colour: a *dimension* takes the whole ordered
+    known. Three shapes, decided by what is on Colour: a *dimension* takes the whole ordered
     palette and Tableau walks the domain against it; a *measure* is a continuous ramp, and a
-    ramp has two ends - the first and last brand colours, low to high.
+    ramp has two ends - the first and last brand colours, low to high; *nothing* on Colour has
+    no domain at all, so it gets the brand's first colour as the flat mark colour.
 
     Args:
         add: ``_render_style``'s rule accumulator.
@@ -1363,7 +1367,11 @@ def _add_palette(add: AddRule, plan: WorksheetPlan, tokens: DesignTokens) -> Non
         field_reference = plan.reference_of(reference)
         quantitative = reference.instance_type == "quantitative"
     else:
-        return  # nothing is colour-encoded, so there is no palette to apply
+        # Nothing on Colour, so there is no domain to walk - but the marks still have *a*
+        # colour, and Tableau's is its default blue. The brand's first series colour is what
+        # keeps a plain bar or line from reading as "generated" too.
+        add("mark", "format", {"attr": "mark-color", "value": tokens.series_colors[0]})
+        return
 
     colors = tokens.series_colors
     if quantitative:

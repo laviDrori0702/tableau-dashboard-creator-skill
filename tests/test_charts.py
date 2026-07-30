@@ -106,11 +106,14 @@ CHART_CASES: list[tuple[str, dict]] = [
             {"field": "order_date", "min": "2025-03-03", "max": "2025-04-22"},
         ],
     )),
+    # The text encoding is what makes the number_format visible: without labelled marks a
+    # styled bar renders identically to a plain one, which is the #35 symptom.
     ("bar-styled", _sheet(
         "Bar Styled", "bar",
         shelves={"columns": ["product_category"], "rows": ["revenue"]},
         axis_titles={"rows": "Revenue per category"},
         number_formats=[{"field": "revenue", "format": "$#,##0"}],
+        encodings={"text": {"field": "revenue", "aggregation": "sum"}},
     )),
     ("bar-stacked", _sheet(
         "Bar Stacked", "bar",
@@ -829,9 +832,15 @@ def test_dual_charts_colour_their_measure_names_from_the_brand(sheet_name):
     assert encoding.get("type") == "palette"
 
 
-def test_an_uncoloured_chart_gets_no_palette():
-    """A plain bar has nothing on Colour, so a palette rule would style nothing."""
+def test_an_uncoloured_chart_gets_the_brand_colour_and_no_palette():
+    """A plain bar has no domain to walk, so a palette would style nothing - but its marks
+    still have a colour, and Tableau's default blue is what makes a chart look generated."""
     assert _mark_encoding("Bar") is None
+
+    rule = _worksheet_element("Bar").find("table/style/style-rule[@element='mark']")
+    assert [(fmt.get("attr"), fmt.get("value")) for fmt in rule.findall("format")] == [
+        ("mark-color", "#1b4f72"),
+    ]
 
 
 def test_no_series_colours_means_tableau_default_10():

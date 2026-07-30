@@ -95,10 +95,10 @@ AGGREGATIONS = frozenset({
 DATE_PARTS = frozenset(DATE_PART_DERIVATIONS)
 ENCODING_NAMES = frozenset(ENCODING_ORDER)
 
-#: How a sheet may be told to fill its zone, and the ``format`` block's keys and alignment
-#: values - all read off the builder's own tables, same reason as :data:`CHART_TYPES`.
+#: How a sheet may be told to fill its zone, and the ``format`` block's alignment values -
+#: both read off the builder's own tables, same reason as :data:`CHART_TYPES`. The block's
+#: key set is the builder's :data:`SHEET_FORMAT_KEYS`, used directly.
 FITS = frozenset(FIT_ZOOMS)
-FORMAT_KEYS = SHEET_FORMAT_KEYS
 FORMAT_ALIGNMENTS: dict[str, frozenset[str]] = {
     "align": TEXT_ALIGNMENTS, "vertical_align": VERTICAL_ALIGNMENTS,
 }
@@ -668,15 +668,15 @@ def _validate_sheet_format(label: str, block: object, errors: list[str]) -> None
     if not isinstance(block, dict):
         errors.append(
             f"{label}: 'format' must be an object "
-            f"(keys: {', '.join(sorted(FORMAT_KEYS))})"
+            f"(keys: {', '.join(sorted(SHEET_FORMAT_KEYS))})"
         )
         return
 
     for key, value in block.items():
-        if key not in FORMAT_KEYS:
+        if key not in SHEET_FORMAT_KEYS:
             errors.append(
                 f"{label}: unknown format key '{key}' "
-                f"(expected one of: {', '.join(sorted(FORMAT_KEYS))})"
+                f"(expected one of: {', '.join(sorted(SHEET_FORMAT_KEYS))})"
             )
             continue
         text = value.strip().lower() if isinstance(value, str) else ""

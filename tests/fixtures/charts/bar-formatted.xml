@@ -29,6 +29,9 @@
           <style-rule element="gridline">
             <format attr="stroke-color" value="#e5e8e8" />
           </style-rule>
+          <style-rule element="mark">
+            <format attr="mark-color" value="#1b4f72" />
+          </style-rule>
           <style-rule element="pane">
             <format attr="background-color" value="#ffffff" />
           </style-rule>

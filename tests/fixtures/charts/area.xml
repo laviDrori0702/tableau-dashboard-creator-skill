@@ -20,6 +20,9 @@
           <aggregation value="true" />
         </view>
         <style>
+          <style-rule element="mark">
+            <format attr="mark-color" value="#1b4f72" />
+          </style-rule>
           <style-rule element="worksheet">
             <format attr="font-family" value="Open Sans" />
             <format attr="display-field-labels" scope="cols" value="false" />

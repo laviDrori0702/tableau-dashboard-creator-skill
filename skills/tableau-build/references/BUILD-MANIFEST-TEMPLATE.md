@@ -132,9 +132,15 @@ So:
 - a **measure** on `color` (a filled map, a heatmap) is a continuous ramp, and gets the first
   and last brand colours as its low and high ends;
 - a `dual-axis` / `combo` chart is coloured by the built-in Measure Names and takes the
-  categorical palette too.
+  categorical palette too;
+- a sheet with **nothing on `color`** (a plain bar, line, area, scatter, histogram, table) has
+  no domain to walk, so it takes the **first** brand colour as its flat mark colour. Otherwise
+  most of the workbook would still be Tableau's default blue, which is the single loudest tell
+  that a dashboard was generated.
 
-Tokens with no `### Chart series colors` section leave Tableau's default 10 in place.
+Tokens with no `### Chart series colors` section leave Tableau's default 10 in place. That
+heading is required by `tableau-brand`'s validator precisely because `build` binds to its name
+(CONTRACT.md §1).
 
 ## Interactions
 
