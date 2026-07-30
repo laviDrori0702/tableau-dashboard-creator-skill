@@ -23,7 +23,10 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from typing import Optional
+from typing import NamedTuple, Optional
+
+# For DesignTokens only; :mod:`worksheet` does not import this module, so no cycle.
+from worksheet import DesignTokens
 
 #: Dashboard zones live in a 100,000 x 100,000 virtual coordinate space, whatever the canvas.
 ZONE_SPACE = 100000
@@ -47,19 +50,16 @@ OBJECT_ZONE_TYPES: dict[str, str] = {
     "blank": "empty",
 }
 
-#: The other kinds, and the zone type each will eventually carry. Every one of them needs a
-#: reference the manifest does not carry yet - a filter's field (plus the dashboard's own
-#: ``<datasource-dependencies>``), a parameter control's parameter, an image's filename, a
-#: button's action, a legend's sheet and colour field - and Tableau does not treat those as
-#: optional. So the layout reserves the box as an empty zone, keeping the geometry the analyst
-#: approved, and the features-and-actions ticket (#37) turns each into its real zone.
-DEFERRED_ZONE_TYPES: dict[str, str] = {
-    "filter": "filter",
-    "parameter": "paramctrl",
-    "image": "bitmap",
-    "button": "dashboard-object",
-    "legend": "color",
-}
+#: The other kinds. Each one's real zone type (``filter``, ``paramctrl``, ``bitmap``,
+#: ``dashboard-object``, ``color``) needs a reference the manifest does not carry yet - a
+#: filter's field plus the dashboard's own ``<datasource-dependencies>``, a parameter control's
+#: parameter, an image's filename (which the ``.twbx`` would also have to embed), a button's
+#: action, a legend's sheet and colour field - and Tableau does not treat those as optional.
+#: So the layout reserves the box as an empty zone, keeping the geometry the analyst approved,
+#: until the ticket that adds the wiring can emit the real zone.
+DEFERRED_KINDS: frozenset[str] = frozenset({
+    "filter", "parameter", "image", "button", "legend",
+})
 
 #: The zone type of a leaf nothing fills, of a deferred kind, and of an unknown one.
 EMPTY_ZONE_TYPE = "empty"
@@ -89,6 +89,18 @@ class Box:
     h: int
 
 
+class Legend(NamedTuple):
+    """The colour encoding one legend zone keys.
+
+    Attributes:
+        field: The qualified colour field reference (the zone's ``param``).
+        pane_id: Which pane's encoding to show (the zone's ``pane-specification-id``).
+    """
+
+    field: str
+    pane_id: str
+
+
 @dataclass(frozen=True)
 class Leaf:
     """What fills one leaf zone of the layout tree.
@@ -103,15 +115,14 @@ class Leaf:
         title: Title text; when set, a text zone is stacked above the content and the
             sheet's own title is suppressed.
         text: The text a ``text`` object zone displays.
-        legend: ``(qualified colour field, pane-specification-id)`` for a colour legend zone
-            stacked below the content; empty for no legend.
+        legend: The colour legend to stack below the content, or ``None`` for no legend.
     """
 
     worksheet: str = ""
     kind: str = ""
     title: str = ""
     text: str = ""
-    legend: tuple[str, ...] = ()
+    legend: Optional[Legend] = None
 
 
 def render_zone_style(parent: ET.Element, margin: str) -> None:
@@ -170,7 +181,9 @@ class _ZoneWriter:
             render it on.
     """
 
-    def __init__(self, canvas: dict, leaves: dict[str, Leaf], tokens) -> None:
+    def __init__(
+        self, canvas: dict, leaves: dict[str, Leaf], tokens: DesignTokens
+    ) -> None:
         """Set up a writer for one dashboard.
 
         Args:
@@ -337,7 +350,11 @@ class _ZoneWriter:
             parent, box, f"{CONTAINER_PREFIXES['vert']}-{label}",
             type_v2="layout-flow", param="vert",
         )
-        content_height = max(0, box.h - title_height - legend_height)
+        # A box too short for both fixed zones is squeezed, never overflowed: a zone written
+        # past the wrapper's bottom edge would overlap the sibling below it.
+        title_height = min(title_height, box.h)
+        legend_height = min(legend_height, box.h - title_height)
+        content_height = box.h - title_height - legend_height
         cursor = box.y
         if title_height:
             self._title(wrapper, leaf.title, Box(box.x, cursor, box.w, title_height), label)
@@ -393,12 +410,12 @@ class _ZoneWriter:
 
     def _legend(self, parent: ET.Element, leaf: Leaf, box: Box, label: str) -> None:
         """Render a fixed-height colour legend zone keying the sheet's colour encoding."""
-        field_reference, pane_id = leaf.legend[0], leaf.legend[1]
+        legend = leaf.legend
         zone = self._zone(
             parent, box, f"{label} legend", type_v2="color",
             fixed_size=str(LEGEND_HEIGHT_PX), is_fixed="true", leg_item_layout="horz",
-            name=leaf.worksheet or None, pane_specification_id=pane_id,
-            param=field_reference, show_title="false",
+            name=leaf.worksheet or None, pane_specification_id=legend.pane_id,
+            param=legend.field, show_title="false",
         )
         render_zone_style(zone, ZONE_MARGIN)
 
@@ -418,7 +435,11 @@ class _ZoneWriter:
 
 
 def render_zones(
-    parent: ET.Element, root: dict, canvas: dict, leaves: dict[str, Leaf], tokens
+    parent: ET.Element,
+    root: dict,
+    canvas: dict,
+    leaves: dict[str, Leaf],
+    tokens: DesignTokens,
 ) -> tuple[str, set[str]]:
     """Render a layout tree into a dashboard's ``<zones>``.
 

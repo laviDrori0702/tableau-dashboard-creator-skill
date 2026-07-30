@@ -31,6 +31,7 @@ import hashlib
 import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import worksheet
 import zones
@@ -369,7 +370,7 @@ def _render_datasource(
 # --- Worksheets, dashboard, windows --------------------------------------------
 
 def _dashboard_leaves(
-    plans: list[tuple[str, dict, worksheet.WorksheetPlan]], objects: object
+    plans: list[PlannedWorksheet], objects: object
 ) -> dict[str, zones.Leaf]:
     """Map every layout element id to what fills its zone.
 
@@ -378,7 +379,7 @@ def _dashboard_leaves(
     the views and the non-view objects.
 
     Args:
-        plans: The resolved worksheets, as ``(datasource, manifest entry, plan)``.
+        plans: The resolved worksheets.
         objects: The manifest's optional ``objects`` list.
 
     Returns:
@@ -392,10 +393,10 @@ def _dashboard_leaves(
         # Only the colour legend is placed in the dashboard; size/shape keys stay on the
         # worksheet's own right edge, where they do not compete for the element's box.
         legend = next(
-            ((reference, pane_id)
+            (zones.Legend(reference, pane_id)
              for card_type, reference, pane_id in worksheet.legend_cards(plan)
              if card_type == "color"),
-            (),
+            None,
         )
         # First claimant wins: two views on one zone is a manifest bug, and picking the
         # later one would silently move the analyst's chart.
@@ -590,16 +591,30 @@ def _build_resolvers(
     return resolvers
 
 
+class PlannedWorksheet(NamedTuple):
+    """One resolved worksheet and the two things about it the plan does not carry.
+
+    The manifest entry travels alongside the plan because the *dashboard* needs what a
+    :class:`worksheet.WorksheetPlan` deliberately knows nothing about - the ``element_id`` the
+    sheet fills and its title - while the datasource name is what the derived-column pass
+    groups by.
+
+    Attributes:
+        datasource: The datasource name the worksheet reads.
+        entry: The raw ``worksheets`` entry from the manifest.
+        plan: The resolved plan the worksheet body is rendered from.
+    """
+
+    datasource: str
+    entry: dict
+    plan: worksheet.WorksheetPlan
+
+
 def _plan_worksheets(
     manifest_document: dict, resolvers: dict[str, worksheet.FieldResolver]
-) -> list[tuple[str, dict, worksheet.WorksheetPlan]]:
-    """Resolve every manifest worksheet into ``(datasource, manifest entry, plan)``.
-
-    The entry travels with the plan because the *dashboard* needs what the plan deliberately
-    does not carry - the ``element_id`` the sheet fills and its title - while the datasource
-    name is what the derived-column pass groups by.
-    """
-    plans: list[tuple[str, dict, worksheet.WorksheetPlan]] = []
+) -> list[PlannedWorksheet]:
+    """Resolve every manifest worksheet into a :class:`PlannedWorksheet`."""
+    plans: list[PlannedWorksheet] = []
     for entry in manifest_document.get("worksheets", []) or []:
         if not isinstance(entry, dict):
             continue
@@ -607,14 +622,16 @@ def _plan_worksheets(
         resolver = resolvers.get(source)
         if resolver is None:  # validate_manifest already named this worksheet
             continue
-        plans.append((source, entry, worksheet.plan_worksheet(entry, resolver)))
+        plans.append(
+            PlannedWorksheet(source, entry, worksheet.plan_worksheet(entry, resolver))
+        )
     return plans
 
 
 def _collect_derived_columns(
     manifest_document: dict,
     resolvers: dict[str, worksheet.FieldResolver],
-    plans: list[tuple[str, dict, worksheet.WorksheetPlan]],
+    plans: list[PlannedWorksheet],
 ) -> dict[str, list[worksheet.FieldRef]]:
     """Collect the non-CSV columns each datasource must declare.
 
@@ -643,9 +660,11 @@ def _collect_derived_columns(
         if reference is not None:
             derived.setdefault(source, {}).setdefault(reference.column_name, reference)
 
-    for source, _, plan in plans:
-        for reference in worksheet.bin_columns(plan):
-            derived.setdefault(source, {}).setdefault(reference.column_name, reference)
+    for planned in plans:
+        for reference in worksheet.bin_columns(planned.plan):
+            derived.setdefault(planned.datasource, {}).setdefault(
+                reference.column_name, reference
+            )
 
     return {source: list(columns.values()) for source, columns in derived.items()}
 
@@ -712,7 +731,7 @@ def render_workbook(
             derived.get(name, []),
         )
 
-    if any(plan.spec.geographic for _, _, plan in plans):
+    if any(planned.plan.spec.geographic for planned in plans):
         # A map needs its <mapsources> at *both* levels: the workbook's declares the source,
         # each map worksheet's view references it. One without the other renders no basemap.
         ET.SubElement(
@@ -721,12 +740,15 @@ def render_workbook(
 
     if plans:  # the XSD requires >=1 <worksheet>; omit the element otherwise
         worksheets = ET.SubElement(workbook, "worksheets")
-        for _, _, plan in plans:
+        for planned in plans:
             worksheet.render_worksheet(
-                worksheets, plan, tokens, simple_id("worksheet", plan.name)
+                worksheets, planned.plan, tokens,
+                simple_id("worksheet", planned.plan.name),
             )
 
-    layout = manifest_document.get("layout") if isinstance(manifest_document.get("layout"), dict) else {}
+    layout = manifest_document.get("layout")
+    if not isinstance(layout, dict):
+        layout = {}
     root_zone_id, embedded = _render_dashboard(
         ET.SubElement(workbook, "dashboards"),
         layout.get("canvas", {}),
@@ -735,7 +757,7 @@ def render_workbook(
         tokens,
     )
     _render_windows(
-        workbook, [plan for _, _, plan in plans], root_zone_id, embedded
+        workbook, [planned.plan for planned in plans], root_zone_id, embedded
     )
 
     if target == TARGET_2026:

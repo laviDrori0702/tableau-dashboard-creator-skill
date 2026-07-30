@@ -94,21 +94,59 @@ def _walk_both(node, zone, path="root"):
     children = node.get("children") or []
     zone_children = zone.findall("zone")
 
+    if not children:
+        if not zone_children:
+            return
+        # A titled or colour-encoded leaf is wrapped, and the wrapper's children are the
+        # generated title / content / legend zones - never further layout nodes, so the tree
+        # still maps one-to-one.
+        label = zone.get("friendly-name", "")
+        assert label.startswith("V-"), f"{path}: a leaf zone has children but is no wrapper"
+        element = label[len("V-"):]
+        names = [part.get("friendly-name") for part in zone_children]
+        assert set(names) <= {element, f"{element} title", f"{element} legend"}, (
+            f"{path}: unexpected zone(s) under a leaf: {names}"
+        )
+        assert element in names, f"{path}: the wrapper lost its content zone"
+        return
+
     assert len(zone_children) == len(children), f"{path}: child count differs"
-    if children:
-        assert zone.get("type-v2") == "layout-flow", f"{path}: container is not a flow zone"
-        assert zone.get("param") == node.get("type"), f"{path}: orientation differs"
+    assert zone.get("type-v2") == "layout-flow", f"{path}: container is not a flow zone"
+    assert zone.get("param") == node.get("type"), f"{path}: orientation differs"
     for index, (child, child_zone) in enumerate(zip(children, zone_children), start=1):
         _walk_both(child, child_zone, f"{path}.{index}")
 
 
-def test_the_demo_projects_layout_tree_maps_one_to_one():
+def _leaf_ids(node):
+    """Return every element id the tree places on a leaf (in document order)."""
+    children = node.get("children") or []
+    if not children:
+        return [node["id"]] if node.get("id") else []
+    return [element_id for child in children for element_id in _leaf_ids(child)]
+
+
+@pytest.mark.parametrize("decorated", [False, True], ids=["bare", "titles-and-legends"])
+def test_the_demo_projects_layout_tree_maps_one_to_one(decorated):
     """AC #1, on the real thing: the demo's approved container tree, walked against the
-    zone tree it produces. A dropped, added or re-oriented container fails here."""
+    zone tree it produces. A dropped, added or re-oriented container fails here.
+
+    Run twice, because the shape the build actually produces is the decorated one: with a
+    title and a colour legend on every element, each leaf gains a wrapper, and the walk has
+    to still hold - a wrapper is transparent to the hierarchy, not a new level of it.
+    """
     layout = build.spec_layout(DEMO_SPEC.read_text(encoding="utf-8-sig"))
     assert layout is not None, f"the demo spec at {DEMO_SPEC} carries no layout tree"
 
-    container, _, _ = _render(layout["root"], canvas=layout["canvas"])
+    leaves = {} if not decorated else {
+        element_id: zones.Leaf(
+            worksheet=f"Sheet {index}",
+            title=f"Title {index}",
+            legend=zones.Legend("[ds].[none:region:nk]", "0"),
+        )
+        for index, element_id in enumerate(_leaf_ids(layout["root"]), start=1)
+    }
+
+    container, _, _ = _render(layout["root"], leaves, canvas=layout["canvas"])
 
     _walk_both(layout["root"], container.find("zone").find("zone"))
 
@@ -312,7 +350,8 @@ def test_a_colour_encoded_chart_gets_a_legend_zone_below_it():
     container, _, _ = _render(
         {"type": "vert", "children": [{"id": "chart", "size": 100}]},
         {"chart": zones.Leaf(
-            worksheet="Trend", legend=("[federated.abc].[none:region:nk]", "0")
+            worksheet="Trend",
+            legend=zones.Legend("[federated.abc].[none:region:nk]", "0"),
         )},
     )
     wrapper = container.find("zone/zone/zone")
@@ -330,7 +369,7 @@ def test_a_titled_colour_encoded_chart_stacks_title_sheet_legend():
     """All three parts share the element's box, and the sheet takes what is left."""
     container, _, _ = _render(
         {"type": "vert", "children": [{"id": "chart", "size": 100}]},
-        {"chart": zones.Leaf(worksheet="Trend", title="T", legend=("[c]", "1"))},
+        {"chart": zones.Leaf(worksheet="Trend", title="T", legend=zones.Legend("[c]", "1"))},
     )
     wrapper = container.find("zone/zone/zone")
     parts = wrapper.findall("zone")
@@ -339,6 +378,25 @@ def test_a_titled_colour_encoded_chart_stacks_title_sheet_legend():
         "text", "Trend", "color",
     ]
     assert sum(int(zone.get("h")) for zone in parts) == int(wrapper.get("h"))
+
+
+def test_a_box_too_short_for_its_title_and_legend_is_squeezed_not_overflowed():
+    """A zone written past its wrapper's bottom edge overlaps the sibling below it."""
+    root = {"type": "vert", "children": [
+        {"id": "sliver", "size": 3}, {"id": "rest", "size": 97},
+    ]}
+
+    container, _, _ = _render(
+        root,
+        {"sliver": zones.Leaf(worksheet="Tiny", title="T", legend=zones.Legend("[c]", "0"))},
+    )
+    wrapper, sibling = container.findall("zone/zone/zone")
+    parts = wrapper.findall("zone")
+
+    assert sum(int(zone.get("h")) for zone in parts) == int(wrapper.get("h"))
+    assert all(int(zone.get("h")) >= 0 for zone in parts)
+    bottom = int(parts[-1].get("y")) + int(parts[-1].get("h"))
+    assert bottom == int(wrapper.get("y")) + int(wrapper.get("h")) == int(sibling.get("y"))
 
 
 @pytest.mark.parametrize("kind, type_v2", [
@@ -366,9 +424,7 @@ def test_every_object_kind_the_manifest_accepts_has_a_zone_type():
     become a blank - so the two tables must cover the same set."""
     import manifest
 
-    assert manifest.OBJECT_KINDS == set(zones.OBJECT_ZONE_TYPES) | set(
-        zones.DEFERRED_ZONE_TYPES
-    )
+    assert manifest.OBJECT_KINDS == set(zones.OBJECT_ZONE_TYPES) | zones.DEFERRED_KINDS
 
 
 def test_a_text_object_carries_its_text():
