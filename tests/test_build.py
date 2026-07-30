@@ -648,6 +648,51 @@ def test_a_stray_table_does_not_donate_field_names():
     assert "2024-01-05" not in manifest.documented_fields(with_preview)["sales_orders.csv"]
 
 
+def test_unknown_fit_is_rejected():
+    """'Entire View' is the label, not the value - a fit Tableau has no zoom for would
+    silently leave the sheet on Standard."""
+    document = _manifest()
+    document["worksheets"][0]["fit"] = "Entire View"
+
+    errors = _errors(document)
+
+    assert any("unknown fit 'Entire View'" in error for error in errors)
+    assert any("entire-view" in error for error in errors)
+
+
+@pytest.mark.parametrize("block,expected", [
+    ({"shading": "#FFFFFF"}, None),
+    ({"borders": "none", "gridlines": "#EEEEEE"}, None),
+    ({"align": "center", "vertical_align": "top"}, None),
+    ({"shading": "white"}, "format.shading 'white' is not a '#rrggbb' colour"),
+    ({"shading": "none"}, "format.shading 'none' is not a '#rrggbb' colour"),
+    ({"gridlines": "off"}, "format.gridlines 'off' is not a '#rrggbb' colour nor 'none'"),
+    ({"align": "middle"}, "format.align 'middle' is not an alignment"),
+    ({"borders": ""}, "format.borders needs a value"),
+    ({"border": "#DDDDDD"}, "unknown format key 'border'"),
+])
+def test_format_block_values_are_checked(block, expected):
+    """A misspelled format key or an unparseable colour is the worst formatting bug: the
+    workbook opens, nothing complains, and the sheet simply is not formatted."""
+    document = _manifest()
+    document["worksheets"][0]["format"] = block
+
+    errors = _errors(document)
+
+    if expected is None:
+        assert errors == []
+    else:
+        assert any(expected in error for error in errors), errors
+
+
+def test_format_must_be_an_object():
+    """A bare colour string on 'format' names no pane to apply it to."""
+    document = _manifest()
+    document["worksheets"][0]["format"] = "#FFFFFF"
+
+    assert any("'format' must be an object" in error for error in _errors(document))
+
+
 def test_load_manifest_reports_bad_json(tmp_path):
     """Unparseable JSON fails fast with the file named, not a stack trace."""
     path = tmp_path / build.MANIFEST_FILENAME
@@ -976,6 +1021,21 @@ def test_every_viewpoint_has_entire_view_zoom():
     ]
     for viewpoint in viewpoints:
         assert viewpoint.find("zoom").get("type") == "entire-view"
+
+
+def test_each_worksheet_window_carries_its_own_fit():
+    """The sheet's own tab needs the fit too, or the analyst reviews it on Standard (#44).
+
+    The dashboard's viewpoints only govern the embedded copy; a reviewer opening the tab sees
+    the worksheet window, and without a zoom there Tableau fits it to nothing.
+    """
+    fits = {
+        window.get("name"): window.find("viewpoint/zoom").get("type")
+        for window in _render().findall("windows/window")
+        if window.get("class") == "worksheet"
+    }
+
+    assert fits == {"Revenue KPI": "entire-view", "Revenue Trend": "entire-view"}
 
 
 def test_every_worksheet_has_a_matching_window():

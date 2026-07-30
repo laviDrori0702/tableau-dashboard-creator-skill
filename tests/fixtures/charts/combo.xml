@@ -26,6 +26,16 @@
             <encoding attr="space" class="0" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" field-type="quantitative" fold="true" scope="rows" synchronized="true" type="space" />
             <format attr="display" class="0" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" scope="rows" value="false" />
           </style-rule>
+          <style-rule element="mark">
+            <encoding attr="color" field="[federated.b2993893834e8f0306a282d0a717d7a9].[:Measure Names]" palette="Brand" type="palette">
+              <color-palette custom="true" name="Brand" type="regular">
+                <color>#1b4f72</color>
+                <color>#2e86c1</color>
+                <color>#48c9b0</color>
+                <color>#f39c12</color>
+              </color-palette>
+            </encoding>
+          </style-rule>
           <style-rule element="worksheet">
             <format attr="font-family" value="Open Sans" />
             <format attr="display-field-labels" scope="cols" value="false" />

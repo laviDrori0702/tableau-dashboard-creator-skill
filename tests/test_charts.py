@@ -64,6 +64,14 @@ DESIGN_TOKENS = """# Design Tokens
 
 - **Font family**: Open Sans
 - **Chart title**: 14px, 600, #7F56D9
+
+## Colors
+
+### Chart series colors
+`#1B4F72`, `#2E86C1`, `#48C9B0`, `#F39C12`
+
+### Text
+- Dark (titles): #1C2833
 """
 
 
@@ -158,6 +166,24 @@ CHART_CASES: list[tuple[str, dict]] = [
     ("calculated-field", _sheet(
         "Calculated Field", "bar",
         shelves={"columns": ["region"], "rows": ["Margin Pct"]},
+    )),
+    # Issue #44: a measure on Text is mark labels on any chart type, and it is what makes a
+    # number format visible - the cell format only reaches a chart through its labels.
+    ("bar-labelled", _sheet(
+        "Bar Labelled", "bar",
+        shelves={"columns": ["product_category"], "rows": ["revenue"]},
+        encodings={"text": {"field": "revenue", "aggregation": "sum"}},
+        number_formats=[{"field": "revenue", "format": "$#,##0"}],
+    )),
+    # Issue #44: Format Borders / Lines / Shading / Alignment, plus a non-default fit.
+    ("bar-formatted", _sheet(
+        "Bar Formatted", "bar",
+        shelves={"columns": ["product_category"], "rows": ["revenue"]},
+        fit="fit-width",
+        format={
+            "shading": "#FFFFFF", "borders": "none", "gridlines": "#E5E8E8",
+            "zero_lines": "none", "align": "center", "vertical_align": "bottom",
+        },
     )),
 ]
 
@@ -757,6 +783,157 @@ def test_style_rules_are_alphabetical_by_element():
         for style in element.findall(".//style"):
             elements = [rule.get("element") for rule in style.findall("style-rule")]
             assert elements == sorted(elements), element.get("name")
+
+
+# --- Worksheet formatting (issue #44) ------------------------------------------
+
+def _mark_encoding(sheet_name: str) -> ET.Element:
+    """Return a sheet's worksheet-level mark colour encoding (its palette)."""
+    return _worksheet_element(sheet_name).find(
+        "table/style/style-rule[@element='mark']/encoding"
+    )
+
+
+def test_the_brand_palette_needs_no_member_values():
+    """The decision this ticket asked for: an inline <color-palette> orders the brand's hexes
+    and Tableau walks the domain against them, so a palette needs no data members at all."""
+    encoding = _mark_encoding("Bar Stacked")
+
+    assert encoding.get("attr") == "color"
+    assert encoding.get("type") == "palette"
+    assert encoding.get("field").endswith("[none:region:nk]")
+    palette = encoding.find("color-palette")
+    assert palette.get("type") == "regular"
+    assert [color.text for color in palette] == [
+        "#1b4f72", "#2e86c1", "#48c9b0", "#f39c12",
+    ]
+    # Nothing binds a member: the encoding carries the palette and no <map to=.../> at all.
+    assert encoding.find("map") is None
+
+
+def test_a_measure_on_colour_gets_a_two_ended_ramp():
+    """A continuous field cannot take a categorical palette - a ramp has a low and a high."""
+    encoding = _mark_encoding("Map")
+
+    assert encoding.get("type") == "interpolated"
+    palette = encoding.find("color-palette")
+    assert palette.get("type") == "ordered-sequential"
+    assert [color.text for color in palette] == ["#1b4f72", "#f39c12"]
+
+
+@pytest.mark.parametrize("sheet_name", ["Dual Axis", "Combo"])
+def test_dual_charts_colour_their_measure_names_from_the_brand(sheet_name):
+    """Their colour field is the built-in Measure Names, which is still a dimension."""
+    encoding = _mark_encoding(sheet_name)
+    assert encoding.get("field").endswith("[:Measure Names]")
+    assert encoding.get("type") == "palette"
+
+
+def test_an_uncoloured_chart_gets_no_palette():
+    """A plain bar has nothing on Colour, so a palette rule would style nothing."""
+    assert _mark_encoding("Bar") is None
+
+
+def test_no_series_colours_means_tableau_default_10():
+    """Tokens that carry only typography must not invent a palette."""
+    root = ET.fromstring(_render(tokens="## Typography\n\n- **Font family**: Open Sans\n"))
+    assert _worksheet_element("Bar Stacked", root).find(
+        "table/style/style-rule[@element='mark']"
+    ) is None
+
+
+def test_a_measure_on_text_labels_the_marks_of_any_chart_type():
+    """A bar with SUM on Text is labelled bars - and the labels are what make its
+    number_format visible, which is why a styled bar used to look identical to a plain one."""
+    element = _worksheet_element("Bar Labelled")
+    rule = element.find("table/panes/pane/style/style-rule[@element='mark']")
+    shown = {fmt.get("attr"): fmt.get("value") for fmt in rule.findall("format")}
+
+    assert shown["mark-labels-show"] == "true"
+    assert element.find("table/panes/pane/encodings/text") is not None
+    cell = element.find("table/style/style-rule[@element='cell']/format")
+    assert cell.get("attr") == "text-format"
+    assert cell.get("value") == "$#,##0"
+
+
+def test_borders_lines_shading_and_alignment_come_off_the_manifest():
+    """The four Desktop format panes, each a style rule the manifest asked for."""
+    element = _worksheet_element("Bar Formatted")
+    formats = {
+        (rule.get("element"), fmt.get("attr")): fmt.get("value")
+        for rule in element.findall("table/style/style-rule")
+        for fmt in rule.findall("format")
+    }
+
+    assert formats[("pane", "background-color")] == "#ffffff"
+    assert formats[("cell", "border-style")] == "none"
+    assert formats[("cell", "border-width")] == "0"
+    assert formats[("gridline", "stroke-color")] == "#e5e8e8"
+    assert formats[("zeroline", "display")] == "false"
+    assert formats[("cell", "text-align")] == "center"
+    assert formats[("cell", "vertical-align")] == "bottom"
+
+
+def test_a_colour_border_gets_a_width_and_a_style():
+    """'borders: #hex' has to say how wide and how solid, or Tableau draws nothing."""
+    document = _manifest([_sheet(
+        "Bordered", "bar",
+        shelves={"columns": ["region"], "rows": ["revenue"]},
+        format={"borders": "#DDDDDD"},
+    )])
+    element = _worksheet_element("Bordered", ET.fromstring(_render(document)))
+    formats = {
+        fmt.get("attr"): fmt.get("value")
+        for fmt in element.findall("table/style/style-rule[@element='cell']/format")
+    }
+
+    assert formats == {
+        "border-color": "#dddddd", "border-style": "solid", "border-width": "1",
+    }
+
+
+def test_a_kpi_card_still_centres_itself_and_an_explicit_align_wins():
+    """Centring is the KPI treatment, not a default worth losing - but the analyst overrules."""
+    kpi_formats = {
+        fmt.get("attr"): fmt.get("value")
+        for fmt in _worksheet_element("Kpi Card").findall(
+            "table/style/style-rule[@element='cell']/format"
+        )
+    }
+    assert kpi_formats == {"text-align": "center", "vertical-align": "center"}
+
+    document = _manifest([_sheet("Left KPI", "text", encodings={"text": "revenue"},
+                                 format={"align": "left"})])
+    element = _worksheet_element("Left KPI", ET.fromstring(_render(document)))
+    overruled = {
+        fmt.get("attr"): fmt.get("value")
+        for fmt in element.findall("table/style/style-rule[@element='cell']/format")
+    }
+    assert overruled == {"text-align": "left", "vertical-align": "center"}
+
+
+def test_every_sheet_fits_its_zone_and_a_text_table_still_scrolls():
+    """Entire View by default (a zone is a fixed box), Standard where the sheet is meant to
+    scroll, and the manifest overrides either."""
+    zooms = {}
+    for window in ALL_CHARTS_ROOT.findall("windows/window"):
+        if window.get("class") != "worksheet":
+            continue
+        zoom = window.find("viewpoint/zoom")
+        zooms[window.get("name")] = None if zoom is None else zoom.get("type")
+
+    assert zooms["Bar"] == "entire-view"
+    assert zooms["Text Table"] is None, "a text table keeps Standard fit"
+    assert zooms["Bar Formatted"] == "fit-width", "the manifest's own fit"
+
+    # The dashboard's copy of each sheet fits the same way.
+    dashboard = {
+        viewpoint.get("name"): viewpoint.find("zoom")
+        for viewpoint in ALL_CHARTS_ROOT.findall("windows/window/viewpoints/viewpoint")
+    }
+    assert dashboard["Bar"].get("type") == "entire-view"
+    assert dashboard["Text Table"] is None
+    assert dashboard["Bar Formatted"].get("type") == "fit-width"
 
 
 # --- Legends -------------------------------------------------------------------

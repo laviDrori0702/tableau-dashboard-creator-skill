@@ -1,4 +1,4 @@
-<worksheet name="Pie">
+<worksheet name="Bar Labelled">
       <layout-options>
         <title>
           <formatted-text>
@@ -20,15 +20,8 @@
           <aggregation value="true" />
         </view>
         <style>
-          <style-rule element="mark">
-            <encoding attr="color" field="[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]" palette="Brand" type="palette">
-              <color-palette custom="true" name="Brand" type="regular">
-                <color>#1b4f72</color>
-                <color>#2e86c1</color>
-                <color>#48c9b0</color>
-                <color>#f39c12</color>
-              </color-palette>
-            </encoding>
+          <style-rule element="cell">
+            <format attr="text-format" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" value="$#,##0" />
           </style-rule>
           <style-rule element="worksheet">
             <format attr="font-family" value="Open Sans" />
@@ -41,12 +34,9 @@
             <view>
               <breakdown value="auto" />
             </view>
-            <mark class="Pie" />
+            <mark class="Automatic" />
             <encodings>
-              <color column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]" />
-              <size column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
               <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
-              <wedge-size column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
             </encodings>
             <style>
               <style-rule element="mark">
@@ -56,8 +46,8 @@
             </style>
           </pane>
         </panes>
-        <rows />
-        <cols />
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]</cols>
       </table>
-      <simple-id uuid="{A9839A3B-54AA-55D6-9FD6-0CA1784A553F}" />
+      <simple-id uuid="{9CEC14CA-6F15-5502-AE64-DA486DD4311A}" />
     </worksheet>

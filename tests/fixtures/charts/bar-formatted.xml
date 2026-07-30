@@ -1,4 +1,4 @@
-<worksheet name="Pie">
+<worksheet name="Bar Formatted">
       <layout-options>
         <title>
           <formatted-text>
@@ -20,20 +20,25 @@
           <aggregation value="true" />
         </view>
         <style>
-          <style-rule element="mark">
-            <encoding attr="color" field="[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]" palette="Brand" type="palette">
-              <color-palette custom="true" name="Brand" type="regular">
-                <color>#1b4f72</color>
-                <color>#2e86c1</color>
-                <color>#48c9b0</color>
-                <color>#f39c12</color>
-              </color-palette>
-            </encoding>
+          <style-rule element="cell">
+            <format attr="border-style" value="none" />
+            <format attr="border-width" value="0" />
+            <format attr="text-align" value="center" />
+            <format attr="vertical-align" value="bottom" />
+          </style-rule>
+          <style-rule element="gridline">
+            <format attr="stroke-color" value="#e5e8e8" />
+          </style-rule>
+          <style-rule element="pane">
+            <format attr="background-color" value="#ffffff" />
           </style-rule>
           <style-rule element="worksheet">
             <format attr="font-family" value="Open Sans" />
             <format attr="display-field-labels" scope="cols" value="false" />
             <format attr="display-field-labels" scope="rows" value="false" />
+          </style-rule>
+          <style-rule element="zeroline">
+            <format attr="display" value="false" />
           </style-rule>
         </style>
         <panes>
@@ -41,23 +46,11 @@
             <view>
               <breakdown value="auto" />
             </view>
-            <mark class="Pie" />
-            <encodings>
-              <color column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]" />
-              <size column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
-              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
-              <wedge-size column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
-            </encodings>
-            <style>
-              <style-rule element="mark">
-                <format attr="mark-labels-show" value="true" />
-                <format attr="mark-labels-cull" value="true" />
-              </style-rule>
-            </style>
+            <mark class="Automatic" />
           </pane>
         </panes>
-        <rows />
-        <cols />
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]</cols>
       </table>
-      <simple-id uuid="{A9839A3B-54AA-55D6-9FD6-0CA1784A553F}" />
+      <simple-id uuid="{0C51BAFA-9B17-5A66-935C-9842E49B1AD0}" />
     </worksheet>

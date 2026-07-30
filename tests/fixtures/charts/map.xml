@@ -26,6 +26,14 @@
           <style-rule element="map">
             <format attr="washout" value="0.0" />
           </style-rule>
+          <style-rule element="mark">
+            <encoding attr="color" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" palette="Brand" type="interpolated">
+              <color-palette custom="true" name="Brand" type="ordered-sequential">
+                <color>#1b4f72</color>
+                <color>#f39c12</color>
+              </color-palette>
+            </encoding>
+          </style-rule>
           <style-rule element="worksheet">
             <format attr="font-family" value="Open Sans" />
             <format attr="display-field-labels" scope="cols" value="false" />

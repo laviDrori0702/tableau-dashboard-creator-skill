@@ -40,15 +40,17 @@ stray field name or datasource id can leak into the analyst's workbook. Pick the
 `combo`, plus `heatmap` / `treemap` / `bullet` / `gantt` / `boxplot`).
 
 Several things the spec may ask for are **not** chart types — they are optional keys on any
-worksheet: `sort`, `filters`, `tooltip`, `reference_lines`, and `axis_titles` /
+worksheet: `sort`, `filters`, `tooltip`, `reference_lines`, `fit`, `format`, and `axis_titles` /
 `number_formats`; a running total or percent-of-total is a `table_calc` on the shelf entry. A
-*stacked* bar is a `bar` with a `color` encoding. Reach for a modifier before reaching for a
-new chart type.
+*stacked* bar is a `bar` with a `color` encoding, and a measure on the `text` encoding gives
+any chart mark labels. Reach for a modifier before reaching for a new chart type.
 
-Styling comes from `DESIGN-TOKENS.md` when the analyst ran `tableau-brand`: its font family
-and chart-title size/colour are applied to every worksheet automatically. When it is absent,
-Tableau's own defaults apply and nothing is invented. The manifest never carries fonts or
-colours.
+Styling comes from `DESIGN-TOKENS.md` when the analyst ran `tableau-brand`: its font family,
+chart-title size/colour and ordered `### Chart series colors` are applied to every worksheet
+automatically — the series colours ride along as an inline palette, so no data member values
+are needed. When it is absent, Tableau's own defaults apply and nothing is invented. The
+manifest carries no fonts or brand colours; its per-sheet `format` block covers only sheet
+furniture (borders, lines, shading, alignment).
 
 ## The build manifest
 
