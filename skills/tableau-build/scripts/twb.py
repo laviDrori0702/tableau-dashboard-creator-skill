@@ -79,6 +79,12 @@ DASHBOARD_NAME = "Dashboard 1"
 #: numeric ``canvas.width``/``height``, so this only guards a direct call to the assembler.
 DEFAULT_CANVAS = {"width": 1000, "height": 800}
 
+#: The dashboard's minimum size in px, whatever the mock's canvas: the smallest window a
+#: business dashboard still reads on. The canvas drives the zone *proportions*, not this floor
+#: - see :func:`_render_dashboard`.
+MIN_DASHBOARD_WIDTH = 1100
+MIN_DASHBOARD_HEIGHT = 800
+
 
 # --- Column types -------------------------------------------------------------
 
@@ -427,11 +433,12 @@ def _render_dashboard(
     leaves: dict[str, zones.Leaf],
     tokens: worksheet.DesignTokens,
 ) -> tuple[str, set[str]]:
-    """Render the dashboard: range-sized from the mock's canvas, with the spec's zone tree.
+    """Render the dashboard: range-sized above a fixed floor, with the spec's zone tree.
 
     Args:
         parent: The ``<dashboards>`` element.
-        canvas: The layout's ``canvas`` object (``width`` / ``height`` in px).
+        canvas: The layout's ``canvas`` object (``width`` / ``height`` in px) - what px
+            measures inside the tree are scaled against, not the dashboard's size.
         root: The layout tree's ``root`` node.
         leaves: ``{element id: Leaf}`` - what fills each leaf zone.
         tokens: The design tokens, for the generated title zones.
@@ -447,12 +454,14 @@ def _render_dashboard(
     ET.SubElement(dashboard, "style")
     width = str(int(canvas.get("width", DEFAULT_CANVAS["width"])))
     height = str(int(canvas.get("height", DEFAULT_CANVAS["height"])))
-    # Range-sized at the mock's canvas as the floor, with no maximum: zone geometry is in a
-    # normalised 100,000-unit space, so the proportions the analyst approved hold at any
-    # window size, while a hard maximum (a fixed size) only forces the viewer to scroll a
-    # wide screen's worth of empty margin. The analyst can lower the minimum in Desktop.
+    # Range-sized, no maximum: zone geometry is in a normalised 100,000-unit space, so the
+    # proportions the analyst approved hold at any window size, while a hard maximum (a fixed
+    # size) only forces the viewer to scroll a wide screen's worth of empty margin. The floor
+    # is the standard minimum, not the mock's canvas - the canvas is a design surface, and
+    # pinning the minimum to it would make a wide mock unopenable on a laptop.
     ET.SubElement(dashboard, "size", {
-        "minheight": height, "minwidth": width, "sizing-mode": "range",
+        "minheight": str(MIN_DASHBOARD_HEIGHT), "minwidth": str(MIN_DASHBOARD_WIDTH),
+        "sizing-mode": "range",
     })
     root_zone_id, embedded = zones.render_zones(
         ET.SubElement(dashboard, "zones"),

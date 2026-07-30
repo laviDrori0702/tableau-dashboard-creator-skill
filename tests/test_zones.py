@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 import build
+import twb
 import worksheet
 import zones
 
@@ -545,14 +546,17 @@ def test_a_layout_rich_manifest_validates():
     ) == []
 
 
-def test_the_dashboard_is_range_sized_from_the_canvas(layout_rich_workbook):
-    """The canvas is the floor, not a cage: zone units are normalised, so the mock's
-    proportions survive a larger window, and no maximum means no dead scrollable margin."""
+def test_the_dashboard_is_range_sized_above_the_standard_floor(layout_rich_workbook):
+    """Zone units are normalised, so the mock's proportions survive any window size: the
+    dashboard gets the standard minimum and no maximum, and the 1366x768 canvas the tree was
+    laid out against does not become the size the analyst is stuck with."""
     _, root = layout_rich_workbook
     size = root.find("dashboards/dashboard/size")
 
     assert size.attrib == {
-        "minheight": "768", "minwidth": "1366", "sizing-mode": "range",
+        "minheight": str(twb.MIN_DASHBOARD_HEIGHT),
+        "minwidth": str(twb.MIN_DASHBOARD_WIDTH),
+        "sizing-mode": "range",
     }
 
 

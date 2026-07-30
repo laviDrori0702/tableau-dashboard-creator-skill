@@ -134,12 +134,13 @@ invented zone is caught rather than silently built.
   version is created by re-running `tableau-mock` (which bumps and stales spec and build).
 - **Live connection, always.** The workbook never carries an extract: the `.twbx` embeds the
   CSVs, and the analyst points it at the real database with Data → Replace Data Source.
-- **The zones are computed and the canvas is the dashboard's minimum size.** The `layout`
-  tree becomes the dashboard's zone hierarchy one-to-one: sibling `size` values are
-  proportions of the parent along its flow axis, mapped into Tableau's 0–100000 space at the
-  canvas dimensions. Because that space is normalised, the approved proportions hold at any
-  window size, so the dashboard is `sizing-mode='range'` with the canvas as `minwidth` /
-  `minheight` and **no maximum** — the analyst can lower the minimum in Desktop.
+- **The zones are computed and the dashboard is range-sized.** The `layout` tree becomes the
+  dashboard's zone hierarchy one-to-one: sibling `size` values are proportions of the parent
+  along its flow axis, mapped into Tableau's 0–100000 space at the canvas dimensions. Because
+  that space is normalised, the approved proportions hold at any window size, so the dashboard
+  is `sizing-mode='range'` at a fixed **1100 × 800** minimum with **no maximum**. The canvas
+  is the design surface the tree was laid out against, not the size the analyst is stuck
+  with — who can change either bound in Desktop.
 - **Every view zone's header is a text object.** A sheet's *own* title is always off: Tableau
   draws it inside the zone out of the sheet's own height, so a short zone (a KPI card) loses
   its number to it. Give every `worksheets[]` entry a `title` — it becomes a text zone above

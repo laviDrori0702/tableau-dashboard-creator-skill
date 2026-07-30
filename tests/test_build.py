@@ -1014,13 +1014,16 @@ def test_a_sheet_no_dashboard_zone_shows_keeps_its_tab():
     assert "Revenue Detail" not in hidden
 
 
-def test_dashboard_is_sized_from_the_layout_canvas():
-    """The mock's approved canvas is the dashboard's *minimum*: the zone proportions hold at
-    any window size, so a maximum would only pad a wide screen with scrollable margin."""
+def test_dashboard_is_range_sized_above_the_standard_floor():
+    """The zone proportions hold at any window size, so the dashboard gets the standard
+    minimum and no maximum - not the mock's canvas, which is a design surface: pinning the
+    minimum to a 1366px-wide mock would make it unopenable on a smaller laptop."""
     size = _render().find("dashboards/dashboard/size")
 
     assert size.attrib == {
-        "minheight": "768", "minwidth": "1366", "sizing-mode": "range",
+        "minheight": str(twb.MIN_DASHBOARD_HEIGHT),
+        "minwidth": str(twb.MIN_DASHBOARD_WIDTH),
+        "sizing-mode": "range",
     }
 
 

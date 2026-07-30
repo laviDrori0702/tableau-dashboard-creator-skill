@@ -23,9 +23,10 @@ a bad spec-to-manifest translation is fixed row-by-row before any XML is generat
 **Copy the `layout` tree from the spec verbatim** — `validate` diffs the two and rejects any
 zone the manifest drops or invents, so the workbook cannot disagree with the approved mock.
 The tree *is* the dashboard's zone hierarchy: each node becomes one zone, sibling `size`
-values are proportions of the parent along its flow axis, and `canvas` px becomes the
-dashboard's *minimum* size (`sizing-mode='range'`, no maximum). A child with no `size` shares
-whatever its siblings leave.
+values are proportions of the parent along its flow axis, and `canvas` px is what those
+proportions are computed against — not the dashboard's size, which is `sizing-mode='range'` at
+a 1100 × 800 minimum with no maximum. A child with no `size` shares whatever its siblings
+leave.
 
 **Give every view element a header.** A sheet's own title never renders on the dashboard, so
 a `worksheets[]` entry without a `title` (or a `text` object placed beside it in the tree)
