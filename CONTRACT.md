@@ -334,7 +334,7 @@ the mock's behavior, and the spec's Tableau mapping.
 |-----------------|-------------------------------------------------------------------------------------|-----------------------------------------------|
 | `toggle panel`  | Show/hide a region of the dashboard on demand.                                      | Dynamic Zone Visibility, or a show/hide button container. |
 | `swap view`     | Replace one chart with an alternative in the same slot (e.g. bar ⇄ line).           | Parameter + Dynamic Zone Visibility, or sheet swap. |
-| `drill`         | Move between levels of a hierarchy (e.g. year → quarter → month) in place.          | Hierarchy expand/collapse, or set/parameter action. |
+| `drill`         | Move between levels of a hierarchy (e.g. year → quarter → month) in place.          | Hierarchy expand/collapse, or a **parameter** action. `tableau-build` emits no set/URL actions, so a drill that a set action would express has to be specced as a parameter action. |
 | `cross-filter`  | Selecting marks in one chart filters the others.                                    | Filter action (`Use as Filter`). |
 | `highlight`     | Selecting marks in one chart highlights related marks elsewhere without filtering.  | Highlight action. |
 | `parameter swap`| A control changes a measure/dimension/threshold used across the dashboard.          | Parameter + parameter action / calculated field. |
