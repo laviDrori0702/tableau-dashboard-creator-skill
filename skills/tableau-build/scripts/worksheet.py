@@ -21,8 +21,8 @@ from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, field
-from typing import NamedTuple, Optional
+from dataclasses import dataclass, field, fields
+from typing import Callable, NamedTuple, Optional
 
 # A worksheet that reads a parameter has to declare it; :mod:`features` owns what a parameter
 # column looks like and imports nothing back, so no cycle.
@@ -80,21 +80,33 @@ _HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
 _SIZE = re.compile(r"(\d+)\s*px", re.IGNORECASE)
 
 
+#: The name the worksheet's inline brand palette is declared and referenced under.
+BRAND_PALETTE_NAME = "Brand"
+
+_SERIES_HEADING = re.compile(r"^#+\s*.*series colors", re.IGNORECASE)
+
+
 @dataclass(frozen=True)
 class DesignTokens:
     """The slice of DESIGN-TOKENS.md a worksheet body can actually apply.
 
-    Tableau styles a *worksheet* with a font family, a title run, and cell/axis formats.
-    The palette's series colours are deliberately not mapped onto marks: a colour palette
-    binds hex values to concrete data members (``<map to='#...'><bucket>"West"</bucket>``),
-    and the builder does not know the data's members. Colour therefore stays with Tableau's
-    default palette and the tokens drive type.
+    Tableau styles a *worksheet* with a font family, a title run, cell/axis formats, and the
+    palette its marks are coloured from.
+
+    **How the palette gets its colours without knowing the data's members.** A palette that
+    binds hex values to concrete members (``<map to='#...'><bucket>"West"</bucket>``) is
+    unbuildable from a manifest - the builder never sees the data. It does not have to be: an
+    ``<encoding>`` may carry an inline ``<color-palette>``, which lists the colours *in order*
+    and leaves Tableau to walk the field's domain against them, exactly as it does with its own
+    default 10. So the brand's ordered series colours *are* the palette, member values are
+    never needed, and a coloured chart is on-brand instead of on Tableau-default.
 
     Attributes:
         font_family: Body font for the whole worksheet.
         title_size: Chart-title point size.
         title_color: Chart-title colour, lower-cased hex.
         kpi_size: Point size for a KPI card's big number.
+        series_colors: The brand's ordered chart-series colours, lower-cased hex.
         present: Whether a DESIGN-TOKENS.md was actually supplied.
     """
 
@@ -102,16 +114,18 @@ class DesignTokens:
     title_size: int = DEFAULT_TITLE_SIZE
     title_color: str = DEFAULT_TITLE_COLOR
     kpi_size: int = DEFAULT_KPI_SIZE
+    series_colors: tuple[str, ...] = ()
     present: bool = False
 
 
 def parse_design_tokens(tokens_text: str) -> DesignTokens:
-    """Read the typography tokens out of a DESIGN-TOKENS.md.
+    """Read the typography and palette tokens out of a DESIGN-TOKENS.md.
 
     The parse is tolerant by design (the file is prose an agent authored from a template):
     it looks for the ``- **Font family**:`` and ``- **Chart title**:`` bullets and takes the
-    first font name / px size / hex colour on each. Anything it cannot find keeps its
-    Tableau default.
+    first font name / px size / hex colour on each, and reads every hex under the
+    ``### Chart series colors`` heading as the ordered palette. Anything it cannot find keeps
+    its Tableau default.
 
     Args:
         tokens_text: The contents of a ``DESIGN-TOKENS.md`` (``""`` when absent).
@@ -123,8 +137,19 @@ def parse_design_tokens(tokens_text: str) -> DesignTokens:
         return DesignTokens()
 
     font, title_size, title_color = DEFAULT_FONT, DEFAULT_TITLE_SIZE, DEFAULT_TITLE_COLOR
+    series_colors: list[str] = []
+    in_series = False
     for raw_line in tokens_text.splitlines():
         line = raw_line.strip()
+        if line.startswith("#"):
+            # The palette is a *section*, not a bullet: the template asks for an ordered list
+            # and every author formats that differently (one comma-separated run, a bullet
+            # each), so every hex until the next heading is a series colour.
+            in_series = _SERIES_HEADING.match(line) is not None
+            continue
+        if in_series:
+            series_colors += [match.group(0).lower() for match in _HEX.finditer(line)]
+            continue
         if not line.startswith("-"):
             continue
         label, _, value = line.lstrip("- ").partition(":")
@@ -148,6 +173,7 @@ def parse_design_tokens(tokens_text: str) -> DesignTokens:
         title_size=title_size,
         title_color=title_color,
         kpi_size=max(title_size + 8, DEFAULT_KPI_SIZE),
+        series_colors=tuple(series_colors),
         present=True,
     )
 
@@ -556,6 +582,25 @@ LEGEND_ENCODINGS: tuple[str, ...] = ("color", "size", "shape")
 #: The pane attribute every snippet carries.
 PANE_RELAXATION = {"selection-relaxation-option": "selection-relaxation-allow"}
 
+#: manifest ``fit`` -> the ``<zoom>`` type the sheet's viewpoint carries (the XSD's
+#: ``VisualDoc-ZoomType-ST``). ``standard`` is Tableau's un-zoomed default and writes no
+#: ``<zoom>`` at all - it is the *absence* of a fit, not a value of one.
+FIT_ZOOMS: dict[str, str] = {
+    "standard": "",
+    "entire-view": "entire-view",
+    "fit-width": "fit-width",
+    "fit-height": "fit-height",
+}
+
+#: What a sheet fits to when the manifest says nothing. Entire View, because a dashboard zone
+#: is a fixed box: Standard leaves the chart at its natural size, floating in the zone's
+#: whitespace, which is what made every generated sheet look unfinished.
+DEFAULT_FIT = "entire-view"
+
+#: Chart types that keep Standard fit by default - a text table is meant to *scroll*, and
+#: squeezing 200 rows into a zone renders it as unreadable slivers.
+STANDARD_FIT_CHART_TYPES = frozenset({"table"})
+
 #: Tableau's line break inside a formatted-text run: AE ligature + tab. Not ``\n``.
 TOOLTIP_BREAK = "\u00c6\t"
 
@@ -641,6 +686,55 @@ class ReferenceLinePlan:
     label: str = ""
 
 
+#: The horizontal / vertical alignments a ``format`` block accepts. ``manifest`` reads these
+#: (and :data:`SHEET_FORMAT_KEYS`), so a typo'd key or value fails validation instead of
+#: silently rendering an unformatted sheet.
+TEXT_ALIGNMENTS: frozenset[str] = frozenset({"left", "center", "right"})
+VERTICAL_ALIGNMENTS: frozenset[str] = frozenset({"top", "center", "bottom"})
+
+#: The one non-colour value a shading / borders / lines key takes: "there is no such line".
+#: Tableau hides a line by turning its display off, not by colouring it the background.
+NO_FORMAT = "none"
+
+#: What a bordered cell looks like when the format names a colour but no width - Desktop's own
+#: hairline.
+BORDER_STYLE = "solid"
+BORDER_WIDTH = "1"
+
+
+@dataclass(frozen=True)
+class SheetFormat:
+    """One worksheet's Format Borders / Lines / Shading / Alignment settings.
+
+    These are the four Desktop format panes that make a workbook look designed rather than
+    generated, and each is a handful of ``<style-rule>`` formats on the worksheet. A border or a
+    line takes a hex or :data:`NO_FORMAT` (there is no such border); shading takes a hex only -
+    a background cannot be shaded "none". The alignments are the same ``cell`` formats a KPI
+    card centres itself with.
+
+    Attributes:
+        shading: The pane's background colour (Format > Shading).
+        borders: The cell border colour, or :data:`NO_FORMAT` for a borderless sheet.
+        gridlines: The gridline colour, or :data:`NO_FORMAT` to hide them.
+        zero_lines: The zero-line colour, or :data:`NO_FORMAT` to hide it.
+        align: Horizontal cell alignment (``left`` / ``center`` / ``right``).
+        vertical_align: Vertical cell alignment (``top`` / ``center`` / ``bottom``).
+    """
+
+    shading: str = ""
+    borders: str = ""
+    gridlines: str = ""
+    zero_lines: str = ""
+    align: str = ""
+    vertical_align: str = ""
+
+
+#: What a ``format`` block may carry - derived from the dataclass, because
+#: :func:`_plan_sheet_format` splats the surviving keys straight into ``SheetFormat(**values)``
+#: and a hand-kept copy that drifts is a TypeError.
+SHEET_FORMAT_KEYS: frozenset[str] = frozenset(field.name for field in fields(SheetFormat))
+
+
 @dataclass
 class WorksheetPlan:
     """Everything one worksheet needs, resolved once and rendered from twice.
@@ -663,6 +757,8 @@ class WorksheetPlan:
         tooltip: ``(label, field)`` pairs for a custom tooltip template.
         number_formats: ``(field, format pattern)`` pairs for the cell style rule.
         axis_titles: ``{"rows"|"columns": title}`` overrides.
+        fit: How the sheet fills its zone - a :data:`FIT_ZOOMS` key.
+        sheet_format: The resolved Format Borders / Lines / Shading / Alignment block.
         geo_role: A map's geographic semantic role, or ``""``.
         reference_lines: Resolved reference lines, in manifest order.
         parameters: Parameters the worksheet's calculations read - the view must declare them
@@ -693,6 +789,8 @@ class WorksheetPlan:
     tooltip: list[tuple[str, FieldRef]] = field(default_factory=list)
     number_formats: list[tuple[FieldRef, str]] = field(default_factory=list)
     axis_titles: dict[str, str] = field(default_factory=dict)
+    fit: str = DEFAULT_FIT
+    sheet_format: SheetFormat = field(default_factory=SheetFormat)
     geo_role: str = ""
 
     def qualify(self, name: str) -> str:
@@ -702,6 +800,11 @@ class WorksheetPlan:
     def reference_of(self, reference: FieldRef) -> str:
         """Return the qualified column-instance reference for a resolved field."""
         return self.resolver.qualify(reference.instance_name)
+
+    @property
+    def zoom_type(self) -> str:
+        """str: The sheet's ``<zoom>`` type; ``""`` for Standard fit, which writes no zoom."""
+        return FIT_ZOOMS.get(self.fit, FIT_ZOOMS[DEFAULT_FIT])
 
     @property
     def all_refs(self) -> list[FieldRef]:
@@ -731,7 +834,8 @@ def plan_worksheet(entry: dict, resolver: FieldResolver) -> WorksheetPlan:
         The plan; an unknown chart type falls back to the plain ``bar`` spec, which
         ``manifest.validate_manifest`` has already rejected before the assembler runs.
     """
-    spec = CHART_SPECS.get(str(entry.get("chart_type", "")).strip().lower(), ChartSpec())
+    chart_type = str(entry.get("chart_type", "")).strip().lower()
+    spec = CHART_SPECS.get(chart_type, ChartSpec())
     shelves = entry.get("shelves") if isinstance(entry.get("shelves"), dict) else {}
     raw_encodings = entry.get("encodings") if isinstance(entry.get("encodings"), dict) else {}
     axis_titles = entry.get("axis_titles") if isinstance(entry.get("axis_titles"), dict) else {}
@@ -761,8 +865,37 @@ def plan_worksheet(entry: dict, resolver: FieldResolver) -> WorksheetPlan:
             for shelf, title in axis_titles.items()
             if isinstance(title, str) and title.strip()
         },
+        fit=_plan_fit(entry.get("fit"), chart_type),
+        sheet_format=_plan_sheet_format(entry.get("format")),
         geo_role=str(entry.get("geo_role", "")).strip() if spec.geographic else "",
     )
+
+
+def _plan_fit(value: object, chart_type: str) -> str:
+    """Resolve the ``fit`` key, defaulting per chart type.
+
+    Args:
+        value: The manifest's ``fit`` value, if any.
+        chart_type: The worksheet's chart type, which decides the default.
+
+    Returns:
+        A :data:`FIT_ZOOMS` key. An unknown value cannot reach here from a validated manifest
+        and falls back to the default rather than emitting a zoom Tableau has no case for.
+    """
+    requested = _lower(value)
+    if requested in FIT_ZOOMS:
+        return requested
+    return "standard" if chart_type in STANDARD_FIT_CHART_TYPES else DEFAULT_FIT
+
+
+def _plan_sheet_format(block: object) -> SheetFormat:
+    """Resolve the ``format`` block into a :class:`SheetFormat`, ignoring unknown keys."""
+    if not isinstance(block, dict):
+        return SheetFormat()
+    values = {
+        key: _lower(value) for key, value in block.items() if key in SHEET_FORMAT_KEYS
+    }
+    return SheetFormat(**values)
 
 
 def _plan_filters(entries: object, resolver: FieldResolver) -> list[FilterPlan]:
@@ -1127,6 +1260,11 @@ def _render_sort(parent: ET.Element, plan: WorksheetPlan) -> None:
     })
 
 
+#: ``_render_style``'s rule accumulator, as the helpers that feed it see it:
+#: ``add(element, tag, attributes[, palette colours])``.
+AddRule = Callable[..., None]
+
+
 def _render_style(parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens) -> None:
     """Render the worksheet's ``<style>``, one style-rule per element, alphabetically.
 
@@ -1134,10 +1272,10 @@ def _render_style(parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens)
     other way produces a diff on first open. Rules are collected into a dict keyed by
     element and then sorted, so a new rule cannot be added in the wrong place.
     """
-    rules: dict[str, list[tuple[str, dict]]] = {}
+    rules: dict[str, list[tuple[str, dict, tuple[str, ...]]]] = {}
 
-    def add(element: str, tag: str, attributes: dict) -> None:
-        rules.setdefault(element, []).append((tag, attributes))
+    def add(element: str, tag: str, attributes: dict, colors: tuple[str, ...] = ()) -> None:
+        rules.setdefault(element, []).append((tag, attributes, colors))
 
     if tokens.present:
         add("worksheet", "format", {"attr": "font-family", "value": tokens.font_family})
@@ -1168,9 +1306,8 @@ def _render_style(parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens)
             "value": pattern,
         })
 
-    if plan.spec.kpi_card:
-        add("cell", "format", {"attr": "text-align", "value": "center"})
-        add("cell", "format", {"attr": "vertical-align", "value": "center"})
+    _add_palette(add, plan, tokens)
+    _add_sheet_format(add, plan)
 
     if plan.spec.geographic:
         add("map", "format", {"attr": "washout", "value": "0.0"})
@@ -1191,8 +1328,109 @@ def _render_style(parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens)
     style = ET.SubElement(parent, "style")
     for element in sorted(rules):
         rule = ET.SubElement(style, "style-rule", {"element": element})
-        for tag, attributes in rules[element]:
-            ET.SubElement(rule, tag, attributes)
+        for tag, attributes, colors in rules[element]:
+            node = ET.SubElement(rule, tag, attributes)
+            if colors:
+                # A ramp is an ordered palette; a categorical one is 'regular'.
+                palette = ET.SubElement(node, "color-palette", {
+                    "custom": "true",
+                    "name": BRAND_PALETTE_NAME,
+                    "type": ("ordered-sequential"
+                             if attributes.get("type") == "interpolated" else "regular"),
+                })
+                for color in colors:
+                    ET.SubElement(palette, "color").text = color
+
+
+def _add_palette(add: AddRule, plan: WorksheetPlan, tokens: DesignTokens) -> None:
+    """Add the brand palette to whatever the worksheet colours its marks by.
+
+    The colours ride along inline (see :class:`DesignTokens`), so no data member has to be
+    known. Three shapes, decided by what is on Colour: a *dimension* takes the whole ordered
+    palette and Tableau walks the domain against it; a *measure* is a continuous ramp, and a
+    ramp has two ends - the first and last brand colours, low to high; *nothing* on Colour has
+    no domain at all, so it gets the brand's first colour as the flat mark colour.
+
+    Args:
+        add: ``_render_style``'s rule accumulator.
+        plan: The worksheet plan.
+        tokens: The design tokens.
+    """
+    if not tokens.series_colors:
+        return
+    if plan.spec.dual:
+        # A dual chart colours its two measures apart by Measure Names - a dimension, whatever
+        # the measures are.
+        field_reference, quantitative = plan.qualify(MEASURE_NAMES), False
+    elif "color" in plan.encodings:
+        reference = plan.encodings["color"]
+        field_reference = plan.reference_of(reference)
+        quantitative = reference.instance_type == "quantitative"
+    else:
+        # Nothing on Colour, so there is no domain to walk - but the marks still have *a*
+        # colour, and Tableau's is its default blue. The brand's first series colour is what
+        # keeps a plain bar or line from reading as "generated" too.
+        add("mark", "format", {"attr": "mark-color", "value": tokens.series_colors[0]})
+        return
+
+    colors = tokens.series_colors
+    if quantitative:
+        colors = (colors[0], colors[-1])
+    # ponytail: XSD-legal, but only Desktop can confirm it keeps the palette on save rather
+    # than rewriting it (the `custom` flag and the name<->`palette` pairing are inferred from
+    # the schema, not read out of a Desktop-saved workbook). Issue #52 carries the steps; a
+    # wrong guess costs a rewrite on open, not a broken workbook.
+    add("mark", "encoding", {
+        "attr": "color",
+        "field": field_reference,
+        "palette": BRAND_PALETTE_NAME,
+        "type": "interpolated" if quantitative else "palette",
+    }, colors)
+
+
+def _add_sheet_format(add: AddRule, plan: WorksheetPlan) -> None:
+    """Add the Format Borders / Lines / Shading / Alignment rules the manifest asked for.
+
+    A KPI card centres itself unless the format says otherwise - its whole treatment is one big
+    centred number, and an explicit ``align`` is the analyst overruling that.
+
+    ponytail: every attribute here is in the XSD's ``StyleAttribute-ST``, but which *element*
+    Desktop hangs each one off is inferred (``text-align`` / ``vertical-align`` on ``cell`` are
+    the exceptions - the KPI card has round-tripped them). Issue #52 carries the save-and-diff
+    steps; the cost of a wrong pairing is a format that does not show, not a broken workbook.
+
+    Args:
+        add: ``_render_style``'s rule accumulator.
+        plan: The worksheet plan.
+    """
+    sheet_format = plan.sheet_format
+
+    if sheet_format.shading:
+        add("pane", "format", {"attr": "background-color", "value": sheet_format.shading})
+
+    if sheet_format.borders == NO_FORMAT:
+        add("cell", "format", {"attr": "border-style", "value": NO_FORMAT})
+        add("cell", "format", {"attr": "border-width", "value": "0"})
+    elif sheet_format.borders:
+        add("cell", "format", {"attr": "border-color", "value": sheet_format.borders})
+        add("cell", "format", {"attr": "border-style", "value": BORDER_STYLE})
+        add("cell", "format", {"attr": "border-width", "value": BORDER_WIDTH})
+
+    for element, value in (
+        ("gridline", sheet_format.gridlines), ("zeroline", sheet_format.zero_lines)
+    ):
+        if value == NO_FORMAT:
+            add(element, "format", {"attr": "display", "value": "false"})
+        elif value:
+            add(element, "format", {"attr": "stroke-color", "value": value})
+
+    centred = "center" if plan.spec.kpi_card else ""
+    for attribute, value in (
+        ("text-align", sheet_format.align or centred),
+        ("vertical-align", sheet_format.vertical_align or centred),
+    ):
+        if value:
+            add("cell", "format", {"attr": attribute, "value": value})
 
 
 def _render_panes(parent: ET.Element, plan: WorksheetPlan, tokens: DesignTokens) -> None:
@@ -1272,7 +1510,11 @@ def _render_pane(
         _render_tooltip(pane, plan, tokens)
     if plan.spec.kpi_card and "text" in plan.encodings:
         _render_big_number(pane, plan, tokens)
-    if plan.spec.label_marks:
+    # A field on Text *is* the request for mark labels, on any chart type - a bar with SUM on
+    # Text means labelled bars. It is also what makes 'number_formats' visible: the cell format
+    # only reaches a chart through its labels, which is why a styled bar with no label showed
+    # nothing for its format.
+    if plan.spec.label_marks or "text" in plan.encodings:
         style = ET.SubElement(pane, "style")
         rule = ET.SubElement(style, "style-rule", {"element": "mark"})
         for attribute in ("mark-labels-show", "mark-labels-cull"):

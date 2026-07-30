@@ -20,6 +20,16 @@
           <aggregation value="true" />
         </view>
         <style>
+          <style-rule element="mark">
+            <encoding attr="color" field="[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]" palette="Brand" type="palette">
+              <color-palette custom="true" name="Brand" type="regular">
+                <color>#1b4f72</color>
+                <color>#2e86c1</color>
+                <color>#48c9b0</color>
+                <color>#f39c12</color>
+              </color-palette>
+            </encoding>
+          </style-rule>
           <style-rule element="worksheet">
             <format attr="font-family" value="Open Sans" />
             <format attr="display-field-labels" scope="cols" value="false" />

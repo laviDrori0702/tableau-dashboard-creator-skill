@@ -53,6 +53,24 @@ A step may also have *optional reads* that enrich its output but never block it:
 > and the `STEPS` definition in `skills/tableau-route/scripts/route.py`. They are the prose and the
 > executable copy of the same graph and must stay identical.
 
+#### The two `DESIGN-TOKENS.md` sections `build` reads by name
+
+`brand` owns the file's shape, but `build` binds to two of its headings, so renaming either
+silently un-styles every workbook while both skills still pass their own checks:
+
+| heading | what `build` does with it |
+|---|---|
+| `## Typography` | The `- **Font family**:` and `- **Chart title**:` bullets become the worksheet font and title run. |
+| `### Chart series colors` | The ordered hex list becomes **every worksheet's colour palette**, emitted as an inline `<color-palette>` on the mark's colour encoding, plus the default mark colour for charts with nothing on Colour. |
+
+The palette needs **no data member values** — that was the open question that kept it unbuilt.
+A member-bound palette (`<map to='#…'><bucket>"West"</bucket>`) is impossible from a manifest,
+but an inline `<color-palette>` only lists colours *in order* and lets Tableau walk the field's
+domain against them. So profiling never has to pass distinct members to the manifest.
+
+Both headings are in `brand.DESIGN_TOKENS_REQUIRED_SECTIONS`; keep them there. Absent
+`DESIGN-TOKENS.md` ⇒ Tableau's own defaults, never an invented font or colour.
+
 ### 1.1 The `IMPLEMENTATION-SPEC.md` handoff (step 7 → step 8)
 
 `IMPLEMENTATION-SPEC.md` carries two machine-checked sections that `tableau-build` consumes; spec

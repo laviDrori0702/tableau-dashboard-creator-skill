@@ -765,6 +765,27 @@ def _render_dashboard_declarations(
             features.render_parameter_column(dependencies, parameter)
 
 
+def _render_zoom(
+    parent: ET.Element, plan: worksheet.WorksheetPlan, wrapped: bool = True
+) -> None:
+    """Render a sheet's fit as a ``<zoom>``, in or under a ``<viewpoint>``.
+
+    Standard fit is the *absence* of a zoom, so a sheet that keeps it (a scrolling text table)
+    gets no viewpoint at all rather than a zoom Tableau would have to interpret.
+
+    Args:
+        parent: The ``<window>`` the viewpoint belongs to, or the ``<viewpoint>`` itself.
+        plan: The worksheet whose fit is being written.
+        wrapped: Whether the ``<viewpoint>`` still has to be created (a worksheet window owns
+            one; the dashboard window's ``<viewpoints>`` list already named it per sheet).
+    """
+    zoom_type = plan.zoom_type
+    if not zoom_type:
+        return
+    viewpoint = ET.SubElement(parent, "viewpoint") if wrapped else parent
+    ET.SubElement(viewpoint, "zoom", {"type": zoom_type})
+
+
 def _render_windows(
     parent: ET.Element,
     plans: list[worksheet.WorksheetPlan],
@@ -782,7 +803,6 @@ def _render_windows(
             renders no tab for it, so the analyst opens a workbook with nothing in it.
     """
     windows = ET.SubElement(parent, "windows", {"source-height": "30"})
-    worksheet_names = [plan.name for plan in plans]
 
     for plan in plans:
         attributes = {"class": "worksheet", "name": plan.name}
@@ -810,18 +830,19 @@ def _render_windows(
                 ET.SubElement(right_strip, "card", {
                     "pane-specification-id": pane_id, "param": column, "type": card_type,
                 })
+        # The sheet's own fit, on its own tab. Without it Tableau opens every tab on Standard
+        # and the analyst reviews 15 charts sitting in whitespace.
+        _render_zoom(window, plan)
         ET.SubElement(window, "simple-id", {"uuid": simple_id("window", plan.name)})
 
     dashboard_window = ET.SubElement(windows, "window", {
         "class": "dashboard", "maximized": "true", "name": DASHBOARD_NAME,
     })
     viewpoints = ET.SubElement(dashboard_window, "viewpoints")
-    for name in worksheet_names:
-        # Never a self-closing viewpoint: without entire-view zoom the sheet does not fill
-        # its allocated space.
-        ET.SubElement(
-            ET.SubElement(viewpoints, "viewpoint", {"name": name}),
-            "zoom", {"type": "entire-view"},
+    for plan in plans:
+        # The same fit again, this time as the dashboard sees the embedded sheet.
+        _render_zoom(
+            ET.SubElement(viewpoints, "viewpoint", {"name": plan.name}), plan, wrapped=False
         )
     ET.SubElement(dashboard_window, "active", {"id": root_zone_id})
     ET.SubElement(

@@ -32,6 +32,7 @@ FULL_TOKENS = (
     "## Source\nbranding/branding.md\n\n"
     "## Typography\nFont: Tableau Medium.\n\n"
     "## Colors\nBlue #2e75b6.\n\n"
+    "### Chart series colors\n1. #2e75b6\n2. #f39c12\n\n"
     "## Spacing\nCard padding 8px.\n\n"
     "## Dashboard Sizing\nRange, min 1100x800, max Flex.\n\n"
     "## Fallback Decisions\nNone — all values came from the brand source.\n"
@@ -41,12 +42,13 @@ FULL_TOKENS = (
 CORE_ONLY_TOKENS = (
     "# Design Tokens\n\n"
     "## Colors\nBlue #2e75b6.\n\n"
+    "### Chart series colors\n1. #2e75b6\n2. #f39c12\n\n"
     "## Typography\nFont: Tableau Medium.\n\n"
     "## Spacing\nCard padding 8px.\n\n"
     "## Fallback Decisions\nNone.\n"
 )
 
-# Missing required sections (has Colors but no Typography/Spacing/Fallbacks).
+# Missing required sections (has Colors but no series colours/Typography/Spacing/Fallbacks).
 INCOMPLETE_TOKENS = "# Design Tokens\n\n## Colors\nBlue #2e75b6.\n"
 
 
@@ -185,7 +187,20 @@ def test_validate_tokens_required_core():
     ok, missing_required, _ = brand.validate_design_tokens(INCOMPLETE_TOKENS)
 
     assert ok is False
-    assert set(missing_required) == {"Typography", "Spacing", "Fallback Decisions"}
+    assert set(missing_required) == {
+        "Chart series colors", "Typography", "Spacing", "Fallback Decisions",
+    }
+
+
+def test_validate_tokens_rejects_a_renamed_chart_series_heading():
+    """``tableau-build`` reads ``### Chart series colors`` by name to build every worksheet's
+    palette, so a file that renames it must fail here rather than silently un-style the
+    workbook (CONTRACT.md §1)."""
+    renamed = FULL_TOKENS.replace("### Chart series colors", "### Series palette")
+
+    ok, missing_required, _ = brand.validate_design_tokens(renamed)
+
+    assert ok is False and missing_required == ["Chart series colors"]
 
 
 def test_validate_tokens_recommended_are_optional():

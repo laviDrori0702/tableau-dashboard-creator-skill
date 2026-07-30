@@ -50,7 +50,7 @@ Interaction ids (`int-*`) are actions, not zones, and never appear in the tree.
 | `text` | **KPI card** — empty shelves, a single `text` encoding, rendered as a big number. |
 | `table` | **Text table** — a dimension on each axis, the measure on `text`. |
 | `histogram` | A binned dimension: `{"field": "revenue", "bin": 500}` on `columns`, a `count` on `rows`. |
-| `dual-axis` | Exactly **two** measures on `rows`, overlaid on synchronised axes. |
+| `dual-axis` | Exactly **two** measures on `rows`, overlaid on synchronised axes. Both panes keep the `Automatic` mark, so a continuous date on `columns` draws **two lines** — pick `combo` when the two series should look different. |
 | `combo` | A dual axis with Bar marks on the first measure and Line on the second. |
 | `heatmap`, `treemap`, `bullet`, `gantt`, `boxplot` | The corresponding mark class. |
 
@@ -70,8 +70,19 @@ A shelf entry may also carry `table_calc` — a quick table calculation over the
 One of `CumTotal`, `WindowTotal`, `Difference`, `PctDiff`, `PctValue`, `PctTotal`, `Rank`,
 `PctRank`; it computes across the table (Tableau's "Table (across)" addressing).
 
+**A histogram's `bin` is a width, not a bin count** — Tableau slices `0–500`, `500–1000`, …
+Derive it from the field's range so the chart lands at roughly **10–25 bars**: a revenue that
+runs 10k–50k wants `bin: 2000`, not the `500` from this document's example (which gives ~80
+slivers). The `Sample values` column of `DATA-MODEL.md` is the only range signal available
+today — nothing computes the width for you.
+
 Encodings the builder emits: `color`, `size`, `shape`, `text`, `lod`, `wedge-size`,
 `geometry`, `tooltip`. Any other name is a validation error, not a silent drop.
+
+**A field on `text` is a request for mark labels**, on any chart type — `{"text": {"field":
+"revenue", "aggregation": "sum"}}` on a bar gives labelled bars, and it is also what makes a
+`number_formats` entry *visible*, since a cell format reaches a chart only through its labels.
+On `chart_type: "text"` the same encoding is the KPI card's big number instead.
 
 ## Optional worksheet keys (the modifiers)
 
@@ -84,6 +95,8 @@ Encodings the builder emits: `color`, `size`, `shape`, `text`, `lod`, `wedge-siz
 | `number_formats` | `[{"field": "revenue", "format": "$#,##0"}]` | Cell number format for that field. |
 | `reference_lines` | `[{"field": "revenue", "aggregation": "sum", "formula": "average", "scope": "per-table", "label": "<Computation>: <Value>"}]` | A line drawn at an aggregate of the measure. `formula` from `constant`/`total`/`sum`/`min`/`max`/`average`/`median`/`quantiles`/`percentile`/`stdev`/`confidence`/`medianconfidence` (default `average`); `scope` from `per-cell`/`per-pane`/`per-table` (default `per-table`). A `label` string is used verbatim; without one, `label_type` from `none`/`automatic`/`value`/`computation`/`custom` (default `computation`). |
 | `title` | `"Revenue by region"` | Puts a styled text zone above the sheet's zone in the dashboard and suppresses the sheet's own title. Omit to keep Tableau's sheet title. |
+| `fit` | `"entire-view"` | How the sheet fills its zone: `entire-view` (the default), `standard`, `fit-width`, `fit-height`. |
+| `format` | `{"shading": "#FFFFFF", "borders": "none", "gridlines": "#E5E8E8", "zero_lines": "none", "align": "center", "vertical_align": "top"}` | Format Shading / Borders / Lines / Alignment. Every colour is a `#rrggbb`; `borders`, `gridlines` and `zero_lines` also take `"none"` to turn the border or line off. `align` is `left`/`center`/`right`, `vertical_align` is `top`/`center`/`bottom`. |
 
 An `objects` entry of `kind: "text"` takes its content the same way: `{"element_id":
 "txt-title", "kind": "text", "text": "Sales Performance"}`.
@@ -91,9 +104,43 @@ An `objects` entry of `kind: "text"` takes its content the same way: `{"element_
 Every modifier's field is resolved as strictly as a shelf field — a filter on a field the
 data model does not document is rejected, not silently dropped.
 
-**Styling comes from `DESIGN-TOKENS.md`, not the manifest.** When it exists, its font family
-and chart-title size/colour are applied to every worksheet; when it does not, Tableau's own
-defaults apply. Nothing in the manifest sets fonts or colours.
+### Fit defaults to Entire View
+
+A dashboard zone is a fixed box, and Tableau's own default (`standard`) leaves the chart at
+its natural size floating in that box's whitespace. So every sheet is emitted at **Entire
+View** unless it says otherwise — except `chart_type: "table"`, which defaults to `standard`
+because a text table is meant to **scroll**: squeezing 200 rows into a zone renders them as
+unreadable slivers. Any sheet with more rows than its zone can show wants `"fit": "standard"`
+too. The fit is written on both the sheet's own tab and the dashboard's copy of it.
+
+### Colour: typography *and* the palette come from `DESIGN-TOKENS.md`
+
+**Nothing in the manifest sets fonts or colours** *except* the per-sheet `format` block above
+(borders, lines, shading, alignment — sheet furniture, not brand identity). When
+`DESIGN-TOKENS.md` exists, its font family, chart-title size/colour **and its ordered
+`### Chart series colors`** are applied to every worksheet; when it does not, Tableau's own
+defaults apply.
+
+The palette needs **no data member values**, which is what previously blocked it. A palette
+that binds hexes to concrete members (`<map to='#…'><bucket>"West"</bucket>`) is unbuildable
+from a manifest — the builder never sees the data — but it does not have to be: the mark's
+colour encoding carries an inline `<color-palette>` listing the brand's colours *in order*,
+and Tableau walks the field's domain against them exactly as it does with its own default 10.
+So:
+
+- a **dimension** on `color` (a stacked bar, a pie, a treemap) takes the whole ordered palette;
+- a **measure** on `color` (a filled map, a heatmap) is a continuous ramp, and gets the first
+  and last brand colours as its low and high ends;
+- a `dual-axis` / `combo` chart is coloured by the built-in Measure Names and takes the
+  categorical palette too;
+- a sheet with **nothing on `color`** (a plain bar, line, area, scatter, histogram, table) has
+  no domain to walk, so it takes the **first** brand colour as its flat mark colour. Otherwise
+  most of the workbook would still be Tableau's default blue, which is the single loudest tell
+  that a dashboard was generated.
+
+Tokens with no `### Chart series colors` section leave Tableau's default 10 in place. That
+heading is required by `tableau-brand`'s validator precisely because `build` binds to its name
+(CONTRACT.md §1).
 
 ## Interactions
 
@@ -214,6 +261,8 @@ None of that is expressible in the manifest, and none of it needs to be.
         "rows": [{"field": "revenue", "aggregation": "sum"}]
       },
       "encodings": {"color": "region"},
+      "fit": "entire-view",
+      "format": {"shading": "#FFFFFF", "borders": "none", "gridlines": "#E5E8E8"},
       "filters": [{"field": "region", "values": ["West", "East"], "context": true}],
       "sort": {"field": "region", "direction": "DESC",
                "by": {"field": "revenue", "aggregation": "sum"}},

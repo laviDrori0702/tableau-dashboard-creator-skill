@@ -1,4 +1,4 @@
-<worksheet name="Kpi Card">
+<worksheet name="Bar Labelled">
       <layout-options>
         <title>
           <formatted-text>
@@ -12,15 +12,16 @@
             <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
           </datasources>
           <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Product Category" datatype="string" name="[product_category]" role="dimension" type="nominal" />
             <column caption="Revenue" datatype="real" name="[revenue]" role="measure" type="quantitative" />
+            <column-instance column="[product_category]" derivation="None" name="[none:product_category:nk]" pivot="key" type="nominal" />
             <column-instance column="[revenue]" derivation="Sum" name="[sum:revenue:qk]" pivot="key" type="quantitative" />
           </datasource-dependencies>
           <aggregation value="true" />
         </view>
         <style>
           <style-rule element="cell">
-            <format attr="text-align" value="center" />
-            <format attr="vertical-align" value="center" />
+            <format attr="text-format" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" value="$#,##0" />
           </style-rule>
           <style-rule element="mark">
             <format attr="mark-color" value="#1b4f72" />
@@ -40,11 +41,6 @@
             <encodings>
               <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
             </encodings>
-            <customized-label>
-              <formatted-text>
-                <run bold="true" fontcolor="#7f56d9" fontname="Open Sans" fontsize="22"><![CDATA[<[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]>]]></run>
-              </formatted-text>
-            </customized-label>
             <style>
               <style-rule element="mark">
                 <format attr="mark-labels-show" value="true" />
@@ -53,9 +49,8 @@
             </style>
           </pane>
         </panes>
-        <rows />
-        <cols />
-        <tooltip-style tooltip-mode="none" />
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]</cols>
       </table>
-      <simple-id uuid="{130C3890-07C5-5581-8DA4-6927A8DEB5DB}" />
+      <simple-id uuid="{9CEC14CA-6F15-5502-AE64-DA486DD4311A}" />
     </worksheet>

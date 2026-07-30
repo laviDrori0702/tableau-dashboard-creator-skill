@@ -37,10 +37,15 @@ from worksheet import (
     CHART_SPECS,
     DATE_PART_DERIVATIONS,
     ENCODING_ORDER,
+    FIT_ZOOMS,
+    NO_FORMAT,
     REFERENCE_LINE_FORMULAS,
     REFERENCE_LINE_LABEL_TYPES,
     REFERENCE_LINE_SCOPES,
+    SHEET_FORMAT_KEYS,
     TABLE_CALC_PREFIXES,
+    TEXT_ALIGNMENTS,
+    VERTICAL_ALIGNMENTS,
 )
 from zones import FILTER_MODES
 
@@ -89,6 +94,17 @@ AGGREGATIONS = frozenset({
 #: dropped silently, and Tableau shows no sign of the missing encoding.
 DATE_PARTS = frozenset(DATE_PART_DERIVATIONS)
 ENCODING_NAMES = frozenset(ENCODING_ORDER)
+
+#: How a sheet may be told to fill its zone, and the ``format`` block's alignment values -
+#: both read off the builder's own tables, same reason as :data:`CHART_TYPES`. The block's
+#: key set is the builder's :data:`SHEET_FORMAT_KEYS`, used directly.
+FITS = frozenset(FIT_ZOOMS)
+FORMAT_ALIGNMENTS: dict[str, frozenset[str]] = {
+    "align": TEXT_ALIGNMENTS, "vertical_align": VERTICAL_ALIGNMENTS,
+}
+
+#: A colour value in a ``format`` block: a hex, or ``none`` for "no such border/line".
+_FORMAT_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 #: Table calculations a shelf entry may ask for, and the parameter data types / action
 #: activations the builder can emit - all read off the builder's own tables.
@@ -625,6 +641,60 @@ def _validate_modifiers(label: str, worksheet: dict, errors: list[str]) -> None:
             errors.append(
                 f"{label}: 'sort' has neither 'by' (the measure to sort on) nor 'order' "
                 f"(an explicit member list) - one of the two is required"
+            )
+
+    fit = worksheet.get("fit")
+    if isinstance(fit, str) and fit.strip().lower() not in FITS:
+        errors.append(
+            f"{label}: unknown fit '{fit}' (expected one of: {', '.join(sorted(FITS))})"
+        )
+
+    _validate_sheet_format(label, worksheet.get("format"), errors)
+
+
+def _validate_sheet_format(label: str, block: object, errors: list[str]) -> None:
+    """Reject a ``format`` block the builder would render as nothing.
+
+    A misspelled key or a colour Tableau cannot parse is the worst kind of formatting bug:
+    the workbook opens, nothing is wrong with it, and the sheet simply is not formatted.
+
+    Args:
+        label: The worksheet's error label.
+        block: The worksheet's ``format`` value, if any.
+        errors: Accumulator for validation errors.
+    """
+    if block is None:
+        return
+    if not isinstance(block, dict):
+        errors.append(
+            f"{label}: 'format' must be an object "
+            f"(keys: {', '.join(sorted(SHEET_FORMAT_KEYS))})"
+        )
+        return
+
+    for key, value in block.items():
+        if key not in SHEET_FORMAT_KEYS:
+            errors.append(
+                f"{label}: unknown format key '{key}' "
+                f"(expected one of: {', '.join(sorted(SHEET_FORMAT_KEYS))})"
+            )
+            continue
+        text = value.strip().lower() if isinstance(value, str) else ""
+        if not text:
+            errors.append(f"{label}: format.{key} needs a value")
+        elif key in FORMAT_ALIGNMENTS:
+            if text not in FORMAT_ALIGNMENTS[key]:
+                errors.append(
+                    f"{label}: format.{key} '{value}' is not an alignment "
+                    f"(expected one of: {', '.join(sorted(FORMAT_ALIGNMENTS[key]))})"
+                )
+        elif not _FORMAT_COLOR.match(text) and not (
+            # A border or a line can be turned off; a background cannot be shaded "none".
+            text == NO_FORMAT and key != "shading"
+        ):
+            errors.append(
+                f"{label}: format.{key} '{value}' is not a '#rrggbb' colour"
+                + ("" if key == "shading" else f" nor '{NO_FORMAT}'")
             )
 
 

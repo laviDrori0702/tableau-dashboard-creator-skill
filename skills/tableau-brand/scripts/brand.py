@@ -79,8 +79,11 @@ COMMIT_STATUSES: tuple[str, ...] = ("approved", "skipped")
 #: DESIGN-TOKENS sections every approved token file must have: the palette, the
 #: type, the spacing the step exists to capture, plus the fallback-disclosure
 #: section that flags every guessed value (CONTRACT acceptance criteria).
+#: ``Chart series colors`` is required by name because ``tableau-build`` reads that
+#: heading to build every worksheet's colour palette (CONTRACT.md §8) - a file that
+#: renames it still validates as "has Colors" and silently loses the brand's palette.
 DESIGN_TOKENS_REQUIRED_SECTIONS: tuple[str, ...] = (
-    "Colors", "Typography", "Spacing", "Fallback Decisions",
+    "Colors", "Chart series colors", "Typography", "Spacing", "Fallback Decisions",
 )
 
 #: Common but genuinely optional sections. Proposed while authoring, never required
