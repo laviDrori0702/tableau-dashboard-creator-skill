@@ -974,7 +974,14 @@ def _plan_sort(entry: object, resolver: FieldResolver) -> Optional[SortPlan]:
 
 
 def _plan_tooltip(entries: object, resolver: FieldResolver) -> list[tuple[str, FieldRef]]:
-    """Resolve the ``tooltip`` list into ``(label, field)`` pairs."""
+    """Resolve the ``tooltip`` list into ``(label, field)`` pairs.
+
+    A bare dimension is wrapped in ``ATTR()`` on the way in: the Tooltip shelf does not add
+    to the view's level of detail, so Tableau needs one value per mark and refuses the
+    un-aggregated pill ("The field Region can't be displayed in Tooltips because it can't be
+    converted to a measure using ATTR()"). Desktop makes the same substitution when a
+    dimension is dropped there, so the manifest never has to spell it out.
+    """
     if not isinstance(entries, list):
         return []
     pairs: list[tuple[str, FieldRef]] = []
@@ -982,9 +989,32 @@ def _plan_tooltip(entries: object, resolver: FieldResolver) -> list[tuple[str, F
         if not isinstance(entry, dict):
             continue
         reference = resolver.reference(entry)
+        if reference is not None and _needs_attr_on_tooltip(entry, reference):
+            reference = resolver.reference({**entry, "aggregation": "attr"})
         if reference is not None:
             pairs.append((str(entry.get("label", reference.caption)).strip(), reference))
     return pairs
+
+
+def _needs_attr_on_tooltip(entry: dict, reference: FieldRef) -> bool:
+    """Whether a resolved tooltip entry has to be re-resolved as ``ATTR()``.
+
+    Args:
+        entry: The manifest tooltip entry.
+        reference: What :meth:`FieldResolver.reference` made of it.
+
+    Returns:
+        True for an un-aggregated dimension the manifest asked for plainly. An explicit
+        ``aggregation`` (including ``none``) is the author's choice and is left alone; a
+        measure already defaults to ``SUM``, a date part and a bin carry their own
+        derivations, and an aggregating calculation resolves to the ``User`` derivation.
+    """
+    return (
+        reference.role == "dimension"
+        and reference.derivation == "None"
+        and reference.bin_size is None
+        and not _lower(entry.get("aggregation"))
+    )
 
 
 def _plan_number_formats(

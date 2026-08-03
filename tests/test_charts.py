@@ -718,6 +718,49 @@ def test_a_custom_tooltip_registers_every_field_it_names():
     assert "<![CDATA[<[federated" in _worksheet_xml("Custom Tooltip")
 
 
+def test_a_bare_dimension_on_tooltip_is_wrapped_in_attr():
+    """Desktop-reported (#39): a dimension on Tooltip must reach the pane as ATTR().
+
+    The Tooltip shelf does not add to the view's level of detail, so a field on it has to
+    resolve to one value per mark. Tableau wraps a dimension in ``ATTR()`` and refuses the
+    un-aggregated pill outright: *"The field Region can't be displayed in Tooltips because
+    it can't be converted to a measure using ATTR()."* The manifest must not have to know
+    that - ``{"label": "Region", "field": "region"}`` is a legal entry.
+    """
+    document = _manifest([_sheet(
+        "Bare Tooltip", "bar",
+        shelves={"columns": ["region"], "rows": ["revenue"]},
+        tooltip=[{"label": "Region", "field": "region"}],
+    )])
+    pane = _worksheet_element(
+        "Bare Tooltip", ET.fromstring(_render(document))
+    ).find("table/panes/pane")
+
+    registered = {
+        tooltip.get("column").rsplit(".", 1)[-1]
+        for tooltip in pane.findall("encodings/tooltip")
+    }
+    assert registered == {"[attr:region:nk]"}
+    assert "[attr:region:nk]" in pane.find("customized-tooltip/formatted-text/run[2]").text
+
+
+def test_an_explicit_tooltip_aggregation_is_left_alone():
+    """The ATTR wrap is a default, not an override: an asked-for aggregation still wins."""
+    document = _manifest([_sheet(
+        "Counted Tooltip", "bar",
+        shelves={"columns": ["region"], "rows": ["revenue"]},
+        tooltip=[{"label": "Orders", "field": "region", "aggregation": "countd"}],
+    )])
+    pane = _worksheet_element(
+        "Counted Tooltip", ET.fromstring(_render(document))
+    ).find("table/panes/pane")
+
+    assert {
+        tooltip.get("column").rsplit(".", 1)[-1]
+        for tooltip in pane.findall("encodings/tooltip")
+    } == {"[ctd:region:qk]"}
+
+
 def test_a_tooltip_field_reaches_the_dependencies():
     """A tooltip-only field still has to be declared, or the tooltip renders empty."""
     declared = {
