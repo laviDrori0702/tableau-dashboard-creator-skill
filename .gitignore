@@ -40,12 +40,9 @@ skill/tableau-dashboard-creator/scripts/__pycache__/
 !skill/tableau-dashboard-creator/skeleton/
 !skill/tableau-dashboard-creator/skeleton/**
 
-# Allow demo/ tree
+# Allow demo/ tree (a single v2 project root)
 !demo/
-!demo/input/
-!demo/input/**
-!demo/output/
-!demo/output/**
+!demo/**
 
 # --- v2 plugin (dev/v2-plugin) ---
 # Allow plugin manifest

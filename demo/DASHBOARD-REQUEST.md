@@ -1,4 +1,4 @@
-# Sales Performance Dashboard - Product Dashboard Request
+# Sales Performance Dashboard - Dashboard Request
 
 ## Overview
 A regional sales performance dashboard for the VP of Sales and regional managers. It should provide a quick overview of revenue, profit, and order KPIs, with the ability to drill down by region, product category, and customer segment. Updated monthly.

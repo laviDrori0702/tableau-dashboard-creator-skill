@@ -122,7 +122,7 @@ tableau-dashboard-plugin/
 ├── skill/
 │   └── tableau-dashboard-creator/   # legacy v1 monolith — kept for reference only
 ├── tests/                     # contract/skill test suite (python -m pytest -q)
-├── demo/                      # worked example (see note below)
+├── demo/                      # a complete worked example project root
 ├── requirements.txt
 └── README.md
 ```
@@ -135,7 +135,28 @@ If you used the old single skill: the workflow now lives in this plugin. Install
 
 ## Demo
 
-`demo/` is a worked Sales Performance example. **Note:** it currently reflects the **v1** artifact names and layout; a refresh to the v2 workflow (`STATE.md`, `DATA-MODEL.md`, `IMPLEMENTATION-SPEC.md`, `mock-version/`) is pending ([#30](https://github.com/laviDrori0702/tableau-dashboard-creator-skill/issues/30)). Until then, treat `CONTRACT.md` and the per-skill `references/` as the authoritative shape of each artifact.
+`demo/` is a Sales Performance project taken through all 8 steps — exactly what an analyst's folder looks like when the pipeline is done. It is a **single project root**, not an input/output split:
+
+```
+demo/
+├── STATE.md                    # the manifest: metadata + all 8 steps approved
+├── DASHBOARD-REQUEST.md        # analyst input: the free-text request
+├── data/*.csv                  # analyst input: 3 CSVs = 3 data sources
+├── branding/                   # analyst input: branding.md + logo.svg
+├── scaffold/                   # the demo examples tableau-init lays down
+├── PRD.md                      # step 2 · tableau-intake
+├── DATA-MODEL.md               # step 3 · tableau-data
+├── DESIGN-TOKENS.md            # step 4 · tableau-brand
+├── DASHBOARD-PLAN.md           # step 5 · tableau-plan
+└── mock-version/v_1/
+    ├── mock.html               # step 6 · tableau-mock (self-contained, interactive)
+    ├── IMPLEMENTATION-SPEC.md  # step 7 · tableau-spec
+    ├── dashboard.twbx          # step 8 · tableau-build — the deliverable
+    ├── dashboard.twb           # build-internal: the unpackaged workbook
+    └── build-manifest.json     # build-internal: the builder's input
+```
+
+Every file there was produced by its owning skill's real flow, so it doubles as a reference for the exact shape of each artifact. `CONTRACT.md` remains the normative spec.
 
 ![Dashboard Mock Preview](assets/mock_screenshot.jpeg)
 

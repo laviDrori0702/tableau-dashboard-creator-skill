@@ -1,0 +1,306 @@
+{
+  "target_tableau_version": "2024.2-2025.x",
+  "datasources": [
+    {
+      "name": "sales_orders",
+      "csv": "sales_orders.csv",
+      "fields": [
+        {"name": "order_id", "type": "string"},
+        {"name": "order_date", "type": "date"},
+        {"name": "customer_name", "type": "string"},
+        {"name": "region", "type": "string"},
+        {"name": "country", "type": "string"},
+        {"name": "product_category", "type": "string"},
+        {"name": "product_name", "type": "string"},
+        {"name": "quantity", "type": "integer"},
+        {"name": "unit_price", "type": "real"},
+        {"name": "discount", "type": "real"},
+        {"name": "revenue", "type": "real"},
+        {"name": "cost", "type": "real"},
+        {"name": "profit", "type": "real"}
+      ]
+    },
+    {
+      "name": "monthly_targets",
+      "csv": "monthly_targets.csv",
+      "fields": [
+        {"name": "month", "type": "string"},
+        {"name": "region", "type": "string"},
+        {"name": "revenue_target", "type": "integer"},
+        {"name": "orders_target", "type": "integer"},
+        {"name": "new_customers_target", "type": "integer"}
+      ]
+    },
+    {
+      "name": "customer_segments",
+      "csv": "customer_segments.csv",
+      "fields": [
+        {"name": "customer_name", "type": "string"},
+        {"name": "segment", "type": "string"},
+        {"name": "industry", "type": "string"},
+        {"name": "company_size", "type": "string"},
+        {"name": "account_manager", "type": "string"},
+        {"name": "customer_since", "type": "date"},
+        {"name": "lifetime_value", "type": "real"},
+        {"name": "nps_score", "type": "integer"}
+      ]
+    }
+  ],
+  "calculated_fields": [
+    {
+      "name": "Average Order Value",
+      "formula": "SUM([revenue]) / COUNTD([order_id])",
+      "datasource": "sales_orders",
+      "type": "real",
+      "format": "$#,##0"
+    },
+    {
+      "name": "Order Month",
+      "formula": "STR(YEAR([order_date])) + \"-\" + IF MONTH([order_date]) < 10 THEN \"0\" ELSE \"\" END + STR(MONTH([order_date]))",
+      "datasource": "sales_orders",
+      "type": "string"
+    }
+  ],
+  "worksheets": [
+    {
+      "name": "Revenue KPI",
+      "element_id": "kpi-revenue",
+      "chart_type": "text",
+      "datasource": "sales_orders",
+      "title": "Total revenue",
+      "shelves": {"columns": [], "rows": []},
+      "encodings": {"text": {"field": "revenue", "aggregation": "sum"}},
+      "number_formats": [{"field": "revenue", "format": "$#,##0"}],
+      "format": {"shading": "#FFFFFF", "borders": "none", "align": "center"}
+    },
+    {
+      "name": "Profit KPI",
+      "element_id": "kpi-profit",
+      "chart_type": "text",
+      "datasource": "sales_orders",
+      "title": "Total profit",
+      "shelves": {"columns": [], "rows": []},
+      "encodings": {"text": {"field": "profit", "aggregation": "sum"}},
+      "number_formats": [{"field": "profit", "format": "$#,##0"}],
+      "format": {"shading": "#FFFFFF", "borders": "none", "align": "center"}
+    },
+    {
+      "name": "Orders KPI",
+      "element_id": "kpi-orders",
+      "chart_type": "text",
+      "datasource": "sales_orders",
+      "title": "Total orders",
+      "shelves": {"columns": [], "rows": []},
+      "encodings": {"text": {"field": "order_id", "aggregation": "countd"}},
+      "format": {"shading": "#FFFFFF", "borders": "none", "align": "center"}
+    },
+    {
+      "name": "AOV KPI",
+      "element_id": "kpi-aov",
+      "chart_type": "text",
+      "datasource": "sales_orders",
+      "title": "Average order value",
+      "shelves": {"columns": [], "rows": []},
+      "encodings": {"text": {"field": "Average Order Value", "aggregation": "none"}},
+      "format": {"shading": "#FFFFFF", "borders": "none", "align": "center"}
+    },
+    {
+      "name": "Revenue Trend",
+      "element_id": "chart-trend",
+      "chart_type": "line",
+      "datasource": "sales_orders",
+      "title": "Revenue trend by region",
+      "shelves": {
+        "columns": [{"field": "order_date", "date_part": "month"}],
+        "rows": [{"field": "revenue", "aggregation": "sum"}]
+      },
+      "encodings": {"color": "region"},
+      "number_formats": [{"field": "revenue", "format": "$#,##0"}],
+      "axis_titles": {"rows": "Revenue"},
+      "format": {"shading": "#FFFFFF", "borders": "none", "gridlines": "#EEF1F4"}
+    },
+    {
+      "name": "Revenue by Region",
+      "element_id": "chart-region-actual",
+      "chart_type": "bar",
+      "datasource": "sales_orders",
+      "title": "Actual revenue by region",
+      "shelves": {
+        "columns": [{"field": "revenue", "aggregation": "sum"}],
+        "rows": ["region"]
+      },
+      "encodings": {"text": {"field": "revenue", "aggregation": "sum"}},
+      "sort": {
+        "field": "region",
+        "direction": "DESC",
+        "by": {"field": "revenue", "aggregation": "sum"}
+      },
+      "number_formats": [{"field": "revenue", "format": "$#,##0"}],
+      "format": {"shading": "#FFFFFF", "borders": "none", "gridlines": "#EEF1F4"}
+    },
+    {
+      "name": "Revenue Target by Region",
+      "element_id": "chart-region-target",
+      "chart_type": "bar",
+      "datasource": "monthly_targets",
+      "title": "Revenue target by region",
+      "shelves": {
+        "columns": [{"field": "revenue_target", "aggregation": "sum"}],
+        "rows": ["region"]
+      },
+      "encodings": {"text": {"field": "revenue_target", "aggregation": "sum"}},
+      "sort": {
+        "field": "region",
+        "direction": "DESC",
+        "by": {"field": "revenue_target", "aggregation": "sum"}
+      },
+      "number_formats": [{"field": "revenue_target", "format": "$#,##0"}],
+      "format": {"shading": "#FFFFFF", "borders": "none", "gridlines": "#EEF1F4"}
+    },
+    {
+      "name": "Profit by Category",
+      "element_id": "chart-category",
+      "chart_type": "bar",
+      "datasource": "sales_orders",
+      "title": "Profit by product category",
+      "shelves": {
+        "columns": ["product_category"],
+        "rows": [{"field": "profit", "aggregation": "sum"}]
+      },
+      "encodings": {"text": {"field": "profit", "aggregation": "sum"}},
+      "sort": {
+        "field": "product_category",
+        "direction": "DESC",
+        "by": {"field": "profit", "aggregation": "sum"}
+      },
+      "number_formats": [{"field": "profit", "format": "$#,##0"}],
+      "axis_titles": {"rows": "Profit"},
+      "format": {"shading": "#FFFFFF", "borders": "none", "gridlines": "#EEF1F4"}
+    },
+    {
+      "name": "Top Customers",
+      "element_id": "table-customers",
+      "chart_type": "table",
+      "datasource": "customer_segments",
+      "title": "Top customers by lifetime value",
+      "shelves": {
+        "columns": [],
+        "rows": [
+          "customer_name",
+          "segment",
+          "industry",
+          "account_manager",
+          {"field": "nps_score", "aggregation": "none"}
+        ]
+      },
+      "encodings": {"text": {"field": "lifetime_value", "aggregation": "sum"}},
+      "sort": {
+        "field": "customer_name",
+        "direction": "DESC",
+        "by": {"field": "lifetime_value", "aggregation": "sum"}
+      },
+      "number_formats": [{"field": "lifetime_value", "format": "$#,##0"}],
+      "fit": "standard",
+      "format": {"shading": "#FFFFFF", "borders": "none"}
+    }
+  ],
+  "objects": [
+    {"element_id": "obj-title", "kind": "text", "text": "Sales Performance"},
+    {
+      "element_id": "flt-month",
+      "kind": "filter",
+      "field": "Order Month",
+      "worksheet": "Revenue Trend",
+      "mode": "checkdropdown"
+    },
+    {
+      "element_id": "flt-region",
+      "kind": "filter",
+      "field": "region",
+      "worksheet": "Revenue Trend",
+      "mode": "checkdropdown"
+    },
+    {
+      "element_id": "flt-category",
+      "kind": "filter",
+      "field": "product_category",
+      "worksheet": "Revenue Trend",
+      "mode": "checkdropdown"
+    }
+  ],
+  "layout": {
+    "canvas": {"width": 1366, "height": 900},
+    "root": {
+      "type": "vert",
+      "children": [
+        {"id": "obj-title", "size": 7},
+        {
+          "type": "horz",
+          "size": 7,
+          "children": [
+            {"id": "flt-month", "size": 34},
+            {"id": "flt-region", "size": 33},
+            {"id": "flt-category", "size": 33}
+          ]
+        },
+        {
+          "type": "horz",
+          "size": 14,
+          "children": [
+            {"id": "kpi-revenue", "size": 25},
+            {"id": "kpi-profit", "size": 25},
+            {"id": "kpi-orders", "size": 25},
+            {"id": "kpi-aov", "size": 25}
+          ]
+        },
+        {
+          "type": "horz",
+          "size": 40,
+          "children": [
+            {"id": "chart-trend", "size": 60},
+            {
+              "type": "vert",
+              "size": 40,
+              "children": [
+                {"id": "chart-region-actual", "size": 50},
+                {"id": "chart-region-target", "size": 50}
+              ]
+            }
+          ]
+        },
+        {
+          "type": "horz",
+          "size": 32,
+          "children": [
+            {"id": "chart-category", "size": 40},
+            {"id": "table-customers", "size": 60}
+          ]
+        }
+      ]
+    }
+  },
+  "actions": [
+    {
+      "name": "Region cross-filter",
+      "type": "filter",
+      "source": "chart-region-actual",
+      "targets": ["chart-trend", "chart-category"],
+      "run_on": "select"
+    },
+    {
+      "name": "Category cross-filter",
+      "type": "filter",
+      "source": "chart-category",
+      "targets": ["chart-trend", "chart-region-actual"],
+      "run_on": "select"
+    },
+    {
+      "name": "Region highlight",
+      "type": "highlight",
+      "source": "chart-region-actual",
+      "targets": ["chart-region-target"],
+      "run_on": "select"
+    }
+  ],
+  "parameters": []
+}
