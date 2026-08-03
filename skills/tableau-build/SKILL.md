@@ -166,7 +166,8 @@ When one arrives:
 1. **Locate the construct.** Desktop names a sheet, a field or an element; find its entry in
    `build-manifest.json` at the precheck's manifest path. That entry is what was asked for —
    the bug is either the XML that came out of it, or a validation that should have refused it.
-2. **Diagnose which template wrote the bad XML.** Each part of the workbook has one author:
+2. **Diagnose which template wrote the bad XML.** Each part of the workbook has one author —
+   the file that *emits* it, which is where the fix goes:
 
    | what Desktop complains about | the template |
    |---|---|
@@ -176,6 +177,11 @@ When one arrives:
    | the workbook shell, a datasource, a column, the version attribute | `twb.py` |
    | the manifest was accepted when it should have been refused | `manifest.py` (a missing check) |
 
+   For an action, a filter card or dynamic zone visibility, check `twb.py` too: it *plans*
+   them (`_plan_actions`, `_plan_quick_filter`, `_plan_interactions`) and `features.py` only
+   renders what it was handed, so a wrong target or a missing declaration is often decided
+   there.
+
 3. **Fix it in the repo, never in the generated XML.** Add the smallest manifest that
    reproduces the bad XML as a test in `tests/` (`test_build.py`, `test_charts.py`,
    `test_features.py`, `test_zones.py`), watch it fail, then fix the template until it passes
@@ -183,7 +189,9 @@ When one arrives:
    fixes every workbook built afterwards. When the correct XML is not obvious, get it from
    Desktop: build that one construct by hand there, save, and diff its `.twb` against the
    generated one — Desktop's own output is the only authority on fidelity.
-4. **Rebuild and re-attest.** Re-run step 5, then have the analyst open the new `.twbx` and
+4. **Rebuild and re-attest.** Re-run steps 5 **and** 6 — a rebuild alone leaves `build` sitting
+   at the `approved` it earned from the pre-fix workbook, and only `commit` re-checks that a
+   packaged deliverable is actually on disk. Then have the analyst open the new `.twbx` and
    confirm the error is gone. The second Desktop open is what closes the loop; the gate going
    green is not.
 5. **When this repo is not to hand** — an analyst in their own project, without the plugin

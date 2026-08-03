@@ -1486,8 +1486,10 @@ def test_commit_touches_no_other_step(tmp_path):
 
     after = route.parse_state(tmp_path / "STATE.md").statuses
     assert after["build"] == "approved"
-    assert {step: status for step, status in after.items() if step != "build"} == \
-           {step: status for step, status in before.items() if step != "build"}
+    assert (
+        {step: status for step, status in after.items() if step != "build"}
+        == {step: status for step, status in before.items() if step != "build"}
+    )
 
 
 def test_recommit_overwrites_in_place(tmp_path):
