@@ -1,7 +1,7 @@
 {
   "name": "tableau-dashboard-plugin",
   "displayName": "Tableau Dashboard Plugin",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Turn a free-text dashboard request into an interactive HTML demo and a Replace-Data-Source-ready Tableau .twbx, via 8 single-job skills that hand off through files on disk. See CONTRACT.md for the inter-skill API.",
   "author": {
     "name": "Lavi Drori",
