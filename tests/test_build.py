@@ -1452,6 +1452,18 @@ def test_commit_refuses_an_invalid_manifest(tmp_path):
     assert route.parse_state(tmp_path / "STATE.md").statuses["build"] == "pending"
 
 
+def test_commit_refuses_when_the_entry_gate_is_closed(tmp_path):
+    """Commit is gated like every other entrypoint: an unresolved producer refuses it."""
+    _built_project(tmp_path)
+    _state_with(tmp_path, spec="pending", data="approved")
+
+    result = build.commit(tmp_path)
+
+    assert result.ok is False
+    assert "spec" in result.message
+    assert route.parse_state(tmp_path / "STATE.md").statuses["build"] == "pending"
+
+
 def test_commit_approves_and_leaves_current_version_alone(tmp_path):
     """A valid manifest approves build in place - current_version is never bumped (§4.3)."""
     _built_project(tmp_path)
@@ -1462,6 +1474,20 @@ def test_commit_approves_and_leaves_current_version_alone(tmp_path):
     state = route.parse_state(tmp_path / "STATE.md")
     assert state.statuses["build"] == "approved"
     assert state.current_version == "v_1"
+
+
+def test_commit_touches_no_other_step(tmp_path):
+    """Build is last, so nothing goes stale: every other status survives the commit (§4.2)."""
+    _built_project(tmp_path, intake="approved", brand="skipped", plan="approved",
+                   mock="approved")
+    before = route.parse_state(tmp_path / "STATE.md").statuses
+
+    assert build.commit(tmp_path).ok is True
+
+    after = route.parse_state(tmp_path / "STATE.md").statuses
+    assert after["build"] == "approved"
+    assert {step: status for step, status in after.items() if step != "build"} == \
+           {step: status for step, status in before.items() if step != "build"}
 
 
 def test_recommit_overwrites_in_place(tmp_path):
