@@ -2,7 +2,7 @@
 name: tableau-build
 description: Builds the Tableau workbook for the tableau-dashboard-plugin workflow from the approved IMPLEMENTATION-SPEC.md and DATA-MODEL.md, producing a Replace-Data-Source-ready dashboard.twbx beside the mock it was specced from. Derives a machine-readable build manifest (datasources, worksheets with chart type and shelves/encodings, the spec's layout container tree, actions, parameters, and the project's target Tableau version) and schema-validates it fail-fast, so an unknown chart type, an element id missing from the layout, or a field that is not in the data model is caught with the offending entry named before any XML is generated. Reads the approved IMPLEMENTATION-SPEC.md at the current version, DATA-MODEL.md, and the CSVs under data/. Use when the user wants to build the workbook, generate the twbx, or when tableau-route reports build is next. Step 8 of 8 in the workflow.
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, AskUserQuestion, Bash(python *), Bash(python3 *)
+allowed-tools: Read, Write, Edit, Grep, AskUserQuestion, Bash(python *), Bash(python3 *)
 ---
 
 # tableau-build
@@ -150,7 +150,47 @@ invented zone is caught rather than silently built.
    Commit re-validates the manifest, refuses unless `dashboard.twbx` is on disk (run step 5
    first), and records `build` = `approved`. If it prints `[REFUSED]`, fix what it names and
    re-run. On success, tell the analyst the pipeline is complete and where the deliverable
-   lives.
+   lives — and ask them to open it (see below).
+
+## When Desktop rejects it — the report-back repair
+
+**The validators are not Tableau.** A workbook can pass all three and still be refused, or
+silently rewritten, on open. So the last thing you say after `commit` is that Desktop is the
+authority: *open the `.twbx`, and if Tableau reports an error or a view renders differently
+from the mock it was specced from, paste the error text back here.* That report is not a
+support ticket — it is the input to a permanent template fix, so the next workbook the builder
+generates is right too.
+
+When one arrives:
+
+1. **Locate the construct.** Desktop names a sheet, a field or an element; find its entry in
+   `build-manifest.json` at the precheck's manifest path. That entry is what was asked for —
+   the bug is either the XML that came out of it, or a validation that should have refused it.
+2. **Diagnose which template wrote the bad XML.** Each part of the workbook has one author:
+
+   | what Desktop complains about | the template |
+   |---|---|
+   | a view's marks, shelves, encodings, sort / filter / tooltip / reference line, formatting | `worksheet.py` |
+   | a zone's position or size, a generated header / legend wrapper, an object kind | `zones.py` |
+   | an action, a parameter, dynamic zone visibility | `features.py` |
+   | the workbook shell, a datasource, a column, the version attribute | `twb.py` |
+   | the manifest was accepted when it should have been refused | `manifest.py` (a missing check) |
+
+3. **Fix it in the repo, never in the generated XML.** Add the smallest manifest that
+   reproduces the bad XML as a test in `tests/` (`test_build.py`, `test_charts.py`,
+   `test_features.py`, `test_zones.py`), watch it fail, then fix the template until it passes
+   and the suite is green. A patch to the `.twb` fixes one workbook; a patch to the template
+   fixes every workbook built afterwards. When the correct XML is not obvious, get it from
+   Desktop: build that one construct by hand there, save, and diff its `.twb` against the
+   generated one — Desktop's own output is the only authority on fidelity.
+4. **Rebuild and re-attest.** Re-run step 5, then have the analyst open the new `.twbx` and
+   confirm the error is gone. The second Desktop open is what closes the loop; the gate going
+   green is not.
+5. **When this repo is not to hand** — an analyst in their own project, without the plugin
+   source — hand-patch that one `.twb`, prove it with `build.py gate`, and ask them to file the
+   error text plus the `build-manifest.json` that produced it at
+   <https://github.com/laviDrori0702/tableau-dashboard-creator-skill/issues/new>, so the fix
+   still lands in the templates.
 
 ## Notes
 
