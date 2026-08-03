@@ -483,7 +483,25 @@ class FieldResolver:
             instance_type = "quantitative"
         elif aggregation:
             prefix, derivation = AGGREGATION_DERIVATIONS.get(aggregation, ("none", "None"))
-            instance_type = "quantitative" if aggregation in _AGGREGATING else column_type
+            if aggregation in _AGGREGATING:
+                instance_type = "quantitative"
+            elif (
+                aggregation == "none"
+                and role == "measure"
+                and not is_aggregate_formula(formula)
+            ):
+                # Issue #59: an explicit "none" on a plain measure is the analyst asking for a
+                # discrete pill, not a number. Left at the measure's own 'quantitative' it is
+                # continuous, and a continuous pill on Rows draws an axis - the demo's customer
+                # table grew one 90/80/70 Nps Score axis per customer. 'ordinal' is what
+                # Desktop writes for a measure set to Discrete with no aggregation.
+                #
+                # An *aggregate* calculated field is excluded: there, "none" means "do not
+                # re-aggregate SUM([revenue])/COUNTD([order_id])", which is still one
+                # continuous number - and making it discrete broke the demo's AOV KPI card.
+                instance_type = "ordinal"
+            else:
+                instance_type = column_type
         elif is_aggregate_formula(formula):
             prefix, derivation = USER_DERIVATION
             instance_type = column_type

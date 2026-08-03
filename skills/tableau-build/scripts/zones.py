@@ -83,6 +83,26 @@ EMPTY_ZONE_TYPE = "empty"
 #: ``V-``/``H-`` convention, which is what makes a deep zone tree readable while debugging).
 CONTAINER_PREFIXES = {"vert": "V", "horz": "H"}
 
+#: The ``<layout-cache>`` Desktop writes on a sheet zone, by whether the sheet is one cell.
+#:
+#: Issue #59: without this element Desktop 2025.1 rendered every zone at its content's natural
+#: size and ignored the stored ``w``/``h`` - a KPI card collapsed to ~60px and printed ``#``
+#: instead of its number. The Desktop-authored example workbook carries a cache on every sheet
+#: zone and on *no other* zone type, which is why only :meth:`_ZoneWriter._content`'s sheet
+#: branch emits one.
+#:
+#: ``minwidth`` / ``minheight`` are deliberately omitted from the scalable variant. They are
+#: optional in the XSD, Desktop re-measures them on open (it is a cache), and a value too
+#: large is a zone Desktop gives a scrollbar - so guessing one trades this bug for a worse
+#: one. Desktop fills them in on its first save.
+SHEET_LAYOUT_CACHES: dict[bool, dict[str, str]] = {
+    True: {"cell-count-h": "1", "cell-count-w": "1", "type-h": "cell", "type-w": "cell"},
+    False: {"type-h": "scalable", "type-w": "scalable"},
+}
+
+#: The ``layout-strategy-id`` Desktop writes on a flow container it splits evenly (a KPI row).
+DISTRIBUTE_EVENLY = "distribute-evenly"
+
 #: The root zone's friendly name.
 ROOT_FRIENDLY_NAME = "Dashboard"
 
@@ -138,6 +158,8 @@ class Leaf:
         sheet: The worksheet a filter card filters (its ``name``); the card is the UI for that
             sheet's own filter, so the two must agree.
         mode: The control's mode, defaulting to :data:`DEFAULT_ZONE_MODES`.
+        single_cell: The view is one cell rather than a scalable chart (a KPI card's ``text``
+            chart type). It picks the zone's :data:`SHEET_LAYOUT_CACHES` variant.
     """
 
     worksheet: str = ""
@@ -148,6 +170,7 @@ class Leaf:
     param: str = ""
     sheet: str = ""
     mode: str = ""
+    single_cell: bool = False
 
 
 def render_zone_style(parent: ET.Element, margin: str) -> None:
@@ -313,13 +336,18 @@ class _ZoneWriter:
             return
 
         orientation = "vert" if str(node.get("type", "")).strip().lower() == "vert" else "horz"
+        sizes = child_sizes(children)
+        # An evenly split container is how Desktop records a KPI row: the strategy, not four
+        # stored 25%s, is what keeps the cards equal as the dashboard stretches (issue #59).
+        is_evenly_split = len(sizes) > 1 and len(set(sizes)) == 1
         container = self._zone(
             parent, box, f"{CONTAINER_PREFIXES[orientation]}-{element_id or path}",
             type_v2="layout-flow", param=orientation,
+            layout_strategy_id=DISTRIBUTE_EVENLY if is_evenly_split else None,
         )
         self._record_visibility(container, visibility)
         for index, (child, child_box) in enumerate(
-            zip(children, self._divide(box, orientation, child_sizes(children))), start=1
+            zip(children, self._divide(box, orientation, sizes)), start=1
         ):
             self._node(container, child, child_box, f"{path}.{index}")
         render_zone_style(container, ZONE_MARGIN)
@@ -431,6 +459,9 @@ class _ZoneWriter:
         if leaf.worksheet:
             # A sheet zone is identified by its 'name' and carries no type-v2.
             zone = self._zone(parent, box, label, name=leaf.worksheet, show_title="false")
+            # First child, before <zone-style>: the XSD's zone sequence is formatted-text,
+            # layout-cache, nested zones, ..., zone-style - and Tableau reads it positionally.
+            ET.SubElement(zone, "layout-cache", SHEET_LAYOUT_CACHES[leaf.single_cell])
             self.embedded.add(leaf.worksheet)
             render_zone_style(zone, ZONE_MARGIN)
             return zone
