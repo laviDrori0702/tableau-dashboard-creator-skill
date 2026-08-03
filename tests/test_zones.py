@@ -293,6 +293,69 @@ def test_zone_style_is_always_the_last_child():
         assert len(zone.findall("zone-style")) == 1
 
 
+# --- Layout metadata (issue #59) ------------------------------------------------
+
+def test_every_sheet_zone_carries_a_layout_cache():
+    """Issue #59 bug 1: Desktop 2025.1 rendered demo v_1 with every zone collapsed to its
+    content's natural size. The only structural diff against the Desktop-authored example
+    workbook was the missing ``<layout-cache>`` on each sheet zone - Desktop writes one on
+    every one of them, and on nothing else."""
+    root = {"type": "horz", "children": [
+        {"id": "kpi", "size": 30},
+        {"id": "chart", "size": 40},
+        {"id": "note", "size": 30},
+    ]}
+    leaves = {
+        "kpi": zones.Leaf(worksheet="Revenue KPI", single_cell=True),
+        "chart": zones.Leaf(worksheet="Trend"),
+        "note": zones.Leaf(kind="text", text="hello"),
+    }
+
+    container, _, _ = _render(root, leaves)
+    by_name = {zone.get("name") or zone.get("type-v2"): zone
+               for zone in container.iter("zone")}
+
+    kpi_cache = by_name["Revenue KPI"].find("layout-cache")
+    assert kpi_cache.attrib == {
+        "cell-count-h": "1", "cell-count-w": "1", "type-h": "cell", "type-w": "cell",
+    }
+    assert by_name["Trend"].find("layout-cache").attrib == {
+        "type-h": "scalable", "type-w": "scalable",
+    }
+    # Desktop writes no cache on a text / empty / filter / colour zone - only on sheets.
+    assert by_name["text"].find("layout-cache") is None
+
+
+def test_layout_cache_precedes_nested_zones_and_zone_style():
+    """The XSD sequence is formatted-text, layout-cache, zones, ..., zone-style; Tableau
+    reads both positionally, so a cache written after the style is a cache it ignores."""
+    container, _, _ = _render(
+        {"type": "vert", "children": [{"id": "chart", "size": 100}]},
+        {"chart": zones.Leaf(worksheet="Trend", title="Trend")},
+    )
+
+    sheet_zone = container.find(".//zone[@name='Trend']")
+    assert [child.tag for child in sheet_zone] == ["layout-cache", "zone-style"]
+
+
+def test_an_evenly_split_flow_container_declares_the_strategy():
+    """A KPI row is four equal cards. Desktop marks such a container
+    ``layout-strategy-id='distribute-evenly'``; an unequal one carries no strategy."""
+    container, _, _ = _render({"type": "vert", "children": [
+        {"type": "horz", "size": 50, "children": [
+            {"id": "a", "size": 25}, {"id": "b", "size": 25},
+            {"id": "c", "size": 25}, {"id": "d", "size": 25},
+        ]},
+        {"type": "horz", "size": 50, "children": [
+            {"id": "e", "size": 70}, {"id": "f", "size": 30},
+        ]},
+    ]})
+    even_row, uneven_row = container.find("zone/zone").findall("zone")
+
+    assert even_row.get("layout-strategy-id") == "distribute-evenly"
+    assert uneven_row.get("layout-strategy-id") is None
+
+
 # --- Content ------------------------------------------------------------------
 
 def test_a_worksheet_zone_names_its_sheet_and_reports_it_as_embedded():

@@ -245,9 +245,9 @@
       <column caption="Quantity" datatype="integer" name="[quantity]" role="measure" type="quantitative" />
       <column caption="Unit Price" datatype="real" name="[unit_price]" role="measure" type="quantitative" />
       <column caption="Discount" datatype="real" name="[discount]" role="measure" type="quantitative" />
-      <column caption="Revenue" datatype="real" name="[revenue]" role="measure" type="quantitative" />
+      <column caption="Revenue" datatype="real" default-format="$#,##0" name="[revenue]" role="measure" type="quantitative" />
       <column caption="Cost" datatype="real" name="[cost]" role="measure" type="quantitative" />
-      <column caption="Profit" datatype="real" name="[profit]" role="measure" type="quantitative" />
+      <column caption="Profit" datatype="real" default-format="$#,##0" name="[profit]" role="measure" type="quantitative" />
       <column caption="Average Order Value" datatype="real" default-format="$#,##0" name="[Average Order Value]" role="measure" type="quantitative">
         <calculation class="tableau" formula="SUM([revenue]) / COUNTD([order_id])" />
       </column>
@@ -386,7 +386,7 @@
       <column caption="monthly_targets.csv" datatype="table" name="[__tableau_internal_object_id__].[monthly_targets.csv_FE5D0EBA04DEFE2D0C6D7DD26AB1B6B0]" role="measure" type="quantitative" />
       <column caption="Month" datatype="string" name="[month]" role="dimension" type="nominal" />
       <column caption="Region" datatype="string" name="[region]" role="dimension" type="nominal" />
-      <column caption="Revenue Target" datatype="integer" name="[revenue_target]" role="measure" type="quantitative" />
+      <column caption="Revenue Target" datatype="integer" default-format="$#,##0" name="[revenue_target]" role="measure" type="quantitative" />
       <column caption="Orders Target" datatype="integer" name="[orders_target]" role="measure" type="quantitative" />
       <column caption="New Customers Target" datatype="integer" name="[new_customers_target]" role="measure" type="quantitative" />
       <layout dim-ordering="alphabetic" measure-ordering="alphabetic" show-structure="true" />
@@ -565,7 +565,7 @@
       <column caption="Company Size" datatype="string" name="[company_size]" role="dimension" type="nominal" />
       <column caption="Account Manager" datatype="string" name="[account_manager]" role="dimension" type="nominal" />
       <column caption="Customer Since" datatype="date" name="[customer_since]" role="dimension" type="ordinal" />
-      <column caption="Lifetime Value" datatype="real" name="[lifetime_value]" role="measure" type="quantitative" />
+      <column caption="Lifetime Value" datatype="real" default-format="$#,##0" name="[lifetime_value]" role="measure" type="quantitative" />
       <column caption="Nps Score" datatype="integer" name="[nps_score]" role="measure" type="quantitative" />
       <layout dim-ordering="alphabetic" measure-ordering="alphabetic" show-structure="true" />
       <object-graph>
@@ -855,7 +855,7 @@
             <column caption="Average Order Value" datatype="real" default-format="$#,##0" name="[Average Order Value]" role="measure" type="quantitative">
               <calculation class="tableau" formula="SUM([revenue]) / COUNTD([order_id])" />
             </column>
-            <column-instance column="[Average Order Value]" derivation="None" name="[none:Average Order Value:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[Average Order Value]" derivation="None" name="[none:Average Order Value:ok]" pivot="key" type="ordinal" />
           </datasource-dependencies>
           <aggregation value="true" />
         </view>
@@ -885,11 +885,11 @@
             </view>
             <mark class="Automatic" />
             <encodings>
-              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:Average Order Value:qk]" />
+              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:Average Order Value:ok]" />
             </encodings>
             <customized-label>
               <formatted-text>
-                <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="23"><![CDATA[<[federated.b2993893834e8f0306a282d0a717d7a9].[none:Average Order Value:qk]>]]></run>
+                <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="23"><![CDATA[<[federated.b2993893834e8f0306a282d0a717d7a9].[none:Average Order Value:ok]>]]></run>
               </formatted-text>
             </customized-label>
             <style>
@@ -1218,7 +1218,7 @@
             <column-instance column="[account_manager]" derivation="None" name="[none:account_manager:nk]" pivot="key" type="nominal" />
             <column-instance column="[customer_name]" derivation="None" name="[none:customer_name:nk]" pivot="key" type="nominal" />
             <column-instance column="[industry]" derivation="None" name="[none:industry:nk]" pivot="key" type="nominal" />
-            <column-instance column="[nps_score]" derivation="None" name="[none:nps_score:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[nps_score]" derivation="None" name="[none:nps_score:ok]" pivot="key" type="ordinal" />
             <column-instance column="[segment]" derivation="None" name="[none:segment:nk]" pivot="key" type="nominal" />
             <column-instance column="[lifetime_value]" derivation="Sum" name="[sum:lifetime_value:qk]" pivot="key" type="quantitative" />
           </datasource-dependencies>
@@ -1260,7 +1260,7 @@
             </style>
           </pane>
         </panes>
-        <rows>([federated.ea24fc047813e26be8ea413b95586d29].[none:customer_name:nk] / [federated.ea24fc047813e26be8ea413b95586d29].[none:segment:nk] / [federated.ea24fc047813e26be8ea413b95586d29].[none:industry:nk] / [federated.ea24fc047813e26be8ea413b95586d29].[none:account_manager:nk] / [federated.ea24fc047813e26be8ea413b95586d29].[none:nps_score:qk])</rows>
+        <rows>([federated.ea24fc047813e26be8ea413b95586d29].[none:customer_name:nk] / [federated.ea24fc047813e26be8ea413b95586d29].[none:segment:nk] / [federated.ea24fc047813e26be8ea413b95586d29].[none:industry:nk] / [federated.ea24fc047813e26be8ea413b95586d29].[none:account_manager:nk] / [federated.ea24fc047813e26be8ea413b95586d29].[none:nps_score:ok])</rows>
         <cols />
       </table>
       <simple-id uuid="{41471BF4-288B-5027-87E7-EE00CFA017DA}" />
@@ -1329,7 +1329,7 @@
                 <format attr="margin" value="4" />
               </zone-style>
             </zone>
-            <zone friendly-name="H-root.3" h="13751" id="8" param="horz" type-v2="layout-flow" w="98828" x="586" y="14640">
+            <zone friendly-name="H-root.3" h="13751" id="8" layout-strategy-id="distribute-evenly" param="horz" type-v2="layout-flow" w="98828" x="586" y="14640">
               <zone friendly-name="V-kpi-revenue" h="13751" id="9" param="vert" type-v2="layout-flow" w="24707" x="586" y="14640">
                 <zone fixed-size="30" friendly-name="H-kpi-revenue header" h="3333" id="10" is-fixed="true" param="horz" type-v2="layout-flow" w="24707" x="586" y="14640">
                   <zone friendly-name="kpi-revenue title" h="3333" id="11" type-v2="text" w="18530" x="586" y="14640">
@@ -1359,6 +1359,7 @@
                   </zone-style>
                 </zone>
                 <zone friendly-name="kpi-revenue" h="10418" id="13" name="Revenue KPI" show-title="false" w="24707" x="586" y="17973">
+                  <layout-cache cell-count-h="1" cell-count-w="1" type-h="cell" type-w="cell" />
                   <zone-style>
                     <format attr="border-color" value="#000000" />
                     <format attr="border-style" value="none" />
@@ -1402,6 +1403,7 @@
                   </zone-style>
                 </zone>
                 <zone friendly-name="kpi-profit" h="10418" id="18" name="Profit KPI" show-title="false" w="24707" x="25293" y="17973">
+                  <layout-cache cell-count-h="1" cell-count-w="1" type-h="cell" type-w="cell" />
                   <zone-style>
                     <format attr="border-color" value="#000000" />
                     <format attr="border-style" value="none" />
@@ -1445,6 +1447,7 @@
                   </zone-style>
                 </zone>
                 <zone friendly-name="kpi-orders" h="10418" id="23" name="Orders KPI" show-title="false" w="24707" x="50000" y="17973">
+                  <layout-cache cell-count-h="1" cell-count-w="1" type-h="cell" type-w="cell" />
                   <zone-style>
                     <format attr="border-color" value="#000000" />
                     <format attr="border-style" value="none" />
@@ -1488,6 +1491,7 @@
                   </zone-style>
                 </zone>
                 <zone friendly-name="kpi-aov" h="10418" id="28" name="AOV KPI" show-title="false" w="24707" x="74707" y="17973">
+                  <layout-cache cell-count-h="1" cell-count-w="1" type-h="cell" type-w="cell" />
                   <zone-style>
                     <format attr="border-color" value="#000000" />
                     <format attr="border-style" value="none" />
@@ -1539,6 +1543,7 @@
                   </zone-style>
                 </zone>
                 <zone friendly-name="chart-trend" h="33512" id="34" name="Revenue Trend" show-title="false" w="59297" x="586" y="31724">
+                  <layout-cache type-h="scalable" type-w="scalable" />
                   <zone-style>
                     <format attr="border-color" value="#000000" />
                     <format attr="border-style" value="none" />
@@ -1561,7 +1566,7 @@
                   <format attr="margin" value="4" />
                 </zone-style>
               </zone>
-              <zone friendly-name="V-root.4.2" h="39289" id="36" param="vert" type-v2="layout-flow" w="39531" x="59883" y="28391">
+              <zone friendly-name="V-root.4.2" h="39289" id="36" layout-strategy-id="distribute-evenly" param="vert" type-v2="layout-flow" w="39531" x="59883" y="28391">
                 <zone friendly-name="V-chart-region-actual" h="19644" id="37" param="vert" type-v2="layout-flow" w="39531" x="59883" y="28391">
                   <zone fixed-size="30" friendly-name="H-chart-region-actual header" h="3333" id="38" is-fixed="true" param="horz" type-v2="layout-flow" w="39531" x="59883" y="28391">
                     <zone friendly-name="chart-region-actual title" h="3333" id="39" type-v2="text" w="29648" x="59883" y="28391">
@@ -1591,6 +1596,7 @@
                     </zone-style>
                   </zone>
                   <zone friendly-name="chart-region-actual" h="16311" id="41" name="Revenue by Region" show-title="false" w="39531" x="59883" y="31724">
+                    <layout-cache type-h="scalable" type-w="scalable" />
                     <zone-style>
                       <format attr="border-color" value="#000000" />
                       <format attr="border-style" value="none" />
@@ -1634,6 +1640,7 @@
                     </zone-style>
                   </zone>
                   <zone friendly-name="chart-region-target" h="16312" id="46" name="Revenue Target by Region" show-title="false" w="39531" x="59883" y="51368">
+                    <layout-cache type-h="scalable" type-w="scalable" />
                     <zone-style>
                       <format attr="border-color" value="#000000" />
                       <format attr="border-style" value="none" />
@@ -1692,6 +1699,7 @@
                   </zone-style>
                 </zone>
                 <zone friendly-name="chart-category" h="28098" id="52" name="Profit by Category" show-title="false" w="39531" x="586" y="71013">
+                  <layout-cache type-h="scalable" type-w="scalable" />
                   <zone-style>
                     <format attr="border-color" value="#000000" />
                     <format attr="border-style" value="none" />
@@ -1735,6 +1743,7 @@
                   </zone-style>
                 </zone>
                 <zone friendly-name="table-customers" h="28098" id="57" name="Top Customers" show-title="false" w="59297" x="40117" y="71013">
+                  <layout-cache type-h="scalable" type-w="scalable" />
                   <zone-style>
                     <format attr="border-color" value="#000000" />
                     <format attr="border-style" value="none" />

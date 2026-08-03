@@ -483,7 +483,17 @@ class FieldResolver:
             instance_type = "quantitative"
         elif aggregation:
             prefix, derivation = AGGREGATION_DERIVATIONS.get(aggregation, ("none", "None"))
-            instance_type = "quantitative" if aggregation in _AGGREGATING else column_type
+            if aggregation in _AGGREGATING:
+                instance_type = "quantitative"
+            elif aggregation == "none" and role == "measure":
+                # Issue #59: an explicit "none" on a measure is the analyst asking for a row
+                # header, not a number. Left at the measure's own 'quantitative' it becomes a
+                # continuous pill, and a continuous pill on Rows draws an axis - the demo's
+                # customer table grew one 90/80/70 Nps Score axis per customer. 'ordinal' is
+                # what Desktop writes for a measure set to Discrete with no aggregation.
+                instance_type = "ordinal"
+            else:
+                instance_type = column_type
         elif is_aggregate_formula(formula):
             prefix, derivation = USER_DERIVATION
             instance_type = column_type

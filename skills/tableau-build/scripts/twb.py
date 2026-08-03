@@ -28,9 +28,10 @@ and version targeting.
 from __future__ import annotations
 
 import hashlib
+import logging
 import uuid
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import NamedTuple
 
 import features
@@ -323,7 +324,7 @@ def _render_metadata_records(
 def _render_datasource(
     parent: ET.Element, name: str, csv_name: str, columns: list[Column], version: str,
     derived: list[worksheet.FieldRef], instances: list[worksheet.FieldRef],
-    parameters: list[features.Parameter],
+    parameters: list[features.Parameter], formats: dict[str, str],
 ) -> None:
     """Render one inline, live-connection datasource over a single CSV.
 
@@ -341,6 +342,10 @@ def _render_datasource(
             it loses the field from the data pane on save.
         parameters: Parameters this datasource's own calculations read - the datasource
             declares the dependency, domain-less, the way Desktop writes it.
+        formats: ``{bracketed column name: format pattern}`` from the worksheets'
+            ``number_formats``. On the column rather than only in a worksheet's style rules,
+            because that is where Desktop reads a field's format for mark labels and axis
+            ticks (issue #59).
     """
     datasource = ET.SubElement(parent, "datasource", {
         "caption": name,
@@ -373,14 +378,23 @@ def _render_datasource(
     })
     for column in columns:
         facts = column.facts
-        ET.SubElement(datasource, "column", {
+        attributes = {
             "caption": column.caption,
             "datatype": column.datatype,
             "name": f"[{column.name}]",
             "role": facts.role,
             "type": facts.type_attr,
-        })
+        }
+        pattern = formats.get(attributes["name"], "")
+        if pattern:
+            attributes["default-format"] = pattern
+        ET.SubElement(datasource, "column", dict(sorted(attributes.items())))
     for reference in derived:
+        # A calculated field's own declared format wins; a worksheet's number_formats entry
+        # fills in for one that declared none.
+        pattern = formats.get(reference.column_name, "")
+        if pattern and not reference.number_format:
+            reference = replace(reference, number_format=pattern)
         worksheet.render_column(datasource, reference)
     for reference in instances:
         worksheet.render_column_instance(datasource, reference)
@@ -652,6 +666,9 @@ def _dashboard_leaves(
             worksheet=plan.name,
             title=str(entry.get("title", "") or "").strip(),
             legend=legend,
+            # A KPI card is one cell; every other chart type scales with its zone. That is the
+            # only distinction the zone's <layout-cache> needs (issue #59).
+            single_cell=plan.spec.kpi_card,
         ))
 
     for entry in objects if isinstance(objects, list) else []:
@@ -993,6 +1010,36 @@ def _collect_derived_columns(
     return {source: list(columns.values()) for source, columns in derived.items()}
 
 
+def _collect_number_formats(plans: list[PlannedWorksheet]) -> dict[str, dict[str, str]]:
+    """Collect the default number format each datasource's columns carry.
+
+    Issue #59: a worksheet's ``number_formats`` entry was emitted only as a ``cell`` style
+    rule, which formats a text table's cells but is not what Desktop consults for **mark
+    labels** or **axis ticks** - so ``$#,##0`` bars rendered ``19,241.21``. A field's default
+    format is an attribute on its ``<column>``, and the columns are rendered once per
+    datasource, so the formats have to be gathered across every worksheet first.
+
+    Args:
+        plans: The resolved worksheets.
+
+    Returns:
+        ``{datasource name: {bracketed column name: format pattern}}``.
+    """
+    formats: dict[str, dict[str, str]] = {}
+    for planned in plans:
+        for reference, pattern in planned.plan.number_formats:
+            declared = formats.setdefault(planned.datasource, {})
+            existing = declared.setdefault(reference.column_name, pattern)
+            if existing != pattern:
+                # One column, one default format: first worksheet wins, because silently
+                # taking the last would make the workbook depend on manifest ordering.
+                logging.warning(
+                    f"[WARN] {planned.datasource}.{reference.column_name} is asked for two "
+                    f"number formats ({existing!r} and {pattern!r}); keeping {existing!r}"
+                )
+    return formats
+
+
 def _collect_table_calc_instances(
     plans: list[PlannedWorksheet],
 ) -> dict[str, list[worksheet.FieldRef]]:
@@ -1189,6 +1236,7 @@ def render_workbook(
 
     datasources = ET.SubElement(workbook, "datasources")
     table_calcs = _collect_table_calc_instances(plans)
+    number_formats = _collect_number_formats(plans)
     for entry in manifest_document.get("datasources", []):
         csv_name = str(entry.get("csv", "")).strip()
         name = str(entry.get("name", "")).strip()
@@ -1201,6 +1249,7 @@ def render_workbook(
             derived.get(name, []),
             table_calcs.get(name, []),
             _parameters_read_by(derived.get(name, []), parameters),
+            number_formats.get(name, {}),
         )
     features.render_parameters_datasource(datasources, parameters, version)
 
