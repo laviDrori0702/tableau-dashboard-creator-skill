@@ -339,11 +339,11 @@ class _ZoneWriter:
         sizes = child_sizes(children)
         # An evenly split container is how Desktop records a KPI row: the strategy, not four
         # stored 25%s, is what keeps the cards equal as the dashboard stretches (issue #59).
-        even = len(sizes) > 1 and len(set(sizes)) == 1
+        is_evenly_split = len(sizes) > 1 and len(set(sizes)) == 1
         container = self._zone(
             parent, box, f"{CONTAINER_PREFIXES[orientation]}-{element_id or path}",
             type_v2="layout-flow", param=orientation,
-            layout_strategy_id=DISTRIBUTE_EVENLY if even else None,
+            layout_strategy_id=DISTRIBUTE_EVENLY if is_evenly_split else None,
         )
         self._record_visibility(container, visibility)
         for index, (child, child_box) in enumerate(

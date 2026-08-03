@@ -855,7 +855,7 @@
             <column caption="Average Order Value" datatype="real" default-format="$#,##0" name="[Average Order Value]" role="measure" type="quantitative">
               <calculation class="tableau" formula="SUM([revenue]) / COUNTD([order_id])" />
             </column>
-            <column-instance column="[Average Order Value]" derivation="None" name="[none:Average Order Value:ok]" pivot="key" type="ordinal" />
+            <column-instance column="[Average Order Value]" derivation="None" name="[none:Average Order Value:qk]" pivot="key" type="quantitative" />
           </datasource-dependencies>
           <aggregation value="true" />
         </view>
@@ -885,11 +885,11 @@
             </view>
             <mark class="Automatic" />
             <encodings>
-              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:Average Order Value:ok]" />
+              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:Average Order Value:qk]" />
             </encodings>
             <customized-label>
               <formatted-text>
-                <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="23"><![CDATA[<[federated.b2993893834e8f0306a282d0a717d7a9].[none:Average Order Value:ok]>]]></run>
+                <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="23"><![CDATA[<[federated.b2993893834e8f0306a282d0a717d7a9].[none:Average Order Value:qk]>]]></run>
               </formatted-text>
             </customized-label>
             <style>

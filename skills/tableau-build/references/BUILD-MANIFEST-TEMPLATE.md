@@ -61,9 +61,12 @@ above via the optional worksheet keys below.
 carrying what the builder must apply: `{"field": "revenue", "aggregation": "sum"}`,
 `{"field": "order_date", "date_part": "month"}`, or `{"field": "revenue", "bin": 500}`.
 Aggregations: `sum`, `avg`, `min`, `max`, `count`, `countd`, `median`, `attr`, `none` — a
-measure with none of them defaults to `SUM`. Date parts: `year`, `quarter`, `month`, `week`,
-`day`, `date`. Never write an expression like `"SUM([revenue])"` — that is the spec's prose,
-not a field reference.
+measure with none of them defaults to `SUM`. `"none"` on a plain measure makes it a
+**discrete** pill: use it for a measure that is a row header (an NPS score in a table), never
+for one that should draw an axis. On an *aggregate* calculated field `"none"` instead means
+"do not re-aggregate", and the pill stays continuous. Date parts: `year`, `quarter`, `month`,
+`week`, `day`, `date`. Never write an expression like `"SUM([revenue])"` — that is the spec's
+prose, not a field reference.
 
 A shelf entry may also carry `table_calc` — a quick table calculation over the aggregate:
 `{"field": "revenue", "aggregation": "sum", "table_calc": "CumTotal"}` for a running total.
@@ -92,7 +95,7 @@ On `chart_type: "text"` the same encoding is the KPI card's big number instead.
 | `filters` | `[{"field": "region", "values": ["Europe"], "context": true}, {"field": "order_date", "min": "2025-01-01", "max": "2025-06-30"}]` | Categorical (member list) or in-range filter. `context: true` runs it before FIXED LODs. |
 | `tooltip` | `[{"label": "Revenue", "field": "revenue", "aggregation": "sum"}]` | A custom tooltip template, one label/value pair per line. |
 | `axis_titles` | `{"rows": "Revenue per category"}` | Overrides the generated axis title. |
-| `number_formats` | `[{"field": "revenue", "format": "$#,##0"}]` | Cell number format for that field. |
+| `number_formats` | `[{"field": "revenue", "format": "$#,##0"}]` | The field's number format, emitted twice: as this sheet's cell format *and* as the datasource column's `default-format`, which is what Desktop reads for mark labels and axis ticks. One format per field per datasource — on a conflict the first worksheet wins and a `[WARN]` is logged. |
 | `reference_lines` | `[{"field": "revenue", "aggregation": "sum", "formula": "average", "scope": "per-table", "label": "<Computation>: <Value>"}]` | A line drawn at an aggregate of the measure. `formula` from `constant`/`total`/`sum`/`min`/`max`/`average`/`median`/`quantiles`/`percentile`/`stdev`/`confidence`/`medianconfidence` (default `average`); `scope` from `per-cell`/`per-pane`/`per-table` (default `per-table`). A `label` string is used verbatim; without one, `label_type` from `none`/`automatic`/`value`/`computation`/`custom` (default `computation`). |
 | `title` | `"Revenue by region"` | Puts a styled text zone above the sheet's zone in the dashboard and suppresses the sheet's own title. Omit to keep Tableau's sheet title. |
 | `fit` | `"entire-view"` | How the sheet fills its zone: `entire-view` (the default), `standard`, `fit-width`, `fit-height`. |

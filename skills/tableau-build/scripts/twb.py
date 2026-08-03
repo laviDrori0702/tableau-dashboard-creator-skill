@@ -31,13 +31,15 @@ import hashlib
 import logging
 import uuid
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import NamedTuple
 
 import features
 import worksheet
 import zones
 from manifest import documented_field_types
+
+logger = logging.getLogger(__name__)
 
 # --- Version targeting (CONTRACT.md §2 values) -------------------------------
 
@@ -390,11 +392,8 @@ def _render_datasource(
             attributes["default-format"] = pattern
         ET.SubElement(datasource, "column", dict(sorted(attributes.items())))
     for reference in derived:
-        # A calculated field's own declared format wins; a worksheet's number_formats entry
-        # fills in for one that declared none.
-        pattern = formats.get(reference.column_name, "")
-        if pattern and not reference.number_format:
-            reference = replace(reference, number_format=pattern)
+        # No number_formats fallback here: a calculated field declares its own format
+        # (``calculated_fields[].format``), which is already on its column.
         worksheet.render_column(datasource, reference)
     for reference in instances:
         worksheet.render_column_instance(datasource, reference)
@@ -1033,7 +1032,7 @@ def _collect_number_formats(plans: list[PlannedWorksheet]) -> dict[str, dict[str
             if existing != pattern:
                 # One column, one default format: first worksheet wins, because silently
                 # taking the last would make the workbook depend on manifest ordering.
-                logging.warning(
+                logger.warning(
                     f"[WARN] {planned.datasource}.{reference.column_name} is asked for two "
                     f"number formats ({existing!r} and {pattern!r}); keeping {existing!r}"
                 )

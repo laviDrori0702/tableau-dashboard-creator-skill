@@ -83,7 +83,10 @@ CONTAINER_TYPES = frozenset({"vert", "horz"})
 #: Layout/mapping ids with this prefix are dashboard actions, not zones (plan convention).
 INTERACTION_PREFIX = "int-"
 
-#: Aggregations a shelf/encoding entry may request ("none" pins a dimension/exact value).
+#: Aggregations a shelf/encoding entry may request. ``"none"`` pins a dimension/exact value;
+#: on a plain measure it is the analyst asking for a *discrete* pill (a row header, not an
+#: axis), and on an aggregate calculated field it means "do not re-aggregate" - see
+#: :meth:`worksheet.FieldResolver.reference`.
 AGGREGATIONS = frozenset({
     "sum", "avg", "min", "max", "count", "countd", "median", "attr", "none",
 })

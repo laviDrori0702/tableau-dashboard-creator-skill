@@ -28,14 +28,17 @@ DATA_MODEL = """# Data Model
 |-------|------|------|---------------|-------------|
 | customer_name | string | dimension | Acme Ltd | Customer |
 | product_category | string | dimension | Software | Product category |
+| order_id | string | dimension | SO-1001 | Order id |
 | nps_score | integer | measure | 82 | Net promoter score |
 | lifetime_value | real | measure | 45200.0 | Lifetime value |
+| revenue | real | measure | 1200.5 | Order revenue |
 | profit | real | measure | 120.5 | Order profit |
 """
 
 CSV_HEADERS = {
     "customers.csv": [
-        "customer_name", "product_category", "nps_score", "lifetime_value", "profit",
+        "customer_name", "product_category", "order_id", "nps_score", "lifetime_value",
+        "revenue", "profit",
     ]
 }
 
@@ -61,6 +64,15 @@ WORKSHEETS = [
         "encodings": {"text": {"field": "profit", "aggregation": "sum"}},
         "number_formats": [{"field": "profit", "format": "$#,##0"}],
     },
+    # The scope guard for bug 2: "none" on an aggregate calculated field means "do not
+    # re-aggregate", not "make it discrete" - the demo's AOV KPI card is exactly this shape.
+    {
+        "name": "AOV KPI",
+        "element_id": "kpi-aov",
+        "chart_type": "text",
+        "datasource": "customers",
+        "encodings": {"text": {"field": "Average Order Value", "aggregation": "none"}},
+    },
 ]
 
 MANIFEST = {
@@ -71,10 +83,19 @@ MANIFEST = {
         "fields": [
             {"name": "customer_name", "type": "string"},
             {"name": "product_category", "type": "string"},
+            {"name": "order_id", "type": "string"},
             {"name": "nps_score", "type": "integer"},
             {"name": "lifetime_value", "type": "real"},
+            {"name": "revenue", "type": "real"},
             {"name": "profit", "type": "real"},
         ],
+    }],
+    "calculated_fields": [{
+        "name": "Average Order Value",
+        "formula": "SUM([revenue]) / COUNTD([order_id])",
+        "datasource": "customers",
+        "type": "real",
+        "format": "$#,##0",
     }],
     "worksheets": WORKSHEETS,
     "layout": {
@@ -88,13 +109,13 @@ MANIFEST = {
     "parameters": [],
 }
 
-ROOT = ET.fromstring(twb.render_workbook(MANIFEST, DATA_MODEL, CSV_HEADERS))
+FIDELITY_ROOT = ET.fromstring(twb.render_workbook(MANIFEST, DATA_MODEL, CSV_HEADERS))
 DATASOURCE_ID = twb.datasource_id("customers")
 
 
 def _worksheet_element(name: str) -> ET.Element:
     """Return the ``<worksheet>`` with the given name."""
-    for element in ROOT.findall("worksheets/worksheet"):
+    for element in FIDELITY_ROOT.findall("worksheets/worksheet"):
         if element.get("name") == name:
             return element
     raise AssertionError(f"no worksheet named {name!r} in the rendered workbook")
@@ -132,12 +153,30 @@ def test_a_bare_measure_on_rows_is_still_continuous_sum():
     assert "[sum:profit:qk]" in rows, rows
 
 
+def test_none_on_an_aggregate_calculated_field_stays_continuous():
+    """The other scope guard. On ``SUM([revenue]) / COUNTD([order_id])``, ``"none"`` means
+    "do not re-aggregate" - it is still one continuous number. Making it discrete turned the
+    demo's AOV KPI card into a row header, so this pins the KPI card's text pill."""
+    element = _worksheet_element("AOV KPI")
+    text = element.find(
+        "table/panes/pane/encodings/text"
+    )
+
+    assert text.get("column").endswith("[none:Average Order Value:qk]"), text.attrib
+    instance = element.find(
+        f"table/view/datasource-dependencies[@datasource='{DATASOURCE_ID}']"
+        "/column-instance[@name='[none:Average Order Value:qk]']"
+    )
+    assert instance is not None
+    assert instance.get("type") == "quantitative"
+
+
 # --- Bug 3: number_formats reach the datasource column --------------------------
 
 def test_a_worksheets_number_format_lands_on_the_datasource_column():
     """Mark labels and axis ticks read the column's ``default-format``; the cell rule only
     formats cells, which is why labelled bars rendered ``19,241.21`` under a ``$#,##0`` spec."""
-    column = ROOT.find(
+    column = FIDELITY_ROOT.find(
         f"datasources/datasource[@name='{DATASOURCE_ID}']/column[@name='[profit]']"
     )
 
@@ -157,7 +196,7 @@ def test_the_cell_style_rule_survives_alongside_it():
 
 def test_an_unformatted_column_carries_no_attribute():
     """No format asked for, no attribute invented."""
-    column = ROOT.find(
+    column = FIDELITY_ROOT.find(
         f"datasources/datasource[@name='{DATASOURCE_ID}']/column[@name='[lifetime_value]']"
     )
 
