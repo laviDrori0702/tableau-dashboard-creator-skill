@@ -64,3 +64,11 @@ skill/tableau-dashboard-creator/scripts/__pycache__/
 **/__pycache__/
 *.pyc
 *.pyo
+
+# Re-ignore secrets inside the allowed trees above. Git's last-match-wins means a
+# broad allowlist negation (!demo/**) out-ranks the .env rules at the top of this
+# file, so they have to be restated here. demo/ is a project root (CONTRACT.md 3.1),
+# which is exactly where a .env would land. .env.example is deliberately not matched.
+**/.env
+**/.env.local
+**/.env.*.local
