@@ -1,0 +1,2046 @@
+<?xml version='1.0' encoding='utf-8' ?>
+
+<workbook original-version="18.1" source-build="2025.1.10 (20251.25.1121.1650)" source-platform="win" version="18.1" xmlns:user="http://www.tableausoftware.com/xml/user">
+  <document-format-change-manifest>
+    <AccessibleZoneTabOrder />
+    <AnimationOnByDefault />
+    <AutoCreateAndUpdateDSDPhoneLayouts />
+    <MarkAnimation />
+    <ObjectModelEncapsulateLegacy />
+    <ObjectModelTableType />
+    <SchemaViewerObjectModel />
+    <SetMembershipControl />
+    <SheetIdentifierTracking />
+    <SortTagCleanup />
+    <WindowsPersistSimpleIdentifiers />
+    <ZoneFriendlyName />
+  </document-format-change-manifest>
+  <datasources>
+    <datasource caption="sales_orders" inline="true" name="federated.b2993893834e8f0306a282d0a717d7a9" version="18.1">
+      <connection class="federated">
+        <named-connections>
+          <named-connection caption="sales_orders" name="textscan.221afd7815a36cdea9296b5f7aaa31a7">
+            <connection class="textscan" directory="." filename="sales_orders.csv" password="" server="" />
+          </named-connection>
+        </named-connections>
+        <relation connection="textscan.221afd7815a36cdea9296b5f7aaa31a7" name="sales_orders.csv" table="[sales_orders#csv]" type="table">
+          <columns character-set="UTF-8" header="yes" locale="en_US" separator=",">
+            <column datatype="string" name="order_id" ordinal="0" />
+            <column datatype="date" name="order_date" ordinal="1" />
+            <column datatype="string" name="customer_name" ordinal="2" />
+            <column datatype="string" name="region" ordinal="3" />
+            <column datatype="string" name="country" ordinal="4" />
+            <column datatype="string" name="product_category" ordinal="5" />
+            <column datatype="string" name="product_name" ordinal="6" />
+            <column datatype="integer" name="quantity" ordinal="7" />
+            <column datatype="real" name="unit_price" ordinal="8" />
+            <column datatype="real" name="discount" ordinal="9" />
+            <column datatype="real" name="revenue" ordinal="10" />
+            <column datatype="real" name="cost" ordinal="11" />
+            <column datatype="real" name="profit" ordinal="12" />
+          </columns>
+        </relation>
+        <metadata-records>
+          <metadata-record class="capability">
+            <remote-name />
+            <remote-type>0</remote-type>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias />
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <attributes>
+              <attribute datatype="string" name="character-set">"UTF-8"</attribute>
+              <attribute datatype="string" name="collation">"en_US"</attribute>
+              <attribute datatype="string" name="field-delimiter">","</attribute>
+              <attribute datatype="string" name="header-row">"true"</attribute>
+              <attribute datatype="string" name="locale">"en_US"</attribute>
+              <attribute datatype="string" name="single-char">""</attribute>
+            </attributes>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>order_id</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[order_id]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>order_id</remote-alias>
+            <ordinal>0</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>order_date</remote-name>
+            <remote-type>133</remote-type>
+            <local-name>[order_date]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>order_date</remote-alias>
+            <ordinal>1</ordinal>
+            <local-type>date</local-type>
+            <aggregation>Year</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>customer_name</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[customer_name]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>customer_name</remote-alias>
+            <ordinal>2</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>region</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[region]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>region</remote-alias>
+            <ordinal>3</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>country</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[country]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>country</remote-alias>
+            <ordinal>4</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>product_category</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[product_category]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>product_category</remote-alias>
+            <ordinal>5</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>product_name</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[product_name]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>product_name</remote-alias>
+            <ordinal>6</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>quantity</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[quantity]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>quantity</remote-alias>
+            <ordinal>7</ordinal>
+            <local-type>integer</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>unit_price</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[unit_price]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>unit_price</remote-alias>
+            <ordinal>8</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>discount</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[discount]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>discount</remote-alias>
+            <ordinal>9</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>revenue</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[revenue]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>revenue</remote-alias>
+            <ordinal>10</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>cost</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[cost]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>cost</remote-alias>
+            <ordinal>11</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>profit</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[profit]</local-name>
+            <parent-name>[sales_orders.csv]</parent-name>
+            <remote-alias>profit</remote-alias>
+            <ordinal>12</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[sales_orders.csv_1487C1402402A5A03940473B113F7035]</object-id>
+          </metadata-record>
+        </metadata-records>
+      </connection>
+      <aliases enabled="yes" />
+      <column caption="sales_orders.csv" datatype="table" name="[__tableau_internal_object_id__].[sales_orders.csv_1487C1402402A5A03940473B113F7035]" role="measure" type="quantitative" />
+      <column caption="Order Id" datatype="string" name="[order_id]" role="dimension" type="nominal" />
+      <column caption="Order Date" datatype="date" name="[order_date]" role="dimension" type="ordinal" />
+      <column caption="Customer Name" datatype="string" name="[customer_name]" role="dimension" type="nominal" />
+      <column caption="Region" datatype="string" name="[region]" role="dimension" type="nominal" />
+      <column caption="Country" datatype="string" name="[country]" role="dimension" type="nominal" />
+      <column caption="Product Category" datatype="string" name="[product_category]" role="dimension" type="nominal" />
+      <column caption="Product Name" datatype="string" name="[product_name]" role="dimension" type="nominal" />
+      <column caption="Quantity" datatype="integer" name="[quantity]" role="measure" type="quantitative" />
+      <column caption="Unit Price" datatype="real" name="[unit_price]" role="measure" type="quantitative" />
+      <column caption="Discount" datatype="real" name="[discount]" role="measure" type="quantitative" />
+      <column caption="Revenue" datatype="real" name="[revenue]" role="measure" type="quantitative" />
+      <column caption="Cost" datatype="real" name="[cost]" role="measure" type="quantitative" />
+      <column caption="Profit" datatype="real" name="[profit]" role="measure" type="quantitative" />
+      <column caption="Average Order Value" datatype="real" default-format="$#,##0" name="[Average Order Value]" role="measure" type="quantitative">
+        <calculation class="tableau" formula="SUM([revenue]) / COUNTD([order_id])" />
+      </column>
+      <column caption="Order Month" datatype="string" name="[Order Month]" role="dimension" type="nominal">
+        <calculation class="tableau" formula="STR(YEAR([order_date])) + &quot;-&quot; + IF MONTH([order_date]) &lt; 10 THEN &quot;0&quot; ELSE &quot;&quot; END + STR(MONTH([order_date]))" />
+      </column>
+      <layout dim-ordering="alphabetic" measure-ordering="alphabetic" show-structure="true" />
+      <object-graph>
+        <objects>
+          <object caption="sales_orders.csv" id="sales_orders.csv_1487C1402402A5A03940473B113F7035">
+            <properties context="">
+              <relation connection="textscan.221afd7815a36cdea9296b5f7aaa31a7" name="sales_orders.csv" table="[sales_orders#csv]" type="table">
+                <columns character-set="UTF-8" header="yes" locale="en_US" separator=",">
+                  <column datatype="string" name="order_id" ordinal="0" />
+                  <column datatype="date" name="order_date" ordinal="1" />
+                  <column datatype="string" name="customer_name" ordinal="2" />
+                  <column datatype="string" name="region" ordinal="3" />
+                  <column datatype="string" name="country" ordinal="4" />
+                  <column datatype="string" name="product_category" ordinal="5" />
+                  <column datatype="string" name="product_name" ordinal="6" />
+                  <column datatype="integer" name="quantity" ordinal="7" />
+                  <column datatype="real" name="unit_price" ordinal="8" />
+                  <column datatype="real" name="discount" ordinal="9" />
+                  <column datatype="real" name="revenue" ordinal="10" />
+                  <column datatype="real" name="cost" ordinal="11" />
+                  <column datatype="real" name="profit" ordinal="12" />
+                </columns>
+              </relation>
+            </properties>
+          </object>
+        </objects>
+      </object-graph>
+    </datasource>
+    <datasource caption="monthly_targets" inline="true" name="federated.fd9f220bc557dfd7f751b88055fef22d" version="18.1">
+      <connection class="federated">
+        <named-connections>
+          <named-connection caption="monthly_targets" name="textscan.bf94291cca86493dd82f75cd65500a3c">
+            <connection class="textscan" directory="." filename="monthly_targets.csv" password="" server="" />
+          </named-connection>
+        </named-connections>
+        <relation connection="textscan.bf94291cca86493dd82f75cd65500a3c" name="monthly_targets.csv" table="[monthly_targets#csv]" type="table">
+          <columns character-set="UTF-8" header="yes" locale="en_US" separator=",">
+            <column datatype="string" name="month" ordinal="0" />
+            <column datatype="string" name="region" ordinal="1" />
+            <column datatype="integer" name="revenue_target" ordinal="2" />
+            <column datatype="integer" name="orders_target" ordinal="3" />
+            <column datatype="integer" name="new_customers_target" ordinal="4" />
+          </columns>
+        </relation>
+        <metadata-records>
+          <metadata-record class="capability">
+            <remote-name />
+            <remote-type>0</remote-type>
+            <parent-name>[monthly_targets.csv]</parent-name>
+            <remote-alias />
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <attributes>
+              <attribute datatype="string" name="character-set">"UTF-8"</attribute>
+              <attribute datatype="string" name="collation">"en_US"</attribute>
+              <attribute datatype="string" name="field-delimiter">","</attribute>
+              <attribute datatype="string" name="header-row">"true"</attribute>
+              <attribute datatype="string" name="locale">"en_US"</attribute>
+              <attribute datatype="string" name="single-char">""</attribute>
+            </attributes>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>month</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[month]</local-name>
+            <parent-name>[monthly_targets.csv]</parent-name>
+            <remote-alias>month</remote-alias>
+            <ordinal>0</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[monthly_targets.csv_FE5D0EBA04DEFE2D0C6D7DD26AB1B6B0]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>region</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[region]</local-name>
+            <parent-name>[monthly_targets.csv]</parent-name>
+            <remote-alias>region</remote-alias>
+            <ordinal>1</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[monthly_targets.csv_FE5D0EBA04DEFE2D0C6D7DD26AB1B6B0]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>revenue_target</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[revenue_target]</local-name>
+            <parent-name>[monthly_targets.csv]</parent-name>
+            <remote-alias>revenue_target</remote-alias>
+            <ordinal>2</ordinal>
+            <local-type>integer</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[monthly_targets.csv_FE5D0EBA04DEFE2D0C6D7DD26AB1B6B0]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>orders_target</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[orders_target]</local-name>
+            <parent-name>[monthly_targets.csv]</parent-name>
+            <remote-alias>orders_target</remote-alias>
+            <ordinal>3</ordinal>
+            <local-type>integer</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[monthly_targets.csv_FE5D0EBA04DEFE2D0C6D7DD26AB1B6B0]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>new_customers_target</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[new_customers_target]</local-name>
+            <parent-name>[monthly_targets.csv]</parent-name>
+            <remote-alias>new_customers_target</remote-alias>
+            <ordinal>4</ordinal>
+            <local-type>integer</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[monthly_targets.csv_FE5D0EBA04DEFE2D0C6D7DD26AB1B6B0]</object-id>
+          </metadata-record>
+        </metadata-records>
+      </connection>
+      <aliases enabled="yes" />
+      <column caption="monthly_targets.csv" datatype="table" name="[__tableau_internal_object_id__].[monthly_targets.csv_FE5D0EBA04DEFE2D0C6D7DD26AB1B6B0]" role="measure" type="quantitative" />
+      <column caption="Month" datatype="string" name="[month]" role="dimension" type="nominal" />
+      <column caption="Region" datatype="string" name="[region]" role="dimension" type="nominal" />
+      <column caption="Revenue Target" datatype="integer" name="[revenue_target]" role="measure" type="quantitative" />
+      <column caption="Orders Target" datatype="integer" name="[orders_target]" role="measure" type="quantitative" />
+      <column caption="New Customers Target" datatype="integer" name="[new_customers_target]" role="measure" type="quantitative" />
+      <layout dim-ordering="alphabetic" measure-ordering="alphabetic" show-structure="true" />
+      <object-graph>
+        <objects>
+          <object caption="monthly_targets.csv" id="monthly_targets.csv_FE5D0EBA04DEFE2D0C6D7DD26AB1B6B0">
+            <properties context="">
+              <relation connection="textscan.bf94291cca86493dd82f75cd65500a3c" name="monthly_targets.csv" table="[monthly_targets#csv]" type="table">
+                <columns character-set="UTF-8" header="yes" locale="en_US" separator=",">
+                  <column datatype="string" name="month" ordinal="0" />
+                  <column datatype="string" name="region" ordinal="1" />
+                  <column datatype="integer" name="revenue_target" ordinal="2" />
+                  <column datatype="integer" name="orders_target" ordinal="3" />
+                  <column datatype="integer" name="new_customers_target" ordinal="4" />
+                </columns>
+              </relation>
+            </properties>
+          </object>
+        </objects>
+      </object-graph>
+    </datasource>
+    <datasource caption="customer_segments" inline="true" name="federated.ea24fc047813e26be8ea413b95586d29" version="18.1">
+      <connection class="federated">
+        <named-connections>
+          <named-connection caption="customer_segments" name="textscan.59968c12b49580cf19bd26b2abb7feb0">
+            <connection class="textscan" directory="." filename="customer_segments.csv" password="" server="" />
+          </named-connection>
+        </named-connections>
+        <relation connection="textscan.59968c12b49580cf19bd26b2abb7feb0" name="customer_segments.csv" table="[customer_segments#csv]" type="table">
+          <columns character-set="UTF-8" header="yes" locale="en_US" separator=",">
+            <column datatype="string" name="customer_name" ordinal="0" />
+            <column datatype="string" name="segment" ordinal="1" />
+            <column datatype="string" name="industry" ordinal="2" />
+            <column datatype="string" name="company_size" ordinal="3" />
+            <column datatype="string" name="account_manager" ordinal="4" />
+            <column datatype="date" name="customer_since" ordinal="5" />
+            <column datatype="real" name="lifetime_value" ordinal="6" />
+            <column datatype="integer" name="nps_score" ordinal="7" />
+          </columns>
+        </relation>
+        <metadata-records>
+          <metadata-record class="capability">
+            <remote-name />
+            <remote-type>0</remote-type>
+            <parent-name>[customer_segments.csv]</parent-name>
+            <remote-alias />
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <attributes>
+              <attribute datatype="string" name="character-set">"UTF-8"</attribute>
+              <attribute datatype="string" name="collation">"en_US"</attribute>
+              <attribute datatype="string" name="field-delimiter">","</attribute>
+              <attribute datatype="string" name="header-row">"true"</attribute>
+              <attribute datatype="string" name="locale">"en_US"</attribute>
+              <attribute datatype="string" name="single-char">""</attribute>
+            </attributes>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>customer_name</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[customer_name]</local-name>
+            <parent-name>[customer_segments.csv]</parent-name>
+            <remote-alias>customer_name</remote-alias>
+            <ordinal>0</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[customer_segments.csv_2E17E9D08143DF1EB3467CF285026037]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>segment</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[segment]</local-name>
+            <parent-name>[customer_segments.csv]</parent-name>
+            <remote-alias>segment</remote-alias>
+            <ordinal>1</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[customer_segments.csv_2E17E9D08143DF1EB3467CF285026037]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>industry</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[industry]</local-name>
+            <parent-name>[customer_segments.csv]</parent-name>
+            <remote-alias>industry</remote-alias>
+            <ordinal>2</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[customer_segments.csv_2E17E9D08143DF1EB3467CF285026037]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>company_size</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[company_size]</local-name>
+            <parent-name>[customer_segments.csv]</parent-name>
+            <remote-alias>company_size</remote-alias>
+            <ordinal>3</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[customer_segments.csv_2E17E9D08143DF1EB3467CF285026037]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>account_manager</remote-name>
+            <remote-type>129</remote-type>
+            <local-name>[account_manager]</local-name>
+            <parent-name>[customer_segments.csv]</parent-name>
+            <remote-alias>account_manager</remote-alias>
+            <ordinal>4</ordinal>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <scale>1</scale>
+            <width>1073741823</width>
+            <contains-null>true</contains-null>
+            <collation flag="0" name="LEN_RUS" />
+            <object-id>[customer_segments.csv_2E17E9D08143DF1EB3467CF285026037]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>customer_since</remote-name>
+            <remote-type>133</remote-type>
+            <local-name>[customer_since]</local-name>
+            <parent-name>[customer_segments.csv]</parent-name>
+            <remote-alias>customer_since</remote-alias>
+            <ordinal>5</ordinal>
+            <local-type>date</local-type>
+            <aggregation>Year</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[customer_segments.csv_2E17E9D08143DF1EB3467CF285026037]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>lifetime_value</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[lifetime_value]</local-name>
+            <parent-name>[customer_segments.csv]</parent-name>
+            <remote-alias>lifetime_value</remote-alias>
+            <ordinal>6</ordinal>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[customer_segments.csv_2E17E9D08143DF1EB3467CF285026037]</object-id>
+          </metadata-record>
+          <metadata-record class="column">
+            <remote-name>nps_score</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[nps_score]</local-name>
+            <parent-name>[customer_segments.csv]</parent-name>
+            <remote-alias>nps_score</remote-alias>
+            <ordinal>7</ordinal>
+            <local-type>integer</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[customer_segments.csv_2E17E9D08143DF1EB3467CF285026037]</object-id>
+          </metadata-record>
+        </metadata-records>
+      </connection>
+      <aliases enabled="yes" />
+      <column caption="customer_segments.csv" datatype="table" name="[__tableau_internal_object_id__].[customer_segments.csv_2E17E9D08143DF1EB3467CF285026037]" role="measure" type="quantitative" />
+      <column caption="Customer Name" datatype="string" name="[customer_name]" role="dimension" type="nominal" />
+      <column caption="Segment" datatype="string" name="[segment]" role="dimension" type="nominal" />
+      <column caption="Industry" datatype="string" name="[industry]" role="dimension" type="nominal" />
+      <column caption="Company Size" datatype="string" name="[company_size]" role="dimension" type="nominal" />
+      <column caption="Account Manager" datatype="string" name="[account_manager]" role="dimension" type="nominal" />
+      <column caption="Customer Since" datatype="date" name="[customer_since]" role="dimension" type="ordinal" />
+      <column caption="Lifetime Value" datatype="real" name="[lifetime_value]" role="measure" type="quantitative" />
+      <column caption="Nps Score" datatype="integer" name="[nps_score]" role="measure" type="quantitative" />
+      <layout dim-ordering="alphabetic" measure-ordering="alphabetic" show-structure="true" />
+      <object-graph>
+        <objects>
+          <object caption="customer_segments.csv" id="customer_segments.csv_2E17E9D08143DF1EB3467CF285026037">
+            <properties context="">
+              <relation connection="textscan.59968c12b49580cf19bd26b2abb7feb0" name="customer_segments.csv" table="[customer_segments#csv]" type="table">
+                <columns character-set="UTF-8" header="yes" locale="en_US" separator=",">
+                  <column datatype="string" name="customer_name" ordinal="0" />
+                  <column datatype="string" name="segment" ordinal="1" />
+                  <column datatype="string" name="industry" ordinal="2" />
+                  <column datatype="string" name="company_size" ordinal="3" />
+                  <column datatype="string" name="account_manager" ordinal="4" />
+                  <column datatype="date" name="customer_since" ordinal="5" />
+                  <column datatype="real" name="lifetime_value" ordinal="6" />
+                  <column datatype="integer" name="nps_score" ordinal="7" />
+                </columns>
+              </relation>
+            </properties>
+          </object>
+        </objects>
+      </object-graph>
+    </datasource>
+  </datasources>
+  <actions>
+    <action caption="Region cross-filter" name="[Action1_3BE3E8291C5D14B2091CD1271DDA0603]">
+      <activation auto-clear="true" type="on-select" />
+      <source dashboard="Dashboard 1" type="sheet" worksheet="Revenue by Region" />
+      <command command="tsc:tsl-filter">
+        <param name="exclude" value="Revenue by Region" />
+        <param name="special-fields" value="all" />
+        <param name="target" value="Revenue Trend" />
+      </command>
+    </action>
+    <action caption="Region cross-filter" name="[Action2_033973F3A9DD093FEC5019C9ADBC28DC]">
+      <activation auto-clear="true" type="on-select" />
+      <source dashboard="Dashboard 1" type="sheet" worksheet="Revenue by Region" />
+      <command command="tsc:tsl-filter">
+        <param name="exclude" value="Revenue by Region" />
+        <param name="special-fields" value="all" />
+        <param name="target" value="Profit by Category" />
+      </command>
+    </action>
+    <action caption="Category cross-filter" name="[Action3_D24BD35F23712FA71F02939D24C24FE1]">
+      <activation auto-clear="true" type="on-select" />
+      <source dashboard="Dashboard 1" type="sheet" worksheet="Profit by Category" />
+      <command command="tsc:tsl-filter">
+        <param name="exclude" value="Profit by Category" />
+        <param name="special-fields" value="all" />
+        <param name="target" value="Revenue Trend" />
+      </command>
+    </action>
+    <action caption="Category cross-filter" name="[Action4_E77641CA7D8A3557C8D2A464A8D81AAB]">
+      <activation auto-clear="true" type="on-select" />
+      <source dashboard="Dashboard 1" type="sheet" worksheet="Profit by Category" />
+      <command command="tsc:tsl-filter">
+        <param name="exclude" value="Profit by Category" />
+        <param name="special-fields" value="all" />
+        <param name="target" value="Revenue by Region" />
+      </command>
+    </action>
+    <action caption="Region highlight" name="[Action5_5545950FE58B23E73D5A0E88BD88AEBD]">
+      <activation auto-clear="true" type="on-select" />
+      <source dashboard="Dashboard 1" type="sheet" worksheet="Revenue by Region" />
+      <command command="tsc:brush">
+        <param name="exclude" value="Revenue by Region" />
+        <param name="field-captions" value="all" />
+        <param name="target" value="Revenue Target by Region" />
+      </command>
+    </action>
+  </actions>
+  <worksheets>
+    <worksheet name="Revenue KPI">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#1c2833" fontname="Open Sans" fontsize="15">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Revenue" datatype="real" name="[revenue]" role="measure" type="quantitative" />
+            <column-instance column="[revenue]" derivation="Sum" name="[sum:revenue:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="cell">
+            <format attr="text-format" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" value="$#,##0" />
+            <format attr="border-style" value="none" />
+            <format attr="border-width" value="0" />
+            <format attr="text-align" value="center" />
+            <format attr="vertical-align" value="center" />
+          </style-rule>
+          <style-rule element="mark">
+            <format attr="mark-color" value="#1b4f72" />
+          </style-rule>
+          <style-rule element="pane">
+            <format attr="background-color" value="#ffffff" />
+          </style-rule>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+            <format attr="display-field-labels" scope="cols" value="false" />
+            <format attr="display-field-labels" scope="rows" value="false" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
+            </encodings>
+            <customized-label>
+              <formatted-text>
+                <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="23"><![CDATA[<[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]>]]></run>
+              </formatted-text>
+            </customized-label>
+            <style>
+              <style-rule element="mark">
+                <format attr="mark-labels-show" value="true" />
+                <format attr="mark-labels-cull" value="true" />
+              </style-rule>
+            </style>
+          </pane>
+        </panes>
+        <rows />
+        <cols />
+        <tooltip-style tooltip-mode="none" />
+      </table>
+      <simple-id uuid="{334C1BAB-5EC8-5C82-A0AC-DA8ECAD13E15}" />
+    </worksheet>
+    <worksheet name="Profit KPI">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#1c2833" fontname="Open Sans" fontsize="15">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Profit" datatype="real" name="[profit]" role="measure" type="quantitative" />
+            <column-instance column="[profit]" derivation="Sum" name="[sum:profit:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="cell">
+            <format attr="text-format" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" value="$#,##0" />
+            <format attr="border-style" value="none" />
+            <format attr="border-width" value="0" />
+            <format attr="text-align" value="center" />
+            <format attr="vertical-align" value="center" />
+          </style-rule>
+          <style-rule element="mark">
+            <format attr="mark-color" value="#1b4f72" />
+          </style-rule>
+          <style-rule element="pane">
+            <format attr="background-color" value="#ffffff" />
+          </style-rule>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+            <format attr="display-field-labels" scope="cols" value="false" />
+            <format attr="display-field-labels" scope="rows" value="false" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" />
+            </encodings>
+            <customized-label>
+              <formatted-text>
+                <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="23"><![CDATA[<[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]>]]></run>
+              </formatted-text>
+            </customized-label>
+            <style>
+              <style-rule element="mark">
+                <format attr="mark-labels-show" value="true" />
+                <format attr="mark-labels-cull" value="true" />
+              </style-rule>
+            </style>
+          </pane>
+        </panes>
+        <rows />
+        <cols />
+        <tooltip-style tooltip-mode="none" />
+      </table>
+      <simple-id uuid="{C47C8D90-C2D6-50DD-859B-37BBBD127035}" />
+    </worksheet>
+    <worksheet name="Orders KPI">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#1c2833" fontname="Open Sans" fontsize="15">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Order Id" datatype="string" name="[order_id]" role="dimension" type="nominal" />
+            <column-instance column="[order_id]" derivation="CountD" name="[ctd:order_id:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="cell">
+            <format attr="border-style" value="none" />
+            <format attr="border-width" value="0" />
+            <format attr="text-align" value="center" />
+            <format attr="vertical-align" value="center" />
+          </style-rule>
+          <style-rule element="mark">
+            <format attr="mark-color" value="#1b4f72" />
+          </style-rule>
+          <style-rule element="pane">
+            <format attr="background-color" value="#ffffff" />
+          </style-rule>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+            <format attr="display-field-labels" scope="cols" value="false" />
+            <format attr="display-field-labels" scope="rows" value="false" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[ctd:order_id:qk]" />
+            </encodings>
+            <customized-label>
+              <formatted-text>
+                <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="23"><![CDATA[<[federated.b2993893834e8f0306a282d0a717d7a9].[ctd:order_id:qk]>]]></run>
+              </formatted-text>
+            </customized-label>
+            <style>
+              <style-rule element="mark">
+                <format attr="mark-labels-show" value="true" />
+                <format attr="mark-labels-cull" value="true" />
+              </style-rule>
+            </style>
+          </pane>
+        </panes>
+        <rows />
+        <cols />
+        <tooltip-style tooltip-mode="none" />
+      </table>
+      <simple-id uuid="{5859448B-9FB4-577D-9593-84D7AB53E899}" />
+    </worksheet>
+    <worksheet name="AOV KPI">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#1c2833" fontname="Open Sans" fontsize="15">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Average Order Value" datatype="real" default-format="$#,##0" name="[Average Order Value]" role="measure" type="quantitative">
+              <calculation class="tableau" formula="SUM([revenue]) / COUNTD([order_id])" />
+            </column>
+            <column-instance column="[Average Order Value]" derivation="None" name="[none:Average Order Value:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="cell">
+            <format attr="border-style" value="none" />
+            <format attr="border-width" value="0" />
+            <format attr="text-align" value="center" />
+            <format attr="vertical-align" value="center" />
+          </style-rule>
+          <style-rule element="mark">
+            <format attr="mark-color" value="#1b4f72" />
+          </style-rule>
+          <style-rule element="pane">
+            <format attr="background-color" value="#ffffff" />
+          </style-rule>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+            <format attr="display-field-labels" scope="cols" value="false" />
+            <format attr="display-field-labels" scope="rows" value="false" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:Average Order Value:qk]" />
+            </encodings>
+            <customized-label>
+              <formatted-text>
+                <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="23"><![CDATA[<[federated.b2993893834e8f0306a282d0a717d7a9].[none:Average Order Value:qk]>]]></run>
+              </formatted-text>
+            </customized-label>
+            <style>
+              <style-rule element="mark">
+                <format attr="mark-labels-show" value="true" />
+                <format attr="mark-labels-cull" value="true" />
+              </style-rule>
+            </style>
+          </pane>
+        </panes>
+        <rows />
+        <cols />
+        <tooltip-style tooltip-mode="none" />
+      </table>
+      <simple-id uuid="{7CFC608E-50A0-56CB-B036-4D8B0239B912}" />
+    </worksheet>
+    <worksheet name="Revenue Trend">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#1c2833" fontname="Open Sans" fontsize="15">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Order Month" datatype="string" name="[Order Month]" role="dimension" type="nominal">
+              <calculation class="tableau" formula="STR(YEAR([order_date])) + &quot;-&quot; + IF MONTH([order_date]) &lt; 10 THEN &quot;0&quot; ELSE &quot;&quot; END + STR(MONTH([order_date]))" />
+            </column>
+            <column caption="Order Date" datatype="date" name="[order_date]" role="dimension" type="ordinal" />
+            <column caption="Product Category" datatype="string" name="[product_category]" role="dimension" type="nominal" />
+            <column caption="Region" datatype="string" name="[region]" role="dimension" type="nominal" />
+            <column caption="Revenue" datatype="real" name="[revenue]" role="measure" type="quantitative" />
+            <column-instance column="[Order Month]" derivation="None" name="[none:Order Month:nk]" pivot="key" type="nominal" />
+            <column-instance column="[product_category]" derivation="None" name="[none:product_category:nk]" pivot="key" type="nominal" />
+            <column-instance column="[region]" derivation="None" name="[none:region:nk]" pivot="key" type="nominal" />
+            <column-instance column="[revenue]" derivation="Sum" name="[sum:revenue:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[order_date]" derivation="Month-Trunc" name="[tmn:order_date:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <filter class="categorical" column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:Order Month:nk]">
+            <groupfilter function="level-members" level="[none:Order Month:nk]" user:ui-enumeration="all" user:ui-marker="enumerate" />
+          </filter>
+          <filter class="categorical" column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]">
+            <groupfilter function="level-members" level="[none:region:nk]" user:ui-enumeration="all" user:ui-marker="enumerate" />
+          </filter>
+          <filter class="categorical" column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]">
+            <groupfilter function="level-members" level="[none:product_category:nk]" user:ui-enumeration="all" user:ui-marker="enumerate" />
+          </filter>
+          <slices>
+            <column>[federated.b2993893834e8f0306a282d0a717d7a9].[none:Order Month:nk]</column>
+            <column>[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]</column>
+            <column>[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]</column>
+          </slices>
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="axis">
+            <format attr="title" class="0" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" scope="rows" value="Revenue" />
+          </style-rule>
+          <style-rule element="cell">
+            <format attr="text-format" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" value="$#,##0" />
+            <format attr="border-style" value="none" />
+            <format attr="border-width" value="0" />
+          </style-rule>
+          <style-rule element="gridline">
+            <format attr="stroke-color" value="#eef1f4" />
+          </style-rule>
+          <style-rule element="mark">
+            <encoding attr="color" field="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]" palette="Brand" type="palette">
+              <color-palette custom="true" name="Brand" type="regular">
+                <color>#1b4f72</color>
+                <color>#2e86c1</color>
+                <color>#48c9b0</color>
+                <color>#f39c12</color>
+                <color>#1b4f72</color>
+              </color-palette>
+            </encoding>
+          </style-rule>
+          <style-rule element="pane">
+            <format attr="background-color" value="#ffffff" />
+          </style-rule>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+            <format attr="display-field-labels" scope="cols" value="false" />
+            <format attr="display-field-labels" scope="rows" value="false" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <color column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]" />
+            </encodings>
+          </pane>
+        </panes>
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[tmn:order_date:qk]</cols>
+      </table>
+      <simple-id uuid="{44036FC5-347C-5ED6-8C47-5E3BD2227BF4}" />
+    </worksheet>
+    <worksheet name="Revenue by Region">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#1c2833" fontname="Open Sans" fontsize="15">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Region" datatype="string" name="[region]" role="dimension" type="nominal" />
+            <column caption="Revenue" datatype="real" name="[revenue]" role="measure" type="quantitative" />
+            <column-instance column="[region]" derivation="None" name="[none:region:nk]" pivot="key" type="nominal" />
+            <column-instance column="[revenue]" derivation="Sum" name="[sum:revenue:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <computed-sort column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]" direction="DESC" using="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="cell">
+            <format attr="text-format" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" value="$#,##0" />
+            <format attr="border-style" value="none" />
+            <format attr="border-width" value="0" />
+          </style-rule>
+          <style-rule element="gridline">
+            <format attr="stroke-color" value="#eef1f4" />
+          </style-rule>
+          <style-rule element="mark">
+            <format attr="mark-color" value="#1b4f72" />
+          </style-rule>
+          <style-rule element="pane">
+            <format attr="background-color" value="#ffffff" />
+          </style-rule>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+            <format attr="display-field-labels" scope="cols" value="false" />
+            <format attr="display-field-labels" scope="rows" value="false" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
+            </encodings>
+            <style>
+              <style-rule element="mark">
+                <format attr="mark-labels-show" value="true" />
+                <format attr="mark-labels-cull" value="true" />
+              </style-rule>
+            </style>
+          </pane>
+        </panes>
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]</cols>
+      </table>
+      <simple-id uuid="{157CC8AA-B1F3-54F1-B25E-35B216DF3DDA}" />
+    </worksheet>
+    <worksheet name="Revenue Target by Region">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#1c2833" fontname="Open Sans" fontsize="15">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="monthly_targets" name="federated.fd9f220bc557dfd7f751b88055fef22d" />
+          </datasources>
+          <datasource-dependencies datasource="federated.fd9f220bc557dfd7f751b88055fef22d">
+            <column caption="Region" datatype="string" name="[region]" role="dimension" type="nominal" />
+            <column caption="Revenue Target" datatype="integer" name="[revenue_target]" role="measure" type="quantitative" />
+            <column-instance column="[region]" derivation="None" name="[none:region:nk]" pivot="key" type="nominal" />
+            <column-instance column="[revenue_target]" derivation="Sum" name="[sum:revenue_target:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <computed-sort column="[federated.fd9f220bc557dfd7f751b88055fef22d].[none:region:nk]" direction="DESC" using="[federated.fd9f220bc557dfd7f751b88055fef22d].[sum:revenue_target:qk]" />
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="cell">
+            <format attr="text-format" field="[federated.fd9f220bc557dfd7f751b88055fef22d].[sum:revenue_target:qk]" value="$#,##0" />
+            <format attr="border-style" value="none" />
+            <format attr="border-width" value="0" />
+          </style-rule>
+          <style-rule element="gridline">
+            <format attr="stroke-color" value="#eef1f4" />
+          </style-rule>
+          <style-rule element="mark">
+            <format attr="mark-color" value="#1b4f72" />
+          </style-rule>
+          <style-rule element="pane">
+            <format attr="background-color" value="#ffffff" />
+          </style-rule>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+            <format attr="display-field-labels" scope="cols" value="false" />
+            <format attr="display-field-labels" scope="rows" value="false" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <text column="[federated.fd9f220bc557dfd7f751b88055fef22d].[sum:revenue_target:qk]" />
+            </encodings>
+            <style>
+              <style-rule element="mark">
+                <format attr="mark-labels-show" value="true" />
+                <format attr="mark-labels-cull" value="true" />
+              </style-rule>
+            </style>
+          </pane>
+        </panes>
+        <rows>[federated.fd9f220bc557dfd7f751b88055fef22d].[none:region:nk]</rows>
+        <cols>[federated.fd9f220bc557dfd7f751b88055fef22d].[sum:revenue_target:qk]</cols>
+      </table>
+      <simple-id uuid="{2BF148EF-C481-51C1-AC05-0520CE580650}" />
+    </worksheet>
+    <worksheet name="Profit by Category">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#1c2833" fontname="Open Sans" fontsize="15">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Product Category" datatype="string" name="[product_category]" role="dimension" type="nominal" />
+            <column caption="Profit" datatype="real" name="[profit]" role="measure" type="quantitative" />
+            <column-instance column="[product_category]" derivation="None" name="[none:product_category:nk]" pivot="key" type="nominal" />
+            <column-instance column="[profit]" derivation="Sum" name="[sum:profit:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <computed-sort column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]" direction="DESC" using="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" />
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="axis">
+            <format attr="title" class="0" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" scope="rows" value="Profit" />
+          </style-rule>
+          <style-rule element="cell">
+            <format attr="text-format" field="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" value="$#,##0" />
+            <format attr="border-style" value="none" />
+            <format attr="border-width" value="0" />
+          </style-rule>
+          <style-rule element="gridline">
+            <format attr="stroke-color" value="#eef1f4" />
+          </style-rule>
+          <style-rule element="mark">
+            <format attr="mark-color" value="#1b4f72" />
+          </style-rule>
+          <style-rule element="pane">
+            <format attr="background-color" value="#ffffff" />
+          </style-rule>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+            <format attr="display-field-labels" scope="cols" value="false" />
+            <format attr="display-field-labels" scope="rows" value="false" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" />
+            </encodings>
+            <style>
+              <style-rule element="mark">
+                <format attr="mark-labels-show" value="true" />
+                <format attr="mark-labels-cull" value="true" />
+              </style-rule>
+            </style>
+          </pane>
+        </panes>
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]</cols>
+      </table>
+      <simple-id uuid="{680354EE-FB3D-51AD-9DFC-11273928693B}" />
+    </worksheet>
+    <worksheet name="Top Customers">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#1c2833" fontname="Open Sans" fontsize="15">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="customer_segments" name="federated.ea24fc047813e26be8ea413b95586d29" />
+          </datasources>
+          <datasource-dependencies datasource="federated.ea24fc047813e26be8ea413b95586d29">
+            <column caption="Account Manager" datatype="string" name="[account_manager]" role="dimension" type="nominal" />
+            <column caption="Customer Name" datatype="string" name="[customer_name]" role="dimension" type="nominal" />
+            <column caption="Industry" datatype="string" name="[industry]" role="dimension" type="nominal" />
+            <column caption="Lifetime Value" datatype="real" name="[lifetime_value]" role="measure" type="quantitative" />
+            <column caption="Nps Score" datatype="integer" name="[nps_score]" role="measure" type="quantitative" />
+            <column caption="Segment" datatype="string" name="[segment]" role="dimension" type="nominal" />
+            <column-instance column="[account_manager]" derivation="None" name="[none:account_manager:nk]" pivot="key" type="nominal" />
+            <column-instance column="[customer_name]" derivation="None" name="[none:customer_name:nk]" pivot="key" type="nominal" />
+            <column-instance column="[industry]" derivation="None" name="[none:industry:nk]" pivot="key" type="nominal" />
+            <column-instance column="[nps_score]" derivation="None" name="[none:nps_score:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[segment]" derivation="None" name="[none:segment:nk]" pivot="key" type="nominal" />
+            <column-instance column="[lifetime_value]" derivation="Sum" name="[sum:lifetime_value:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <computed-sort column="[federated.ea24fc047813e26be8ea413b95586d29].[none:customer_name:nk]" direction="DESC" using="[federated.ea24fc047813e26be8ea413b95586d29].[sum:lifetime_value:qk]" />
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="cell">
+            <format attr="text-format" field="[federated.ea24fc047813e26be8ea413b95586d29].[sum:lifetime_value:qk]" value="$#,##0" />
+            <format attr="border-style" value="none" />
+            <format attr="border-width" value="0" />
+          </style-rule>
+          <style-rule element="mark">
+            <format attr="mark-color" value="#1b4f72" />
+          </style-rule>
+          <style-rule element="pane">
+            <format attr="background-color" value="#ffffff" />
+          </style-rule>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+            <format attr="display-field-labels" scope="cols" value="false" />
+            <format attr="display-field-labels" scope="rows" value="false" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="Automatic" />
+            <encodings>
+              <text column="[federated.ea24fc047813e26be8ea413b95586d29].[sum:lifetime_value:qk]" />
+            </encodings>
+            <style>
+              <style-rule element="mark">
+                <format attr="mark-labels-show" value="true" />
+                <format attr="mark-labels-cull" value="true" />
+              </style-rule>
+            </style>
+          </pane>
+        </panes>
+        <rows>([federated.ea24fc047813e26be8ea413b95586d29].[none:customer_name:nk] / [federated.ea24fc047813e26be8ea413b95586d29].[none:segment:nk] / [federated.ea24fc047813e26be8ea413b95586d29].[none:industry:nk] / [federated.ea24fc047813e26be8ea413b95586d29].[none:account_manager:nk] / [federated.ea24fc047813e26be8ea413b95586d29].[none:nps_score:qk])</rows>
+        <cols />
+      </table>
+      <simple-id uuid="{41471BF4-288B-5027-87E7-EE00CFA017DA}" />
+    </worksheet>
+  </worksheets>
+  <dashboards>
+    <dashboard enable-sort-zone-taborder="true" name="Dashboard 1">
+      <style />
+      <size minheight="800" minwidth="1100" sizing-mode="range" />
+      <datasources>
+        <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+      </datasources>
+      <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+        <column caption="Order Month" datatype="string" name="[Order Month]" role="dimension" type="nominal">
+          <calculation class="tableau" formula="STR(YEAR([order_date])) + &quot;-&quot; + IF MONTH([order_date]) &lt; 10 THEN &quot;0&quot; ELSE &quot;&quot; END + STR(MONTH([order_date]))" />
+        </column>
+        <column-instance column="[Order Month]" derivation="None" name="[none:Order Month:nk]" pivot="key" type="nominal" />
+        <column caption="Product Category" datatype="string" name="[product_category]" role="dimension" type="nominal" />
+        <column-instance column="[product_category]" derivation="None" name="[none:product_category:nk]" pivot="key" type="nominal" />
+        <column caption="Region" datatype="string" name="[region]" role="dimension" type="nominal" />
+        <column-instance column="[region]" derivation="None" name="[none:region:nk]" pivot="key" type="nominal" />
+      </datasource-dependencies>
+      <zones>
+        <zone friendly-name="Dashboard" h="100000" id="1" type-v2="layout-basic" w="100000" x="0" y="0">
+          <zone friendly-name="V-root" h="98222" id="2" param="vert" type-v2="layout-flow" w="98828" x="586" y="889">
+            <zone friendly-name="obj-title" h="6876" id="3" type-v2="text" w="98828" x="586" y="889">
+              <formatted-text>
+                <run fontcolor="#1c2833" fontname="Open Sans" fontsize="15">Sales Performance</run>
+              </formatted-text>
+              <zone-style>
+                <format attr="border-color" value="#000000" />
+                <format attr="border-style" value="none" />
+                <format attr="border-width" value="0" />
+                <format attr="margin" value="4" />
+              </zone-style>
+            </zone>
+            <zone friendly-name="H-root.2" h="6875" id="4" param="horz" type-v2="layout-flow" w="98828" x="586" y="7765">
+              <zone friendly-name="flt-month" h="6875" id="5" mode="checkdropdown" name="Revenue Trend" param="[federated.b2993893834e8f0306a282d0a717d7a9].[none:Order Month:nk]" show-title="false" type-v2="filter" w="33602" x="586" y="7765">
+                <zone-style>
+                  <format attr="border-color" value="#000000" />
+                  <format attr="border-style" value="none" />
+                  <format attr="border-width" value="0" />
+                  <format attr="margin" value="4" />
+                </zone-style>
+              </zone>
+              <zone friendly-name="flt-region" h="6875" id="6" mode="checkdropdown" name="Revenue Trend" param="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]" show-title="false" type-v2="filter" w="32613" x="34188" y="7765">
+                <zone-style>
+                  <format attr="border-color" value="#000000" />
+                  <format attr="border-style" value="none" />
+                  <format attr="border-width" value="0" />
+                  <format attr="margin" value="4" />
+                </zone-style>
+              </zone>
+              <zone friendly-name="flt-category" h="6875" id="7" mode="checkdropdown" name="Revenue Trend" param="[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]" show-title="false" type-v2="filter" w="32613" x="66801" y="7765">
+                <zone-style>
+                  <format attr="border-color" value="#000000" />
+                  <format attr="border-style" value="none" />
+                  <format attr="border-width" value="0" />
+                  <format attr="margin" value="4" />
+                </zone-style>
+              </zone>
+              <zone-style>
+                <format attr="border-color" value="#000000" />
+                <format attr="border-style" value="none" />
+                <format attr="border-width" value="0" />
+                <format attr="margin" value="4" />
+              </zone-style>
+            </zone>
+            <zone friendly-name="H-root.3" h="13751" id="8" param="horz" type-v2="layout-flow" w="98828" x="586" y="14640">
+              <zone friendly-name="V-kpi-revenue" h="13751" id="9" param="vert" type-v2="layout-flow" w="24707" x="586" y="14640">
+                <zone fixed-size="30" friendly-name="H-kpi-revenue header" h="3333" id="10" is-fixed="true" param="horz" type-v2="layout-flow" w="24707" x="586" y="14640">
+                  <zone friendly-name="kpi-revenue title" h="3333" id="11" type-v2="text" w="18530" x="586" y="14640">
+                    <formatted-text>
+                      <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="15">Total revenue</run>
+                    </formatted-text>
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone friendly-name="kpi-revenue header spacer" h="3333" id="12" type-v2="empty" w="6177" x="19116" y="14640">
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone friendly-name="kpi-revenue" h="10418" id="13" name="Revenue KPI" show-title="false" w="24707" x="586" y="17973">
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone-style>
+                  <format attr="border-color" value="#000000" />
+                  <format attr="border-style" value="none" />
+                  <format attr="border-width" value="0" />
+                  <format attr="margin" value="4" />
+                </zone-style>
+              </zone>
+              <zone friendly-name="V-kpi-profit" h="13751" id="14" param="vert" type-v2="layout-flow" w="24707" x="25293" y="14640">
+                <zone fixed-size="30" friendly-name="H-kpi-profit header" h="3333" id="15" is-fixed="true" param="horz" type-v2="layout-flow" w="24707" x="25293" y="14640">
+                  <zone friendly-name="kpi-profit title" h="3333" id="16" type-v2="text" w="18530" x="25293" y="14640">
+                    <formatted-text>
+                      <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="15">Total profit</run>
+                    </formatted-text>
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone friendly-name="kpi-profit header spacer" h="3333" id="17" type-v2="empty" w="6177" x="43823" y="14640">
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone friendly-name="kpi-profit" h="10418" id="18" name="Profit KPI" show-title="false" w="24707" x="25293" y="17973">
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone-style>
+                  <format attr="border-color" value="#000000" />
+                  <format attr="border-style" value="none" />
+                  <format attr="border-width" value="0" />
+                  <format attr="margin" value="4" />
+                </zone-style>
+              </zone>
+              <zone friendly-name="V-kpi-orders" h="13751" id="19" param="vert" type-v2="layout-flow" w="24707" x="50000" y="14640">
+                <zone fixed-size="30" friendly-name="H-kpi-orders header" h="3333" id="20" is-fixed="true" param="horz" type-v2="layout-flow" w="24707" x="50000" y="14640">
+                  <zone friendly-name="kpi-orders title" h="3333" id="21" type-v2="text" w="18530" x="50000" y="14640">
+                    <formatted-text>
+                      <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="15">Total orders</run>
+                    </formatted-text>
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone friendly-name="kpi-orders header spacer" h="3333" id="22" type-v2="empty" w="6177" x="68530" y="14640">
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone friendly-name="kpi-orders" h="10418" id="23" name="Orders KPI" show-title="false" w="24707" x="50000" y="17973">
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone-style>
+                  <format attr="border-color" value="#000000" />
+                  <format attr="border-style" value="none" />
+                  <format attr="border-width" value="0" />
+                  <format attr="margin" value="4" />
+                </zone-style>
+              </zone>
+              <zone friendly-name="V-kpi-aov" h="13751" id="24" param="vert" type-v2="layout-flow" w="24707" x="74707" y="14640">
+                <zone fixed-size="30" friendly-name="H-kpi-aov header" h="3333" id="25" is-fixed="true" param="horz" type-v2="layout-flow" w="24707" x="74707" y="14640">
+                  <zone friendly-name="kpi-aov title" h="3333" id="26" type-v2="text" w="18530" x="74707" y="14640">
+                    <formatted-text>
+                      <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="15">Average order value</run>
+                    </formatted-text>
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone friendly-name="kpi-aov header spacer" h="3333" id="27" type-v2="empty" w="6177" x="93237" y="14640">
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone friendly-name="kpi-aov" h="10418" id="28" name="AOV KPI" show-title="false" w="24707" x="74707" y="17973">
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone-style>
+                  <format attr="border-color" value="#000000" />
+                  <format attr="border-style" value="none" />
+                  <format attr="border-width" value="0" />
+                  <format attr="margin" value="4" />
+                </zone-style>
+              </zone>
+              <zone-style>
+                <format attr="border-color" value="#000000" />
+                <format attr="border-style" value="none" />
+                <format attr="border-width" value="0" />
+                <format attr="margin" value="4" />
+              </zone-style>
+            </zone>
+            <zone friendly-name="H-root.4" h="39289" id="29" param="horz" type-v2="layout-flow" w="98828" x="586" y="28391">
+              <zone friendly-name="V-chart-trend" h="39289" id="30" param="vert" type-v2="layout-flow" w="59297" x="586" y="28391">
+                <zone fixed-size="30" friendly-name="H-chart-trend header" h="3333" id="31" is-fixed="true" param="horz" type-v2="layout-flow" w="59297" x="586" y="28391">
+                  <zone friendly-name="chart-trend title" h="3333" id="32" type-v2="text" w="44473" x="586" y="28391">
+                    <formatted-text>
+                      <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="15">Revenue trend by region</run>
+                    </formatted-text>
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone friendly-name="chart-trend header spacer" h="3333" id="33" type-v2="empty" w="14824" x="45059" y="28391">
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone friendly-name="chart-trend" h="33512" id="34" name="Revenue Trend" show-title="false" w="59297" x="586" y="31724">
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone fixed-size="22" friendly-name="chart-trend legend" h="2444" id="35" is-fixed="true" leg-item-layout="horz" name="Revenue Trend" pane-specification-id="0" param="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]" show-title="false" type-v2="color" w="59297" x="586" y="65236">
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone-style>
+                  <format attr="border-color" value="#000000" />
+                  <format attr="border-style" value="none" />
+                  <format attr="border-width" value="0" />
+                  <format attr="margin" value="4" />
+                </zone-style>
+              </zone>
+              <zone friendly-name="V-root.4.2" h="39289" id="36" param="vert" type-v2="layout-flow" w="39531" x="59883" y="28391">
+                <zone friendly-name="V-chart-region-actual" h="19644" id="37" param="vert" type-v2="layout-flow" w="39531" x="59883" y="28391">
+                  <zone fixed-size="30" friendly-name="H-chart-region-actual header" h="3333" id="38" is-fixed="true" param="horz" type-v2="layout-flow" w="39531" x="59883" y="28391">
+                    <zone friendly-name="chart-region-actual title" h="3333" id="39" type-v2="text" w="29648" x="59883" y="28391">
+                      <formatted-text>
+                        <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="15">Actual revenue by region</run>
+                      </formatted-text>
+                      <zone-style>
+                        <format attr="border-color" value="#000000" />
+                        <format attr="border-style" value="none" />
+                        <format attr="border-width" value="0" />
+                        <format attr="margin" value="4" />
+                      </zone-style>
+                    </zone>
+                    <zone friendly-name="chart-region-actual header spacer" h="3333" id="40" type-v2="empty" w="9883" x="89531" y="28391">
+                      <zone-style>
+                        <format attr="border-color" value="#000000" />
+                        <format attr="border-style" value="none" />
+                        <format attr="border-width" value="0" />
+                        <format attr="margin" value="4" />
+                      </zone-style>
+                    </zone>
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone friendly-name="chart-region-actual" h="16311" id="41" name="Revenue by Region" show-title="false" w="39531" x="59883" y="31724">
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone friendly-name="V-chart-region-target" h="19645" id="42" param="vert" type-v2="layout-flow" w="39531" x="59883" y="48035">
+                  <zone fixed-size="30" friendly-name="H-chart-region-target header" h="3333" id="43" is-fixed="true" param="horz" type-v2="layout-flow" w="39531" x="59883" y="48035">
+                    <zone friendly-name="chart-region-target title" h="3333" id="44" type-v2="text" w="29648" x="59883" y="48035">
+                      <formatted-text>
+                        <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="15">Revenue target by region</run>
+                      </formatted-text>
+                      <zone-style>
+                        <format attr="border-color" value="#000000" />
+                        <format attr="border-style" value="none" />
+                        <format attr="border-width" value="0" />
+                        <format attr="margin" value="4" />
+                      </zone-style>
+                    </zone>
+                    <zone friendly-name="chart-region-target header spacer" h="3333" id="45" type-v2="empty" w="9883" x="89531" y="48035">
+                      <zone-style>
+                        <format attr="border-color" value="#000000" />
+                        <format attr="border-style" value="none" />
+                        <format attr="border-width" value="0" />
+                        <format attr="margin" value="4" />
+                      </zone-style>
+                    </zone>
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone friendly-name="chart-region-target" h="16312" id="46" name="Revenue Target by Region" show-title="false" w="39531" x="59883" y="51368">
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone-style>
+                  <format attr="border-color" value="#000000" />
+                  <format attr="border-style" value="none" />
+                  <format attr="border-width" value="0" />
+                  <format attr="margin" value="4" />
+                </zone-style>
+              </zone>
+              <zone-style>
+                <format attr="border-color" value="#000000" />
+                <format attr="border-style" value="none" />
+                <format attr="border-width" value="0" />
+                <format attr="margin" value="4" />
+              </zone-style>
+            </zone>
+            <zone friendly-name="H-root.5" h="31431" id="47" param="horz" type-v2="layout-flow" w="98828" x="586" y="67680">
+              <zone friendly-name="V-chart-category" h="31431" id="48" param="vert" type-v2="layout-flow" w="39531" x="586" y="67680">
+                <zone fixed-size="30" friendly-name="H-chart-category header" h="3333" id="49" is-fixed="true" param="horz" type-v2="layout-flow" w="39531" x="586" y="67680">
+                  <zone friendly-name="chart-category title" h="3333" id="50" type-v2="text" w="29648" x="586" y="67680">
+                    <formatted-text>
+                      <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="15">Profit by product category</run>
+                    </formatted-text>
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone friendly-name="chart-category header spacer" h="3333" id="51" type-v2="empty" w="9883" x="30234" y="67680">
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone friendly-name="chart-category" h="28098" id="52" name="Profit by Category" show-title="false" w="39531" x="586" y="71013">
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone-style>
+                  <format attr="border-color" value="#000000" />
+                  <format attr="border-style" value="none" />
+                  <format attr="border-width" value="0" />
+                  <format attr="margin" value="4" />
+                </zone-style>
+              </zone>
+              <zone friendly-name="V-table-customers" h="31431" id="53" param="vert" type-v2="layout-flow" w="59297" x="40117" y="67680">
+                <zone fixed-size="30" friendly-name="H-table-customers header" h="3333" id="54" is-fixed="true" param="horz" type-v2="layout-flow" w="59297" x="40117" y="67680">
+                  <zone friendly-name="table-customers title" h="3333" id="55" type-v2="text" w="44473" x="40117" y="67680">
+                    <formatted-text>
+                      <run bold="true" fontcolor="#1c2833" fontname="Open Sans" fontsize="15">Top customers by lifetime value</run>
+                    </formatted-text>
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone friendly-name="table-customers header spacer" h="3333" id="56" type-v2="empty" w="14824" x="84590" y="67680">
+                    <zone-style>
+                      <format attr="border-color" value="#000000" />
+                      <format attr="border-style" value="none" />
+                      <format attr="border-width" value="0" />
+                      <format attr="margin" value="4" />
+                    </zone-style>
+                  </zone>
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone friendly-name="table-customers" h="28098" id="57" name="Top Customers" show-title="false" w="59297" x="40117" y="71013">
+                  <zone-style>
+                    <format attr="border-color" value="#000000" />
+                    <format attr="border-style" value="none" />
+                    <format attr="border-width" value="0" />
+                    <format attr="margin" value="4" />
+                  </zone-style>
+                </zone>
+                <zone-style>
+                  <format attr="border-color" value="#000000" />
+                  <format attr="border-style" value="none" />
+                  <format attr="border-width" value="0" />
+                  <format attr="margin" value="4" />
+                </zone-style>
+              </zone>
+              <zone-style>
+                <format attr="border-color" value="#000000" />
+                <format attr="border-style" value="none" />
+                <format attr="border-width" value="0" />
+                <format attr="margin" value="4" />
+              </zone-style>
+            </zone>
+            <zone-style>
+              <format attr="border-color" value="#000000" />
+              <format attr="border-style" value="none" />
+              <format attr="border-width" value="0" />
+              <format attr="margin" value="4" />
+            </zone-style>
+          </zone>
+          <zone-style>
+            <format attr="border-color" value="#000000" />
+            <format attr="border-style" value="none" />
+            <format attr="border-width" value="0" />
+            <format attr="margin" value="8" />
+          </zone-style>
+        </zone>
+      </zones>
+      <simple-id uuid="{0DD80B98-5120-5EDC-BBC6-4C242D6F5D85}" />
+    </dashboard>
+  </dashboards>
+  <windows source-height="30">
+    <window class="worksheet" hidden="true" name="Revenue KPI">
+      <cards>
+        <edge name="left">
+          <strip size="160">
+            <card type="pages" />
+            <card type="filters" />
+            <card type="marks" />
+          </strip>
+        </edge>
+        <edge name="top">
+          <strip size="2147483647">
+            <card type="columns" />
+          </strip>
+          <strip size="2147483647">
+            <card type="rows" />
+          </strip>
+          <strip size="31">
+            <card type="title" />
+          </strip>
+        </edge>
+      </cards>
+      <viewpoint>
+        <zoom type="entire-view" />
+      </viewpoint>
+      <simple-id uuid="{7B63FE65-2894-551B-8172-05B15FD1FE13}" />
+    </window>
+    <window class="worksheet" hidden="true" name="Profit KPI">
+      <cards>
+        <edge name="left">
+          <strip size="160">
+            <card type="pages" />
+            <card type="filters" />
+            <card type="marks" />
+          </strip>
+        </edge>
+        <edge name="top">
+          <strip size="2147483647">
+            <card type="columns" />
+          </strip>
+          <strip size="2147483647">
+            <card type="rows" />
+          </strip>
+          <strip size="31">
+            <card type="title" />
+          </strip>
+        </edge>
+      </cards>
+      <viewpoint>
+        <zoom type="entire-view" />
+      </viewpoint>
+      <simple-id uuid="{27506D02-D157-5539-9F27-1C5586681893}" />
+    </window>
+    <window class="worksheet" hidden="true" name="Orders KPI">
+      <cards>
+        <edge name="left">
+          <strip size="160">
+            <card type="pages" />
+            <card type="filters" />
+            <card type="marks" />
+          </strip>
+        </edge>
+        <edge name="top">
+          <strip size="2147483647">
+            <card type="columns" />
+          </strip>
+          <strip size="2147483647">
+            <card type="rows" />
+          </strip>
+          <strip size="31">
+            <card type="title" />
+          </strip>
+        </edge>
+      </cards>
+      <viewpoint>
+        <zoom type="entire-view" />
+      </viewpoint>
+      <simple-id uuid="{1ACF14E3-6085-53BE-9657-CF8B93510523}" />
+    </window>
+    <window class="worksheet" hidden="true" name="AOV KPI">
+      <cards>
+        <edge name="left">
+          <strip size="160">
+            <card type="pages" />
+            <card type="filters" />
+            <card type="marks" />
+          </strip>
+        </edge>
+        <edge name="top">
+          <strip size="2147483647">
+            <card type="columns" />
+          </strip>
+          <strip size="2147483647">
+            <card type="rows" />
+          </strip>
+          <strip size="31">
+            <card type="title" />
+          </strip>
+        </edge>
+      </cards>
+      <viewpoint>
+        <zoom type="entire-view" />
+      </viewpoint>
+      <simple-id uuid="{2A5F6CE3-8A69-55D4-B672-8765BB786102}" />
+    </window>
+    <window class="worksheet" hidden="true" name="Revenue Trend">
+      <cards>
+        <edge name="left">
+          <strip size="160">
+            <card type="pages" />
+            <card type="filters" />
+            <card type="marks" />
+          </strip>
+        </edge>
+        <edge name="top">
+          <strip size="2147483647">
+            <card type="columns" />
+          </strip>
+          <strip size="2147483647">
+            <card type="rows" />
+          </strip>
+          <strip size="31">
+            <card type="title" />
+          </strip>
+        </edge>
+        <edge name="right">
+          <strip size="160">
+            <card pane-specification-id="0" param="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]" type="color" />
+          </strip>
+        </edge>
+      </cards>
+      <viewpoint>
+        <zoom type="entire-view" />
+      </viewpoint>
+      <simple-id uuid="{AD6137D4-D0B8-58C4-835D-4D1E15E2520E}" />
+    </window>
+    <window class="worksheet" hidden="true" name="Revenue by Region">
+      <cards>
+        <edge name="left">
+          <strip size="160">
+            <card type="pages" />
+            <card type="filters" />
+            <card type="marks" />
+          </strip>
+        </edge>
+        <edge name="top">
+          <strip size="2147483647">
+            <card type="columns" />
+          </strip>
+          <strip size="2147483647">
+            <card type="rows" />
+          </strip>
+          <strip size="31">
+            <card type="title" />
+          </strip>
+        </edge>
+      </cards>
+      <viewpoint>
+        <zoom type="entire-view" />
+      </viewpoint>
+      <simple-id uuid="{8AFB9376-6685-512C-8677-C464CE8D0968}" />
+    </window>
+    <window class="worksheet" hidden="true" name="Revenue Target by Region">
+      <cards>
+        <edge name="left">
+          <strip size="160">
+            <card type="pages" />
+            <card type="filters" />
+            <card type="marks" />
+          </strip>
+        </edge>
+        <edge name="top">
+          <strip size="2147483647">
+            <card type="columns" />
+          </strip>
+          <strip size="2147483647">
+            <card type="rows" />
+          </strip>
+          <strip size="31">
+            <card type="title" />
+          </strip>
+        </edge>
+      </cards>
+      <viewpoint>
+        <zoom type="entire-view" />
+      </viewpoint>
+      <simple-id uuid="{9033714A-A74C-5928-A357-E9927C86F827}" />
+    </window>
+    <window class="worksheet" hidden="true" name="Profit by Category">
+      <cards>
+        <edge name="left">
+          <strip size="160">
+            <card type="pages" />
+            <card type="filters" />
+            <card type="marks" />
+          </strip>
+        </edge>
+        <edge name="top">
+          <strip size="2147483647">
+            <card type="columns" />
+          </strip>
+          <strip size="2147483647">
+            <card type="rows" />
+          </strip>
+          <strip size="31">
+            <card type="title" />
+          </strip>
+        </edge>
+      </cards>
+      <viewpoint>
+        <zoom type="entire-view" />
+      </viewpoint>
+      <simple-id uuid="{CD71EF96-FAB7-51BC-A5A6-B8EB1EA21546}" />
+    </window>
+    <window class="worksheet" hidden="true" name="Top Customers">
+      <cards>
+        <edge name="left">
+          <strip size="160">
+            <card type="pages" />
+            <card type="filters" />
+            <card type="marks" />
+          </strip>
+        </edge>
+        <edge name="top">
+          <strip size="2147483647">
+            <card type="columns" />
+          </strip>
+          <strip size="2147483647">
+            <card type="rows" />
+          </strip>
+          <strip size="31">
+            <card type="title" />
+          </strip>
+        </edge>
+      </cards>
+      <simple-id uuid="{8D0B244B-26EC-59F7-B216-DBD752B4505B}" />
+    </window>
+    <window class="dashboard" maximized="true" name="Dashboard 1">
+      <viewpoints>
+        <viewpoint name="Revenue KPI">
+          <zoom type="entire-view" />
+        </viewpoint>
+        <viewpoint name="Profit KPI">
+          <zoom type="entire-view" />
+        </viewpoint>
+        <viewpoint name="Orders KPI">
+          <zoom type="entire-view" />
+        </viewpoint>
+        <viewpoint name="AOV KPI">
+          <zoom type="entire-view" />
+        </viewpoint>
+        <viewpoint name="Revenue Trend">
+          <zoom type="entire-view" />
+        </viewpoint>
+        <viewpoint name="Revenue by Region">
+          <zoom type="entire-view" />
+        </viewpoint>
+        <viewpoint name="Revenue Target by Region">
+          <zoom type="entire-view" />
+        </viewpoint>
+        <viewpoint name="Profit by Category">
+          <zoom type="entire-view" />
+        </viewpoint>
+        <viewpoint name="Top Customers" />
+      </viewpoints>
+      <active id="1" />
+      <simple-id uuid="{28C05EE9-D356-5BAC-BADE-B4FC6594E4C4}" />
+    </window>
+  </windows>
+</workbook>

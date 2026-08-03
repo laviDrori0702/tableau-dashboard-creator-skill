@@ -1,0 +1,11 @@
+{
+  "_comment": "DEMO EXAMPLE under scaffold/. To sample your own published data sources, copy this to datasources.json at the PROJECT ROOT and fill in .env (copy scaffold/.env.example) with your Tableau connection. tableau-data prefers the root file over this example. One entry per source; (ds_name + project_name) identify it uniquely on the site. VizQL Data Service queries PUBLISHED data sources only -- not embedded -- and needs Tableau Cloud or Server 2025.1+. For an embedded source or a database, export it to CSV from Tableau and drop the CSV(s) in data/ instead (each CSV = one data source). Per-datasource credentials are not handled yet. Keys starting with _ are ignored.",
+  "ds_1": {
+    "ds_name": "Superstore",
+    "project_name": "Samples"
+  },
+  "ds_2": {
+    "ds_name": "Regional Sales",
+    "project_name": "Sales Analytics"
+  }
+}

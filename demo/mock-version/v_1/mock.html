@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sales Performance Dashboard - Mock (v_1)</title>
+<style>
+  /* Tokens from DESIGN-TOKENS.md (tableau-brand, step 4). */
+  :root {
+    --font: "Open Sans", "Segoe UI", system-ui, sans-serif;
+    --bg: #f4f6f7;
+    --card: #ffffff;
+    --banner: #ffffff;
+    --sep: #eef1f4;
+    --text-dark: #1c2833;
+    --text-mid: #5d6d7e;
+    --s1: #1b4f72;
+    --s2: #2e86c1;
+    --s3: #48c9b0;
+    --s4: #f39c12;
+    --pad: 8px;
+    --gap: 12px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #dfe4e6; font-family: var(--font); color: var(--text-dark); }
+
+  /* The canvas is the plan's Screen Size: 1366 x 900. */
+  .canvas {
+    position: relative; width: 1366px; height: 900px;
+    margin: 16px auto; background: var(--bg); overflow: hidden;
+  }
+
+  .header {
+    position: absolute; left: 0; top: 0; width: 1366px; height: 63px;
+    background: var(--banner); border-bottom: 1px solid var(--sep);
+    display: flex; align-items: center; gap: 12px; padding: 0 12px;
+  }
+  .header .logo { height: 32px; width: 32px; }
+  .header h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -0.2px; }
+  .header .sub { margin-left: auto; font-size: 12px; color: var(--text-mid); }
+
+  .filter-bar {
+    position: absolute; left: 0; top: 63px; width: 1366px; height: 63px;
+    display: flex; align-items: center; gap: 12px; padding: 0 12px;
+    border-bottom: 1px solid var(--sep);
+  }
+  .fld { display: flex; flex-direction: column; gap: 2px; }
+  .fld label { font-size: 12px; color: var(--text-mid); }
+  .fld select {
+    font-family: var(--font); font-size: 12px; color: var(--text-dark);
+    background: var(--card); border: 1px solid #d5dbdf; padding: 4px 6px; min-width: 150px;
+  }
+  .chips { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .chips .lbl { font-size: 12px; color: var(--text-mid); }
+  .chip {
+    font-family: var(--font); font-size: 12px; cursor: pointer;
+    border: 1px solid var(--s2); background: var(--s2); color: #fff; padding: 4px 9px;
+  }
+  .chip[aria-pressed="false"] { background: var(--card); color: var(--text-mid); border-color: #d5dbdf; }
+  .reset {
+    font-family: var(--font); font-size: 12px; cursor: pointer;
+    border: 1px solid #d5dbdf; background: var(--card); color: var(--text-mid); padding: 4px 9px;
+  }
+
+  .card {
+    position: absolute; background: var(--card); padding: var(--pad);
+    border: 1px solid var(--sep); display: flex; flex-direction: column;
+  }
+  .card > h2 {
+    font-size: 15px; font-weight: 700; margin: 0 0 4px; color: var(--text-dark);
+  }
+  .card > .note { font-size: 12px; color: var(--text-mid); margin: 0 0 4px; }
+  .card > .plot { flex: 1; min-height: 0; }
+
+  .kpi { padding-top: 12px; }
+  .kpi .bar { position: absolute; left: 0; top: 0; height: 4px; width: 100%; }
+  .kpi .cap { font-size: 12px; color: var(--text-mid); text-transform: uppercase; letter-spacing: .4px; }
+  .kpi .val { font-size: 30px; font-weight: 700; margin-top: 2px; }
+  .kpi .sec { font-size: 12px; color: var(--text-mid); margin-top: auto; }
+
+  svg { display: block; width: 100%; height: 100%; }
+  .ax { font-size: 10px; fill: var(--text-mid); }
+  .gl { stroke: var(--sep); stroke-width: 1; }
+  .mark { cursor: pointer; }
+  .dim { opacity: .25; }
+
+  table.cust { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.cust th {
+    text-align: left; color: var(--text-mid); font-weight: 600; cursor: pointer;
+    border-bottom: 1px solid var(--sep); padding: 4px 6px; white-space: nowrap;
+  }
+  table.cust th.num, table.cust td.num { text-align: right; }
+  table.cust th[aria-sort="descending"]::after { content: " \25BC"; }
+  table.cust th[aria-sort="ascending"]::after { content: " \25B2"; }
+  table.cust td { padding: 4px 6px; border-bottom: 1px solid var(--sep); }
+  table.cust tbody tr:last-child td { border-bottom: 0; }
+</style>
+</head>
+<body>
+
+<div class="canvas">
+
+  <!-- Header: dashboard title text object + brand logo (chrome, not a plan element). -->
+  <div class="header">
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+      <rect x="4" y="30" width="12" height="30" fill="#1B4F72"></rect>
+      <rect x="20" y="18" width="12" height="42" fill="#2E86C1"></rect>
+      <rect x="36" y="8" width="12" height="52" fill="#48C9B0"></rect>
+      <circle cx="56" cy="12" r="6" fill="#F39C12"></circle>
+    </svg>
+    <h1 data-plan-id="obj-title">Sales Performance</h1>
+    <div class="sub">Jan - Apr 2025 &middot; refreshed monthly &middot; mock v_1</div>
+  </div>
+
+  <!-- Filters: one control per plan Filters row. -->
+  <div class="filter-bar">
+    <div class="fld">
+      <label for="flt-month">Month</label>
+      <select id="flt-month" data-plan-id="flt-month"></select>
+    </div>
+    <div class="fld">
+      <label for="flt-region">Region</label>
+      <select id="flt-region" data-plan-id="flt-region"></select>
+    </div>
+    <div class="fld">
+      <label for="flt-category">Product category</label>
+      <select id="flt-category" data-plan-id="flt-category"></select>
+    </div>
+    <div class="chips">
+      <span class="lbl">Interactions</span>
+      <button class="chip" data-plan-id="int-region-crossfilter" aria-pressed="true"
+              title="Click a region bar to filter the trend and the category breakdown">
+        cross-filter: region</button>
+      <button class="chip" data-plan-id="int-category-crossfilter" aria-pressed="true"
+              title="Click a category bar to filter the trend and regional revenue">
+        cross-filter: category</button>
+      <button class="chip" data-plan-id="int-region-highlight" aria-pressed="true"
+              title="Selecting a region highlights the same region in the target chart">
+        highlight: region vs target</button>
+      <button class="reset" id="reset">Clear selection</button>
+    </div>
+  </div>
+
+  <!-- KPI row -->
+  <div class="card kpi" data-plan-id="kpi-revenue" style="left:12px;top:134px;width:326px;height:110px">
+    <div class="bar" style="background:var(--s1)"></div>
+    <div class="cap">Total revenue</div>
+    <div class="val" id="v-revenue">-</div>
+    <div class="sec" id="s-revenue">-</div>
+  </div>
+  <div class="card kpi" data-plan-id="kpi-profit" style="left:350px;top:134px;width:326px;height:110px">
+    <div class="bar" style="background:var(--s2)"></div>
+    <div class="cap">Total profit</div>
+    <div class="val" id="v-profit">-</div>
+    <div class="sec" id="s-profit">-</div>
+  </div>
+  <div class="card kpi" data-plan-id="kpi-orders" style="left:688px;top:134px;width:326px;height:110px">
+    <div class="bar" style="background:var(--s3)"></div>
+    <div class="cap">Total orders</div>
+    <div class="val" id="v-orders">-</div>
+    <div class="sec" id="s-orders">-</div>
+  </div>
+  <div class="card kpi" data-plan-id="kpi-aov" style="left:1026px;top:134px;width:326px;height:110px">
+    <div class="bar" style="background:var(--s4)"></div>
+    <div class="cap">Average order value</div>
+    <div class="val" id="v-aov">-</div>
+    <div class="sec" id="s-aov">-</div>
+  </div>
+
+  <!-- Middle row -->
+  <div class="card" data-plan-id="chart-trend" style="left:12px;top:260px;width:798px;height:344px">
+    <h2 id="t-trend">Revenue trend by region</h2>
+    <div class="plot"><svg id="c-trend" viewBox="0 0 798 300" preserveAspectRatio="none"></svg></div>
+  </div>
+  <div class="card" data-plan-id="chart-region-actual" style="left:822px;top:260px;width:532px;height:166px">
+    <h2>Actual revenue by region</h2>
+    <div class="plot"><svg id="c-region-actual" viewBox="0 0 532 122" preserveAspectRatio="none"></svg></div>
+  </div>
+  <div class="card" data-plan-id="chart-region-target" style="left:822px;top:438px;width:532px;height:166px">
+    <h2>Revenue target by region</h2>
+    <div class="plot"><svg id="c-region-target" viewBox="0 0 532 122" preserveAspectRatio="none"></svg></div>
+  </div>
+
+  <!-- Bottom row -->
+  <div class="card" data-plan-id="chart-category" style="left:12px;top:620px;width:532px;height:272px">
+    <h2 id="t-category">Profit by product category</h2>
+    <div class="plot"><svg id="c-category" viewBox="0 0 532 228" preserveAspectRatio="none"></svg></div>
+  </div>
+  <div class="card" data-plan-id="table-customers" style="left:556px;top:620px;width:798px;height:272px">
+    <h2>Top customers by lifetime value</h2>
+    <p class="note">Customer master (customer_segments.csv) - a separate data source, so the
+      order filters above do not apply. Click a column header to sort.</p>
+    <div class="plot" style="overflow:auto"><table class="cust" id="c-customers"></table></div>
+  </div>
+
+</div>
+
+<!-- Slot-sizing manifest: a pixel box for every plan ELEMENT id. Canvas == plan Screen Size. -->
+<script type="application/json" id="mock-layout">
+{
+  "canvas": { "width": 1366, "height": 900 },
+  "elements": [
+    { "id": "kpi-revenue",         "x": 12,   "y": 134, "width": 326, "height": 110 },
+    { "id": "kpi-profit",          "x": 350,  "y": 134, "width": 326, "height": 110 },
+    { "id": "kpi-orders",          "x": 688,  "y": 134, "width": 326, "height": 110 },
+    { "id": "kpi-aov",             "x": 1026, "y": 134, "width": 326, "height": 110 },
+    { "id": "chart-trend",         "x": 12,   "y": 260, "width": 798, "height": 344 },
+    { "id": "chart-region-actual", "x": 822,  "y": 260, "width": 532, "height": 166 },
+    { "id": "chart-region-target", "x": 822,  "y": 438, "width": 532, "height": 166 },
+    { "id": "chart-category",      "x": 12,   "y": 620, "width": 532, "height": 272 },
+    { "id": "table-customers",     "x": 556,  "y": 620, "width": 798, "height": 272 }
+  ]
+}
+</script>
+
+<!-- The real rows from data/*.csv (CONTRACT.md: one CSV = one data source). -->
+<script type="application/json" id="sales-orders">
+[
+["ORD-001","2025-01-03","Acme Corp","North America","United States","Electronics","Wireless Headphones",12,89.99,0.10,971.89,480.00,491.89],
+["ORD-002","2025-01-05","GlobalTech Ltd","Europe","Germany","Software","Cloud License Annual",5,299.99,0.00,1499.95,750.00,749.95],
+["ORD-003","2025-01-07","Sakura Inc","Asia Pacific","Japan","Electronics","USB-C Hub",30,45.00,0.15,1147.50,600.00,547.50],
+["ORD-004","2025-01-10","Nordic Solutions","Europe","Sweden","Furniture","Standing Desk",3,549.99,0.05,1567.47,1050.00,517.47],
+["ORD-005","2025-01-12","Maple Systems","North America","Canada","Electronics","4K Monitor",8,399.99,0.10,2879.93,1760.00,1119.93],
+["ORD-006","2025-01-15","Acme Corp","North America","United States","Software","Security Suite",15,149.99,0.20,1799.88,900.00,899.88],
+["ORD-007","2025-01-18","Outback Digital","Asia Pacific","Australia","Furniture","Ergonomic Chair",6,329.99,0.00,1979.94,1080.00,899.94],
+["ORD-008","2025-01-20","Thames Analytics","Europe","United Kingdom","Electronics","Mechanical Keyboard",25,129.99,0.10,2924.78,1250.00,1674.78],
+["ORD-009","2025-01-22","GlobalTech Ltd","Europe","Germany","Electronics","Wireless Mouse",40,59.99,0.05,2279.62,800.00,1479.62],
+["ORD-010","2025-01-25","Sakura Inc","Asia Pacific","Japan","Software","Data Analytics Platform",2,999.99,0.00,1999.98,800.00,1199.98],
+["ORD-011","2025-02-01","Acme Corp","North America","United States","Furniture","Conference Table",1,1299.99,0.00,1299.99,780.00,519.99],
+["ORD-012","2025-02-03","Nordic Solutions","Europe","Sweden","Electronics","Webcam Pro",10,179.99,0.10,1619.91,700.00,919.91],
+["ORD-013","2025-02-06","Maple Systems","North America","Canada","Software","Cloud License Annual",8,299.99,0.15,2039.93,1200.00,839.93],
+["ORD-014","2025-02-08","Thames Analytics","Europe","United Kingdom","Furniture","Monitor Arm",15,89.99,0.00,1349.85,525.00,824.85],
+["ORD-015","2025-02-10","Outback Digital","Asia Pacific","Australia","Electronics","Wireless Headphones",20,89.99,0.05,1709.81,800.00,909.81],
+["ORD-016","2025-02-13","GlobalTech Ltd","Europe","Germany","Furniture","Standing Desk",4,549.99,0.10,1979.96,1400.00,579.96],
+["ORD-017","2025-02-15","Acme Corp","North America","United States","Electronics","4K Monitor",6,399.99,0.00,2399.94,1320.00,1079.94],
+["ORD-018","2025-02-18","Sakura Inc","Asia Pacific","Japan","Furniture","Ergonomic Chair",8,329.99,0.05,2507.92,1440.00,1067.92],
+["ORD-019","2025-02-20","Nordic Solutions","Europe","Sweden","Software","Security Suite",12,149.99,0.10,1619.89,720.00,899.89],
+["ORD-020","2025-02-22","Maple Systems","North America","Canada","Electronics","Mechanical Keyboard",18,129.99,0.00,2339.82,900.00,1439.82],
+["ORD-021","2025-03-01","Thames Analytics","Europe","United Kingdom","Software","Data Analytics Platform",3,999.99,0.05,2849.97,1200.00,1649.97],
+["ORD-022","2025-03-04","Outback Digital","Asia Pacific","Australia","Software","Cloud License Annual",6,299.99,0.10,1619.95,900.00,719.95],
+["ORD-023","2025-03-06","Acme Corp","North America","United States","Electronics","USB-C Hub",50,45.00,0.15,1912.50,1000.00,912.50],
+["ORD-024","2025-03-08","GlobalTech Ltd","Europe","Germany","Electronics","Webcam Pro",15,179.99,0.00,2699.85,1050.00,1649.85],
+["ORD-025","2025-03-10","Sakura Inc","Asia Pacific","Japan","Electronics","Wireless Mouse",35,59.99,0.05,1994.67,700.00,1294.67],
+["ORD-026","2025-03-13","Nordic Solutions","Europe","Sweden","Furniture","Conference Table",2,1299.99,0.00,2599.98,1560.00,1039.98],
+["ORD-027","2025-03-15","Maple Systems","North America","Canada","Furniture","Monitor Arm",20,89.99,0.10,1619.82,700.00,919.82],
+["ORD-028","2025-03-18","Thames Analytics","Europe","United Kingdom","Electronics","4K Monitor",10,399.99,0.05,3799.91,2200.00,1599.91],
+["ORD-029","2025-03-20","Outback Digital","Asia Pacific","Australia","Furniture","Standing Desk",5,549.99,0.00,2749.95,1750.00,999.95],
+["ORD-030","2025-03-22","Acme Corp","North America","United States","Software","Data Analytics Platform",4,999.99,0.10,3599.96,1600.00,1999.96],
+["ORD-031","2025-04-01","GlobalTech Ltd","Europe","Germany","Electronics","Wireless Headphones",22,89.99,0.05,1880.79,880.00,1000.79],
+["ORD-032","2025-04-03","Sakura Inc","Asia Pacific","Japan","Software","Security Suite",10,149.99,0.00,1499.90,600.00,899.90],
+["ORD-033","2025-04-06","Nordic Solutions","Europe","Sweden","Electronics","Mechanical Keyboard",14,129.99,0.10,1637.87,700.00,937.87],
+["ORD-034","2025-04-08","Maple Systems","North America","Canada","Furniture","Ergonomic Chair",7,329.99,0.00,2309.93,1260.00,1049.93],
+["ORD-035","2025-04-10","Thames Analytics","Europe","United Kingdom","Software","Cloud License Annual",9,299.99,0.15,2294.92,1350.00,944.92],
+["ORD-036","2025-04-13","Outback Digital","Asia Pacific","Australia","Electronics","USB-C Hub",45,45.00,0.10,1822.50,900.00,922.50],
+["ORD-037","2025-04-15","Acme Corp","North America","United States","Furniture","Standing Desk",3,549.99,0.00,1649.97,1050.00,599.97],
+["ORD-038","2025-04-18","GlobalTech Ltd","Europe","Germany","Software","Data Analytics Platform",2,999.99,0.05,1899.98,800.00,1099.98],
+["ORD-039","2025-04-20","Sakura Inc","Asia Pacific","Japan","Electronics","4K Monitor",9,399.99,0.10,3239.92,1980.00,1259.92],
+["ORD-040","2025-04-22","Nordic Solutions","Europe","Sweden","Furniture","Monitor Arm",18,89.99,0.00,1619.82,630.00,989.82]
+]
+</script>
+<script type="application/json" id="monthly-targets">
+[
+["2025-01","North America",8000,10,2],["2025-01","Europe",9000,12,3],["2025-01","Asia Pacific",7000,8,1],
+["2025-02","North America",8500,11,2],["2025-02","Europe",9500,13,2],["2025-02","Asia Pacific",7500,9,2],
+["2025-03","North America",9000,12,3],["2025-03","Europe",10000,14,2],["2025-03","Asia Pacific",8000,10,2],
+["2025-04","North America",9500,13,2],["2025-04","Europe",10500,15,3],["2025-04","Asia Pacific",8500,11,1]
+]
+</script>
+<script type="application/json" id="customer-segments">
+[
+["Acme Corp","Enterprise","Technology","500-1000","Sarah Chen","2021-03-15",45200.00,72],
+["GlobalTech Ltd","Enterprise","Manufacturing","1000+","James Miller","2020-07-22",38500.00,65],
+["Sakura Inc","Mid-Market","Technology","200-500","Sarah Chen","2022-01-10",28900.00,81],
+["Nordic Solutions","Mid-Market","Consulting","100-200","Lisa Wang","2022-06-18",21400.00,78],
+["Maple Systems","Enterprise","Finance","500-1000","James Miller","2021-09-03",33800.00,69],
+["Outback Digital","Mid-Market","Media","100-200","Lisa Wang","2023-02-28",18200.00,85],
+["Thames Analytics","Enterprise","Finance","1000+","Sarah Chen","2020-11-05",41600.00,74]
+]
+</script>
+
+<script>
+"use strict";
+
+// --- Data ------------------------------------------------------------------
+var readJson = function (id) { return JSON.parse(document.getElementById(id).textContent); };
+
+var ORDERS = readJson("sales-orders").map(function (r) {
+  return {
+    order_id: r[0], order_date: r[1], customer_name: r[2], region: r[3], country: r[4],
+    product_category: r[5], product_name: r[6], quantity: r[7], unit_price: r[8],
+    discount: r[9], revenue: r[10], cost: r[11], profit: r[12],
+    month: r[1].slice(0, 7)
+  };
+});
+var TARGETS = readJson("monthly-targets").map(function (r) {
+  return { month: r[0], region: r[1], revenue_target: r[2], orders_target: r[3] };
+});
+var CUSTOMERS = readJson("customer-segments").map(function (r) {
+  return {
+    customer_name: r[0], segment: r[1], industry: r[2], company_size: r[3],
+    account_manager: r[4], customer_since: r[5], lifetime_value: r[6], nps_score: r[7]
+  };
+});
+
+var SERIES = ["#1b4f72", "#2e86c1", "#48c9b0", "#f39c12"];
+var MONTHS = distinct(ORDERS, "month").sort();
+var REGIONS = distinct(ORDERS, "region").sort();
+var CATEGORIES = distinct(ORDERS, "product_category").sort();
+var REGION_COLOR = {};
+REGIONS.forEach(function (region, i) { REGION_COLOR[region] = SERIES[i % SERIES.length]; });
+
+function distinct(rows, key) {
+  var seen = {};
+  rows.forEach(function (row) { seen[row[key]] = true; });
+  return Object.keys(seen);
+}
+function sum(rows, key) {
+  return rows.reduce(function (acc, row) { return acc + row[key]; }, 0);
+}
+function groupSum(rows, key, measure) {
+  var out = {};
+  rows.forEach(function (row) { out[row[key]] = (out[row[key]] || 0) + row[measure]; });
+  return out;
+}
+function money(value, decimals) {
+  return "$" + value.toLocaleString("en-US", {
+    minimumFractionDigits: decimals || 0, maximumFractionDigits: decimals || 0
+  });
+}
+
+// --- State -----------------------------------------------------------------
+// Filter cards (flt-*) plus the two cross-filter selections and the highlight,
+// which are the mock's stand-in for the Tableau actions (CONTRACT.md 6).
+var state = {
+  month: "All", region: "All", category: "All",
+  xfRegion: null, xfCategory: null,
+  on: { "int-region-crossfilter": true, "int-category-crossfilter": true, "int-region-highlight": true },
+  sortKey: "lifetime_value", sortDir: -1
+};
+
+function selectedRegion() { return state.on["int-region-crossfilter"] ? state.xfRegion : null; }
+function selectedCategory() { return state.on["int-category-crossfilter"] ? state.xfCategory : null; }
+
+// Base = the three filter cards. Cross-filter selections are layered per view, because
+// a filter action never filters the view it came from.
+function baseRows() {
+  return ORDERS.filter(function (row) {
+    return (state.month === "All" || row.month === state.month)
+      && (state.region === "All" || row.region === state.region)
+      && (state.category === "All" || row.product_category === state.category);
+  });
+}
+function rowsFor(view) {
+  var rows = baseRows();
+  var region = selectedRegion();
+  var category = selectedCategory();
+  if (region && view !== "chart-region-actual") {
+    rows = rows.filter(function (row) { return row.region === region; });
+  }
+  if (category && view !== "chart-category") {
+    rows = rows.filter(function (row) { return row.product_category === category; });
+  }
+  return rows;
+}
+
+// --- SVG helpers -----------------------------------------------------------
+var NS = "http://www.w3.org/2000/svg";
+function el(name, attrs, text) {
+  var node = document.createElementNS(NS, name);
+  Object.keys(attrs || {}).forEach(function (key) { node.setAttribute(key, attrs[key]); });
+  if (text !== undefined) { node.textContent = text; }
+  return node;
+}
+function clear(node) { while (node.firstChild) { node.removeChild(node.firstChild); } }
+function niceMax(value) {
+  if (value <= 0) { return 1; }
+  var step = Math.pow(10, Math.floor(Math.log10(value)) - 1);
+  return Math.ceil(value / (step * 5)) * step * 5;
+}
+
+// --- KPI cards -------------------------------------------------------------
+function renderKpis() {
+  var rows = rowsFor("kpi");
+  var revenue = sum(rows, "revenue");
+  var profit = sum(rows, "profit");
+  var orders = distinct(rows, "order_id").length;
+  document.getElementById("v-revenue").textContent = money(revenue);
+  document.getElementById("s-revenue").textContent =
+    rows.length + " of " + ORDERS.length + " orders in scope";
+  document.getElementById("v-profit").textContent = money(profit);
+  document.getElementById("s-profit").textContent =
+    "margin " + (revenue ? (profit / revenue * 100).toFixed(1) : "0.0") + "%";
+  document.getElementById("v-orders").textContent = orders.toLocaleString("en-US");
+  document.getElementById("s-orders").textContent = "distinct order_id";
+  document.getElementById("v-aov").textContent = money(orders ? revenue / orders : 0);
+  document.getElementById("s-aov").textContent = "revenue / orders";
+}
+
+// --- chart-trend: line, revenue by month, one line per region --------------
+function renderTrend() {
+  var svg = document.getElementById("c-trend");
+  var rows = rowsFor("chart-trend");
+  clear(svg);
+  var W = 798, H = 300, L = 62, R = 12, T = 10, B = 34;
+  var plotW = W - L - R, plotH = H - T - B;
+
+  var byRegion = {};
+  REGIONS.forEach(function (region) { byRegion[region] = MONTHS.map(function () { return 0; }); });
+  rows.forEach(function (row) {
+    byRegion[row.region][MONTHS.indexOf(row.month)] += row.revenue;
+  });
+  var peak = 0;
+  REGIONS.forEach(function (region) {
+    byRegion[region].forEach(function (value) { peak = Math.max(peak, value); });
+  });
+  var top = niceMax(peak);
+
+  for (var t = 0; t <= 4; t++) {
+    var y = T + plotH - (plotH * t / 4);
+    svg.appendChild(el("line", { x1: L, y1: y, x2: W - R, y2: y, "class": "gl" }));
+    svg.appendChild(el("text", {
+      x: L - 8, y: y + 3, "text-anchor": "end", "class": "ax"
+    }, money(top * t / 4)));
+  }
+  MONTHS.forEach(function (month, i) {
+    var x = L + (MONTHS.length === 1 ? plotW / 2 : plotW * i / (MONTHS.length - 1));
+    // First/last labels anchor inward so they are not clipped by the plot edges.
+    var anchor = i === 0 ? "start" : (i === MONTHS.length - 1 ? "end" : "middle");
+    svg.appendChild(el("text", { x: x, y: H - 12, "text-anchor": anchor, "class": "ax" }, month));
+  });
+
+  REGIONS.forEach(function (region) {
+    var values = byRegion[region];
+    var points = values.map(function (value, i) {
+      var x = L + (MONTHS.length === 1 ? plotW / 2 : plotW * i / (MONTHS.length - 1));
+      return [x, T + plotH - (value / top) * plotH];
+    });
+    var faded = selectedRegion() && selectedRegion() !== region;
+    var path = el("polyline", {
+      points: points.map(function (p) { return p[0] + "," + p[1]; }).join(" "),
+      fill: "none", stroke: REGION_COLOR[region], "stroke-width": 2.5,
+      "class": faded ? "dim" : ""
+    });
+    svg.appendChild(path);
+    points.forEach(function (p, i) {
+      var dot = el("circle", {
+        cx: p[0], cy: p[1], r: 3.5, fill: REGION_COLOR[region], "class": faded ? "dim" : ""
+      });
+      dot.appendChild(el("title", {}, region + " " + MONTHS[i] + ": " + money(values[i], 2)));
+      svg.appendChild(dot);
+    });
+  });
+
+  // Inline legend (region on colour).
+  var lx = L + 4;
+  REGIONS.forEach(function (region) {
+    svg.appendChild(el("rect", { x: lx, y: T + 2, width: 9, height: 9, fill: REGION_COLOR[region] }));
+    var label = el("text", { x: lx + 13, y: T + 10, "class": "ax" }, region);
+    svg.appendChild(label);
+    lx += 22 + region.length * 5.4;
+  });
+
+  document.getElementById("t-trend").textContent =
+    "Revenue trend by region" + scopeSuffix("chart-trend");
+}
+
+// --- chart-region-actual / chart-region-target: horizontal bars ------------
+function renderRegionBars(svgId, values, colorOf, clickable, highlightRegion) {
+  var svg = document.getElementById(svgId);
+  clear(svg);
+  var W = 532, H = 122, L = 96, R = 56, T = 6;
+  var plotW = W - L - R;
+  var rowH = (H - T) / REGIONS.length;
+  var top = niceMax(Math.max.apply(null, REGIONS.map(function (r) { return values[r] || 0; })));
+
+  REGIONS.forEach(function (region, i) {
+    var value = values[region] || 0;
+    var y = T + i * rowH;
+    var barH = Math.max(rowH - 12, 10);
+    var width = (value / top) * plotW;
+    svg.appendChild(el("text", {
+      x: L - 8, y: y + barH / 2 + 4, "text-anchor": "end", "class": "ax"
+    }, region));
+    var dimmed = highlightRegion && highlightRegion !== region;
+    var bar = el("rect", {
+      x: L, y: y, width: Math.max(width, 1), height: barH,
+      fill: colorOf(region), "class": (clickable ? "mark " : "") + (dimmed ? "dim" : "")
+    });
+    bar.appendChild(el("title", {}, region + ": " + money(value, 2)));
+    if (clickable) {
+      bar.addEventListener("click", function () {
+        state.xfRegion = state.xfRegion === region ? null : region;
+        render();
+      });
+    }
+    svg.appendChild(bar);
+    svg.appendChild(el("text", {
+      x: L + width + 6, y: y + barH / 2 + 4, "class": "ax"
+    }, money(value)));
+  });
+}
+
+// --- chart-category: vertical bars, profit by category ---------------------
+function renderCategory() {
+  var svg = document.getElementById("c-category");
+  var rows = rowsFor("chart-category");
+  clear(svg);
+  var W = 532, H = 228, L = 62, R = 12, T = 10, B = 30;
+  var plotW = W - L - R, plotH = H - T - B;
+
+  var totals = groupSum(rows, "product_category", "profit");
+  var ordered = CATEGORIES.slice().sort(function (a, b) {
+    return (totals[b] || 0) - (totals[a] || 0);
+  });
+  var top = niceMax(Math.max.apply(null, ordered.map(function (c) { return totals[c] || 0; })));
+
+  for (var t = 0; t <= 4; t++) {
+    var y = T + plotH - (plotH * t / 4);
+    svg.appendChild(el("line", { x1: L, y1: y, x2: W - R, y2: y, "class": "gl" }));
+    svg.appendChild(el("text", {
+      x: L - 8, y: y + 3, "text-anchor": "end", "class": "ax"
+    }, money(top * t / 4)));
+  }
+
+  var slot = plotW / ordered.length;
+  ordered.forEach(function (category, i) {
+    var value = totals[category] || 0;
+    var barW = Math.min(slot - 24, 90);
+    var x = L + slot * i + (slot - barW) / 2;
+    var height = (value / top) * plotH;
+    var faded = selectedCategory() && selectedCategory() !== category;
+    // Flat brand primary: product_category is on Columns, not Colour (see the spec).
+    var bar = el("rect", {
+      x: x, y: T + plotH - height, width: barW, height: Math.max(height, 1),
+      fill: "#1b4f72", "class": "mark " + (faded ? "dim" : "")
+    });
+    bar.appendChild(el("title", {}, category + ": " + money(value, 2)));
+    bar.addEventListener("click", function () {
+      state.xfCategory = state.xfCategory === category ? null : category;
+      render();
+    });
+    svg.appendChild(bar);
+    svg.appendChild(el("text", {
+      x: x + barW / 2, y: T + plotH - height - 5, "text-anchor": "middle", "class": "ax"
+    }, money(value)));
+    svg.appendChild(el("text", {
+      x: x + barW / 2, y: H - 10, "text-anchor": "middle", "class": "ax"
+    }, category));
+  });
+
+  document.getElementById("t-category").textContent =
+    "Profit by product category" + scopeSuffix("chart-category");
+}
+
+// --- table-customers -------------------------------------------------------
+var CUSTOMER_COLUMNS = [
+  { key: "customer_name", label: "Customer", numeric: false },
+  { key: "segment", label: "Segment", numeric: false },
+  { key: "industry", label: "Industry", numeric: false },
+  { key: "account_manager", label: "Account manager", numeric: false },
+  { key: "lifetime_value", label: "Lifetime value", numeric: true },
+  { key: "nps_score", label: "NPS", numeric: true }
+];
+
+function renderCustomers() {
+  var table = document.getElementById("c-customers");
+  clear(table);
+  var head = document.createElement("thead");
+  var headRow = document.createElement("tr");
+  CUSTOMER_COLUMNS.forEach(function (column) {
+    var th = document.createElement("th");
+    th.textContent = column.label;
+    if (column.numeric) { th.className = "num"; }
+    if (state.sortKey === column.key) {
+      th.setAttribute("aria-sort", state.sortDir === -1 ? "descending" : "ascending");
+    }
+    th.addEventListener("click", function () {
+      if (state.sortKey === column.key) { state.sortDir = -state.sortDir; }
+      else { state.sortKey = column.key; state.sortDir = column.numeric ? -1 : 1; }
+      renderCustomers();
+    });
+    headRow.appendChild(th);
+  });
+  head.appendChild(headRow);
+  table.appendChild(head);
+
+  var body = document.createElement("tbody");
+  CUSTOMERS.slice().sort(function (a, b) {
+    var left = a[state.sortKey], right = b[state.sortKey];
+    if (left < right) { return -state.sortDir; }
+    if (left > right) { return state.sortDir; }
+    return 0;
+  }).forEach(function (customer) {
+    var tr = document.createElement("tr");
+    CUSTOMER_COLUMNS.forEach(function (column) {
+      var td = document.createElement("td");
+      if (column.numeric) { td.className = "num"; }
+      td.textContent = column.key === "lifetime_value"
+        ? money(customer[column.key]) : customer[column.key];
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+  table.appendChild(body);
+}
+
+// --- Chrome ----------------------------------------------------------------
+function scopeSuffix(view) {
+  var parts = [];
+  var region = selectedRegion();
+  var category = selectedCategory();
+  if (region && view !== "chart-region-actual") { parts.push(region); }
+  if (category && view !== "chart-category") { parts.push(category); }
+  return parts.length ? " - " + parts.join(" / ") : "";
+}
+
+function fillSelect(id, values, label) {
+  var select = document.getElementById(id);
+  clear(select);
+  var all = document.createElement("option");
+  all.value = "All";
+  all.textContent = "All " + label;
+  select.appendChild(all);
+  values.forEach(function (value) {
+    var option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    select.appendChild(option);
+  });
+}
+
+function render() {
+  renderKpis();
+  renderTrend();
+  // Both region charts draw flat in the brand's primary colour: nothing is on Colour in
+  // IMPLEMENTATION-SPEC.md, so this is exactly what the built worksheet renders.
+  renderRegionBars(
+    "c-region-actual",
+    groupSum(rowsFor("chart-region-actual"), "region", "revenue"),
+    function () { return "#1b4f72"; },
+    true,
+    null
+  );
+  renderRegionBars(
+    "c-region-target",
+    groupSum(TARGETS, "region", "revenue_target"),
+    function () { return "#1b4f72"; },
+    false,
+    state.on["int-region-highlight"] ? state.xfRegion : null
+  );
+  renderCategory();
+  renderCustomers();
+}
+
+fillSelect("flt-month", MONTHS, "months");
+fillSelect("flt-region", REGIONS, "regions");
+fillSelect("flt-category", CATEGORIES, "categories");
+
+document.getElementById("flt-month").addEventListener("change", function (e) {
+  state.month = e.target.value; render();
+});
+document.getElementById("flt-region").addEventListener("change", function (e) {
+  state.region = e.target.value; render();
+});
+document.getElementById("flt-category").addEventListener("change", function (e) {
+  state.category = e.target.value; render();
+});
+Array.prototype.forEach.call(document.querySelectorAll(".chip"), function (chip) {
+  chip.addEventListener("click", function () {
+    var id = chip.getAttribute("data-plan-id");
+    state.on[id] = !state.on[id];
+    chip.setAttribute("aria-pressed", String(state.on[id]));
+    render();
+  });
+});
+document.getElementById("reset").addEventListener("click", function () {
+  state.xfRegion = null;
+  state.xfCategory = null;
+  render();
+});
+
+render();
+</script>
+</body>
+</html>

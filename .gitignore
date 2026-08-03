@@ -40,12 +40,9 @@ skill/tableau-dashboard-creator/scripts/__pycache__/
 !skill/tableau-dashboard-creator/skeleton/
 !skill/tableau-dashboard-creator/skeleton/**
 
-# Allow demo/ tree
+# Allow demo/ tree (a single v2 project root)
 !demo/
-!demo/input/
-!demo/input/**
-!demo/output/
-!demo/output/**
+!demo/**
 
 # --- v2 plugin (dev/v2-plugin) ---
 # Allow plugin manifest
@@ -67,3 +64,11 @@ skill/tableau-dashboard-creator/scripts/__pycache__/
 **/__pycache__/
 *.pyc
 *.pyo
+
+# Re-ignore secrets inside the allowed trees above. Git's last-match-wins means a
+# broad allowlist negation (!demo/**) out-ranks the .env rules at the top of this
+# file, so they have to be restated here. demo/ is a project root (CONTRACT.md 3.1),
+# which is exactly where a .env would land. .env.example is deliberately not matched.
+**/.env
+**/.env.local
+**/.env.*.local

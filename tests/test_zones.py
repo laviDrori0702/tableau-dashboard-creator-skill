@@ -31,7 +31,7 @@ CANVAS = {"width": 1366, "height": 768}
 #: The demo project's approved spec - a real 4-level tree with a mapped container in it.
 DEMO_SPEC = (
     Path(__file__).resolve().parent.parent
-    / "demo" / "output" / "mock-version" / "v_1" / "IMPLEMENTATION-SPEC.md"
+    / "demo" / "mock-version" / "v_1" / "IMPLEMENTATION-SPEC.md"
 )
 
 #: The root margin, in zone units, at CANVAS - what every child of the root is inset by.
