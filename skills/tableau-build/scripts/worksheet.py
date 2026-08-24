@@ -19,6 +19,7 @@ Everything is pure and stdlib-only: text in, XML elements out, no filesystem.
 
 from __future__ import annotations
 
+import logging
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field, fields
@@ -27,6 +28,8 @@ from typing import Callable, NamedTuple, Optional
 # A worksheet that reads a parameter has to declare it; :mod:`features` owns what a parameter
 # column looks like and imports nothing back, so no cycle.
 from features import PARAMETERS_DATASOURCE, Parameter, render_parameter_column
+
+logger = logging.getLogger(__name__)
 
 # --- CDATA -------------------------------------------------------------------
 # ponytail: ElementTree cannot emit CDATA, and Tableau *requires* it around field
@@ -76,6 +79,14 @@ DEFAULT_TITLE_SIZE = 12
 DEFAULT_TITLE_COLOR = "#000000"
 DEFAULT_KPI_SIZE = 22
 
+#: A trailing prose annotation on a token value: "Tableau (Medium / Light - native)".
+_FONT_ANNOTATION = re.compile(r"\s*\(.*\)\s*$", re.DOTALL)
+
+#: What a font family Windows can resolve looks like - letters, digits, and the punctuation
+#: real family names use. An em-dash, a slash or a comma-separated stack is prose, and a
+#: prose value reaches Desktop as an unresolvable ``fontname=`` (issue #66).
+_FONT_FAMILY = re.compile(r"[A-Za-z0-9][A-Za-z0-9 .'&+-]*")
+
 _HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
 _SIZE = re.compile(r"(\d+)\s*px", re.IGNORECASE)
 
@@ -116,6 +127,37 @@ class DesignTokens:
     kpi_size: int = DEFAULT_KPI_SIZE
     series_colors: tuple[str, ...] = ()
     present: bool = False
+
+
+def _font_family(value: str) -> str:
+    """Reduce a ``- **Font family**:`` token value to a name Desktop can actually resolve.
+
+    The value is authored prose, so it arrives annotated: ``Tableau (Medium / Light - native,
+    no webfont)``. Taken verbatim it becomes every run's ``fontname=``, which Windows cannot
+    resolve, so Desktop silently falls back on every title, label and tooltip and the brand
+    typography is lost with no warning (issue #66). A trailing parenthetical is dropped; if
+    what is left is not a plausible family name, Tableau's own default is used instead.
+    Either change is logged, because the analyst chose that font on purpose.
+
+    Args:
+        value: The bullet's value, already stripped of markdown emphasis.
+
+    Returns:
+        The font family to emit as every ``fontname=``.
+    """
+    family = _FONT_ANNOTATION.sub("", value).strip()
+    if not _FONT_FAMILY.fullmatch(family):
+        logger.warning(
+            f"[WARN] design token 'Font family' is {value!r}, which is not a font family "
+            f"Tableau can resolve; using {DEFAULT_FONT!r}. Write the family name only."
+        )
+        return DEFAULT_FONT
+    if family != value:
+        logger.warning(
+            f"[WARN] design token 'Font family' {value!r} carries a prose annotation; "
+            f"emitting fontname={family!r}."
+        )
+    return family
 
 
 def parse_design_tokens(tokens_text: str) -> DesignTokens:
@@ -159,7 +201,7 @@ def parse_design_tokens(tokens_text: str) -> DesignTokens:
             continue
 
         if label == "font family":
-            font = value.strip("`*")
+            font = _font_family(value.strip("`*"))
         elif label == "chart title":
             size = _SIZE.search(value)
             if size:

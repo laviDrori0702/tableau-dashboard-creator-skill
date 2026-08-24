@@ -106,6 +106,13 @@ SOURCE_NONE = "none"               # nothing -> run the brand interview (<=10 Qs
 # any trailing "#"s): "## Colors" -> "Colors".
 _HEADING_LINE = re.compile(r"^#{1,6}\s+(.*?)\s*#*\s*$")
 
+#: The ``- **Font family**:`` bullet ``tableau-build`` reads to style every text run.
+_FONT_FAMILY_BULLET = re.compile(r"^-\s*\**\s*font family\s*\**\s*:\s*(.+)$", re.IGNORECASE)
+
+#: What a font family Windows can resolve looks like - letters, digits, and the punctuation
+#: real family names use. A parenthetical, an em-dash or a slash means the value is prose.
+_FONT_FAMILY = re.compile(r"[A-Za-z0-9][A-Za-z0-9 .'&+-]*")
+
 
 def parse_statuses(text: str) -> dict[str, str]:
     """Parse the per-step statuses out of a STATE.md manifest.
@@ -189,6 +196,39 @@ def validate_design_tokens(text: str) -> tuple[bool, list[str], list[str]]:
         if section.lower() not in headings_blob
     ]
     return (not missing_required, missing_required, missing_recommended)
+
+
+def font_family_problem(text: str) -> Optional[str]:
+    """Report a ``Font family`` token value that is prose rather than a font name.
+
+    ``tableau-build`` puts this value straight into every text run's ``fontname=``, so an
+    annotated value like ``Tableau (Medium / Light - native, no webfont)`` names no font
+    Windows can resolve and Desktop silently falls back on every title, label and tooltip
+    (issue #66). Build sanitizes what it can; this catches it where it is authored, while
+    the analyst can still say which family they meant. An unfilled ``[font]`` placeholder
+    and a file with no such bullet are both fine - other checks own those.
+
+    Args:
+        text: The contents of a ``DESIGN-TOKENS.md`` file.
+
+    Returns:
+        A fix-it message, or None when every ``Font family`` bullet names a font.
+    """
+    for raw_line in text.splitlines():
+        match = _FONT_FAMILY_BULLET.match(raw_line.strip())
+        if not match:
+            continue
+        value = match.group(1).strip().strip("`*")
+        if not value or value.startswith("["):  # an unfilled template placeholder
+            continue
+        if not _FONT_FAMILY.fullmatch(value):
+            return (
+                f"'Font family' is {value!r}, which is not a font family Tableau can "
+                f"resolve - it becomes every text run's fontname= verbatim. Write the "
+                f"family name only (e.g. 'Tableau'); put weights and availability notes "
+                f"in prose."
+            )
+    return None
 
 
 def render_design_tokens_template() -> str:
@@ -572,15 +612,21 @@ def commit(project_dir: Path | str, status: str) -> CommitResult:
                 f"Author it first, or commit '--status skipped' to skip this step "
                 f"(only possible once 'branding/branding.md' exists).",
             )
-        ok, missing_required, missing_recommended = validate_design_tokens(
-            tokens_path.read_text(encoding="utf-8-sig")
-        )
+        tokens_text = tokens_path.read_text(encoding="utf-8-sig")
+        ok, missing_required, missing_recommended = validate_design_tokens(tokens_text)
         if not ok:
             return CommitResult(
                 False,
                 f"'{DESIGN_TOKENS_FILENAME}' is missing required section(s): "
                 f"{', '.join(missing_required)}. Add them and re-run commit.",
                 missing_required=missing_required,
+                missing_recommended=missing_recommended,
+            )
+        font_problem = font_family_problem(tokens_text)
+        if font_problem is not None:
+            return CommitResult(
+                False,
+                f"Cannot approve brand: {font_problem} Fix it and re-run commit.",
                 missing_recommended=missing_recommended,
             )
     elif status == "skipped" and not (project_root / BRANDING_SPEC).exists():

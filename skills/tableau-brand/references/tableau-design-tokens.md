@@ -15,7 +15,7 @@ read by the skill at authoring time only; it is never a handoff artifact.
 Use the native **Tableau** font family (it ships with Tableau Desktop, so the
 workbook renders identically without installing anything):
 
-- **Font family**: Tableau (Tableau Bold / Tableau Medium / Tableau Light)
+- **Font family**: Tableau
 - **Dashboard title**: 28px, Tableau Bold, `#1c2833`
 - **Chart title**: 15px, Tableau Medium, `#1c2833`
 - **Filter / section labels**: 12px, Tableau Medium, `#5d6d7e`
