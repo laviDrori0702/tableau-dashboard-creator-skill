@@ -130,9 +130,12 @@ invented zone is caught rather than silently built.
    that raised it: `[semantic]` (is the XML internally consistent?), `[schema]` (does it match
    the XSD?) and `[conformance]` (does the workbook agree with the manifest — every layout
    element became a zone, every zone names a real sheet, every declared worksheet is built,
-   placed, and has a window). Only the third can see something *missing*: what is absent is
-   absent consistently, so the first two happily pass a workbook that dropped a chart. To
-   re-run the gate over a `.twb` already on disk — the revalidate half of a fix — use:
+   placed, and has a window). **The gate refuses to run partially** — if `lxml` is missing the
+   `[schema]` validator cannot execute, so the gate fails rather than reporting green on two
+   of three (`pip install -r requirements.txt`). Only the third can see something *missing*:
+   what is absent is absent consistently, so the first two happily pass a workbook that
+   dropped a chart. To re-run the gate over a `.twb` already on disk — the revalidate half of
+   a fix — use:
 
    ```bash
    python "${CLAUDE_SKILL_DIR}/scripts/build.py" gate "<project-dir>"
