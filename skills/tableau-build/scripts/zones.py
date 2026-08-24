@@ -282,27 +282,36 @@ class _ZoneWriter:
         return max(1, round(units / ZONE_SPACE * self._height))
 
     @staticmethod
-    def _flex_child(children: list) -> int:
+    def _flex_child(children: list, sizes: list[float]) -> int:
         """Return the index of the child left unpinned, to absorb the container's slack.
 
-        Desktop pins every hand-proportioned child but one; the unpinned child takes the
-        rounding remainder and, when a sibling is hidden by a show/hide field, the space
-        that sibling gave up. A visibility-controlled child is therefore the worst
-        candidate - hiding the only flex child would leave the container's slack blank -
-        so the last *uncontrolled* child flexes, and the last child only if all of them
-        are controlled.
+        A hand-built container pins every child but one, and the one it leaves free is the
+        *largest* - never simply the last. In the reference workbook's main column the flex
+        child sits in the middle (the 51% trend section, between a pinned 150px KPI row and
+        a pinned 209px bottom section); in its trend section the trailing 22px legend is
+        pinned and the chart row flexes. The unpinned child is what absorbs the rounding
+        remainder, the room a hidden sibling gives up, and every pixel the dashboard gains
+        over its minimum size - which is right for the main content region and wrong for a
+        legend strip or a spacer, which would swallow the growth and leave the charts at
+        their authored size.
+
+        A visibility-controlled child is excluded outright: hiding the only flex child
+        would leave the container's slack blank.
 
         Args:
             children: The container's child nodes.
+            sizes: Each child's proportion, positionally.
 
         Returns:
             The index into ``children`` of the child to leave unpinned.
         """
-        for index in reversed(range(len(children))):
+        def is_controlled(index: int) -> bool:
             child = children[index]
-            if not (isinstance(child, dict) and str(child.get("visibility") or "").strip()):
-                return index
-        return len(children) - 1
+            return isinstance(child, dict) and bool(str(child.get("visibility") or "").strip())
+
+        indices = range(len(children))
+        free = [index for index in indices if not is_controlled(index)] or list(indices)
+        return max(free, key=lambda index: sizes[index])
 
     def _zone(self, parent: ET.Element, box: Box, friendly_name: str, **attributes) -> ET.Element:
         """Append one zone with its geometry, id and friendly name.
@@ -386,7 +395,7 @@ class _ZoneWriter:
             layout_strategy_id=DISTRIBUTE_EVENLY if is_evenly_split else None,
         )
         self._record_visibility(container, visibility)
-        flex = self._flex_child(children)
+        flex = self._flex_child(children, sizes)
         for index, (child, child_box) in enumerate(
             zip(children, self._divide(box, orientation, sizes)), start=1
         ):

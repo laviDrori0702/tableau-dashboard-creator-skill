@@ -397,6 +397,20 @@ def test_a_vertical_split_pins_children_by_height():
     assert top.get("fixed-size") == str(round(int(top.get("h")) / zones.ZONE_SPACE * 768))
 
 
+def test_the_biggest_child_flexes_even_when_it_is_not_last():
+    """A hand-built container pins every child but the biggest one - the reference workbook's
+    trend section pins its 40px title row *and* its trailing 22px legend, leaving the chart
+    row between them free. Flexing the trailing strip instead would hand it every pixel the
+    dashboard gains over its minimum size, and the charts would never grow (issue #63)."""
+    container, _, _ = _render({"type": "vert", "children": [
+        {"id": "title", "size": 8}, {"id": "charts", "size": 89}, {"id": "legend", "size": 3},
+    ]})
+    title, charts, legend = container.find("zone/zone").findall("zone")
+
+    assert charts.get("is-fixed") is None
+    assert [title.get("is-fixed"), legend.get("is-fixed")] == ["true", "true"]
+
+
 def test_a_show_hide_child_is_pinned_and_its_sibling_flexes():
     """A show/hide panel is exactly what must not be the flex child: hiding it would leave
     the container's slack blank. The uncontrolled sibling takes the reflow (issue #63)."""
