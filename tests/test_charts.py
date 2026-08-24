@@ -773,7 +773,11 @@ def test_a_manual_sort_writes_the_member_order():
         sort={"field": "region", "direction": "ASC", "order": ["West", "East"]},
     )])
     element = _worksheet_element("Manual", ET.fromstring(_render(document)))
-    buckets = element.findall("table/view/sort/dictionary/bucket")
+    assert element.find("table/view/sort") is None
+    manual = element.find("table/view/manual-sort")
+    assert manual.get("column").endswith("[none:region:nk]")
+    assert manual.get("direction") == "ASC"
+    buckets = manual.findall("dictionary/bucket")
     assert [bucket.text for bucket in buckets] == ['"West"', '"East"']
 
 
