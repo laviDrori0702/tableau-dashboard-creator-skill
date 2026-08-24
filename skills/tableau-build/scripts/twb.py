@@ -151,7 +151,7 @@ class Column:
     @property
     def caption(self) -> str:
         """str: The UI caption Tableau shows (``order_date`` -> ``Order Date``)."""
-        return self.name.replace("_", " ").title()
+        return worksheet.caption_for(self.name)
 
 
 # --- Deterministic ids ---------------------------------------------------------

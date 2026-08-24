@@ -373,8 +373,14 @@ BIN_DECIMALS = "2"
 
 
 def caption_for(field_name: str) -> str:
-    """Return the UI caption for a field name (``order_date`` -> ``Order Date``)."""
-    return field_name.replace("_", " ").title()
+    """Return the UI caption for a field name (``order_date`` -> ``Order Date``).
+
+    Title-casing is for raw snake_case columns only. A name the author already cased -
+    ``ACV - Current``, ``YoY Direction``, ``In KPI Window`` - is passed through verbatim:
+    ``.title()`` would lower-case the rest of every acronym (issue #69).
+    """
+    spaced_name = field_name.replace("_", " ")
+    return spaced_name.title() if spaced_name == spaced_name.lower() else spaced_name
 
 
 class CalculatedField(NamedTuple):
@@ -444,10 +450,10 @@ class FieldRef:
     def caption(self) -> str:
         """str: The caption Tableau shows for the column.
 
-        A bin's name is already the caption (``Revenue (bin)``); title-casing it would
-        turn the ``(bin)`` marker into ``(Bin)`` and stop matching the column name.
+        A bin's name is already a caption (``Revenue (bin)``) and ``caption_for`` passes
+        cased names through, so the marker stays ``(bin)`` and keeps matching the column.
         """
-        return self.field_name if self.bin_size is not None else caption_for(self.field_name)
+        return caption_for(self.field_name)
 
 
 class FieldResolver:
