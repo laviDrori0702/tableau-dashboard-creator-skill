@@ -41,7 +41,7 @@ Interaction ids (`int-*`) are actions, not zones, and never appear in the tree.
 
 | `chart_type` | what it emits |
 |--------------|---------------|
-| `bar` | Discrete dimension × aggregated measure. Add a `color` encoding for a **stacked** bar. |
+| `bar` | A dimension × aggregated measure - discrete, or a continuous date with a `date_part` (the mark is an explicit `Bar` either way). Add a `color` encoding for a **stacked** bar. |
 | `line` | Same shape, but the dimension is a **continuous date** — give it a `date_part`. |
 | `area` | Line with an explicit `Area` mark. |
 | `pie` | Rows/Cols stay empty; everything is encodings (`color`, `wedge-size`, `size`, `text`). |

@@ -643,17 +643,24 @@ class ChartSpec:
 #: that are really modifiers - sorted, filtered, styled, custom tooltip - are the optional
 #: ``sort`` / ``filters`` / design tokens / ``tooltip`` manifest keys, applicable to any row
 #: here; a stacked bar is ``bar`` with a ``color`` encoding.
+#:
+#: Issue #64: every single-pane type names its mark explicitly. ``Automatic`` picks by
+#: shelf shape - a *discrete* dimension x measure draws bars, but a *continuous* date x
+#: measure draws points - so a ``bar`` over the ``date_part`` month spine that
+#: BUILD-MANIFEST-TEMPLATE.md steers date axes to rendered as scattered dots.
+#: ``chart_type`` is the analyst's stated intent; nothing is left to Tableau's inference.
 CHART_SPECS: dict[str, ChartSpec] = {
-    "bar": ChartSpec(),
-    "line": ChartSpec(),
+    "bar": ChartSpec(mark_class="Bar"),
+    "line": ChartSpec(mark_class="Line"),
     "area": ChartSpec(mark_class="Area"),
     "pie": ChartSpec(mark_class="Pie", label_marks=True, empty_shelves=True),
-    "scatter": ChartSpec(),
+    "scatter": ChartSpec(mark_class="Circle"),
     "map": ChartSpec(geographic=True),
-    "text": ChartSpec(label_marks=True, kpi_card=True, empty_shelves=True),
-    "table": ChartSpec(label_marks=True),
+    "text": ChartSpec(mark_class="Text", label_marks=True, kpi_card=True,
+                      empty_shelves=True),
+    "table": ChartSpec(mark_class="Text", label_marks=True),
     "heatmap": ChartSpec(mark_class="Square"),
-    "histogram": ChartSpec(),
+    "histogram": ChartSpec(mark_class="Bar"),
     "treemap": ChartSpec(mark_class="Square", label_marks=True),
     "bullet": ChartSpec(mark_class="Bar"),
     "gantt": ChartSpec(mark_class="Gantt"),
