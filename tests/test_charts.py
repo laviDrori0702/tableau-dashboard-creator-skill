@@ -956,16 +956,41 @@ def test_an_unfilled_token_template_is_ignored():
 def test_a_prose_annotated_font_family_is_sanitized(caplog):
     """Issue #66: tableau-brand wrote 'Tableau (Medium / Light - native, no webfont)' into the
     token value. Taken verbatim it is not a font Windows can resolve, so Desktop silently
-    falls back on every run - the trailing parenthetical is an annotation, not a family
-    name."""
+    falls back on every run. Stripping the annotation leaves a bare 'Tableau', which is not a
+    family either, so the named default weight is what gets emitted."""
     with caplog.at_level("WARNING"):
         tokens = worksheet.parse_design_tokens(
             "## Typography\n\n"
             "- **Font family**: Tableau (Medium / Light — native, no webfont)\n"
         )
 
-    assert tokens.font_family == "Tableau"
+    assert tokens.font_family == worksheet.DEFAULT_FONT
     assert "[WARN]" in caplog.text
+
+
+def test_a_bare_tableau_is_not_a_family(caplog):
+    """Tableau ships six *families* - Bold, Book, Light, Medium, Regular, Semibold - and no
+    font called plain 'Tableau'. The weight is part of the name, so a bare 'Tableau' resolves
+    to nothing (verified against Desktop output in
+    tests/temp-workbooks-for-tests/zones-and-containers.twb, which carries
+    fontname='Tableau Medium')."""
+    with caplog.at_level("WARNING"):
+        tokens = worksheet.parse_design_tokens("## Typography\n\n- **Font family**: Tableau\n")
+
+    assert tokens.font_family == worksheet.DEFAULT_FONT
+    assert "[WARN]" in caplog.text
+
+
+def test_a_real_tableau_family_passes(caplog):
+    """The weight-bearing families are exactly what Desktop writes - never rewrite one."""
+    for family in worksheet.TABLEAU_FONTS:
+        with caplog.at_level("WARNING"):
+            tokens = worksheet.parse_design_tokens(
+                f"## Typography\n\n- **Font family**: {family}\n"
+            )
+
+        assert tokens.font_family == family
+        assert caplog.text == ""
 
 
 def test_an_unresolvable_font_family_falls_back(caplog):

@@ -113,6 +113,16 @@ _FONT_FAMILY_BULLET = re.compile(r"^-\s*\**\s*font family\s*\**\s*:\s*(.+)$", re
 #: real family names use. A parenthetical, an em-dash or a slash means the value is prose.
 _FONT_FAMILY = re.compile(r"[A-Za-z0-9][A-Za-z0-9 .'&+-]*")
 
+#: The Tableau families that actually ship with Desktop (mirror of
+#: ``tableau-build``'s ``worksheet.TABLEAU_FONTS``; the two skills are self-contained,
+#: CONTRACT.md §7). There is no font called plain "Tableau" - the weight is part of the
+#: family name - so a value like "Tableau" or "Tableau Sans" resolves to nothing and
+#: Desktop falls back silently on every run.
+TABLEAU_FONTS: tuple[str, ...] = (
+    "Tableau Bold", "Tableau Book", "Tableau Light",
+    "Tableau Medium", "Tableau Regular", "Tableau Semibold",
+)
+
 
 def parse_statuses(text: str) -> dict[str, str]:
     """Parse the per-step statuses out of a STATE.md manifest.
@@ -201,12 +211,15 @@ def validate_design_tokens(text: str) -> tuple[bool, list[str], list[str]]:
 def font_family_problem(text: str) -> Optional[str]:
     """Report a ``Font family`` token value that is prose rather than a font name.
 
-    ``tableau-build`` puts this value straight into every text run's ``fontname=``, so an
-    annotated value like ``Tableau (Medium / Light - native, no webfont)`` names no font
-    Windows can resolve and Desktop silently falls back on every title, label and tooltip
-    (issue #66). Build sanitizes what it can; this catches it where it is authored, while
-    the analyst can still say which family they meant. An unfilled ``[font]`` placeholder
-    and a file with no such bullet are both fine - other checks own those.
+    ``tableau-build`` puts this value straight into every text run's ``fontname=`` and into
+    the worksheet's ``font-family`` format, so an annotated value like ``Tableau (Medium /
+    Light - native, no webfont)`` names no font Windows can resolve and Desktop silently
+    falls back on every title, label and tooltip (issue #66). A bare ``Tableau`` fails the
+    same way: the weight is part of the family name, so only the six
+    :data:`TABLEAU_FONTS` exist. Build sanitizes what it can; this catches it where it is
+    authored, while the analyst can still say which family they meant. An unfilled
+    ``[font]`` placeholder and a file with no such bullet are both fine - other checks own
+    those.
 
     Args:
         text: The contents of a ``DESIGN-TOKENS.md`` file.
@@ -221,12 +234,13 @@ def font_family_problem(text: str) -> Optional[str]:
         value = match.group(1).strip().strip("`*")
         if not value or value.startswith("["):  # an unfilled template placeholder
             continue
-        if not _FONT_FAMILY.fullmatch(value):
+        tableau_font = value.lower().startswith("tableau")
+        if not _FONT_FAMILY.fullmatch(value) or (tableau_font and value not in TABLEAU_FONTS):
             return (
-                f"'Font family' is {value!r}, which is not a font family Tableau can "
-                f"resolve - it becomes every text run's fontname= verbatim. Write the "
-                f"family name only (e.g. 'Tableau'); put weights and availability notes "
-                f"in prose."
+                f"'Font family' is {value!r}, which is not a font family Desktop can "
+                f"resolve - it becomes every text run's fontname= verbatim. Name one "
+                f"family, weight included ({' | '.join(TABLEAU_FONTS)}), and put "
+                f"availability notes in prose."
             )
     return None
 

@@ -233,9 +233,20 @@ def test_font_family_prose_value_is_named():
     assert "Font family" in problem
 
 
+def test_a_bare_tableau_is_named():
+    """Tableau ships no font called plain 'Tableau' - the weight is part of the family name
+    (Bold / Book / Light / Medium / Regular / Semibold), so a bare 'Tableau' resolves to
+    nothing in Desktop and the message has to say which names are real."""
+    problem = brand.font_family_problem("- **Font family**: Tableau\n")
+
+    assert problem is not None
+    assert "Tableau Medium" in problem
+
+
 def test_a_plain_font_family_has_no_problem():
-    """The normal case, the unfilled template placeholder, and a file with no typography
-    bullet at all must all pass."""
+    """A real Tableau family, a non-Tableau family, the unfilled template placeholder, and a
+    file with no typography bullet at all must all pass."""
+    assert brand.font_family_problem("- **Font family**: Tableau Medium\n") is None
     assert brand.font_family_problem("- **Font family**: Segoe UI\n") is None
     assert brand.font_family_problem("- **Font family**: [font]\n") is None
     assert brand.font_family_problem("no typography section here") is None

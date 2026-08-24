@@ -110,7 +110,7 @@ two points below; do not hand-edit `STATE.md` yourself.
 | section | required? | what goes there |
 |---------|-----------|-----------------|
 | `## Colors` | **required** | Backgrounds, accent bars, a cohesive ≤5-color series palette, text colors. |
-| `## Typography` | **required** | Font family + sizes/weights for title, chart title, labels, tooltips. `Font family` is a **machine value** - `tableau-build` copies it into every text run's `fontname=`, so write the family name alone (`Tableau`, not `Tableau (Medium / Light - native)`) and keep weights/availability notes in prose. |
+| `## Typography` | **required** | Font family + sizes/weights for title, chart title, labels, tooltips. `Font family` is a **machine value** - `tableau-build` copies it into every text run's `fontname=`, so it must be one installed family, weight included: `Tableau Bold` \| `Tableau Book` \| `Tableau Light` \| `Tableau Medium` \| `Tableau Regular` \| `Tableau Semibold`. There is no font called plain `Tableau`; keep availability notes in prose, not in the value. |
 | `## Spacing` | **required** | Card padding, section spacing, container margins, accent-bar height. |
 | `## Fallback Decisions` | **required** | Every value pulled from a Tableau default, flagged as guessed (or "None"). |
 | `## Source` | optional | Which branding source produced these tokens. |

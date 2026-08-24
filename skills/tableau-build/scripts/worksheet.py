@@ -75,6 +75,16 @@ def cdata(text: str) -> str:
 #: Tableau's own defaults, used for any token DESIGN-TOKENS.md does not carry (and for every
 #: token when the file is absent) - "neutral" means Tableau's look, not an invented one.
 DEFAULT_FONT = "Tableau Book"
+
+#: The Tableau families that actually ship with Desktop. There is no font called plain
+#: "Tableau": the weight is part of the family name, so "Tableau" alone resolves to nothing
+#: and Desktop falls back silently. Real Desktop output writes one of these verbatim - see
+#: ``tests/temp-workbooks-for-tests/zones-and-containers.twb``, whose every run carries
+#: ``fontname='Tableau Medium'``.
+TABLEAU_FONTS: tuple[str, ...] = (
+    "Tableau Bold", "Tableau Book", "Tableau Light",
+    "Tableau Medium", "Tableau Regular", "Tableau Semibold",
+)
 DEFAULT_TITLE_SIZE = 12
 DEFAULT_TITLE_COLOR = "#000000"
 DEFAULT_KPI_SIZE = 22
@@ -135,9 +145,11 @@ def _font_family(value: str) -> str:
     The value is authored prose, so it arrives annotated: ``Tableau (Medium / Light - native,
     no webfont)``. Taken verbatim it becomes every run's ``fontname=``, which Windows cannot
     resolve, so Desktop silently falls back on every title, label and tooltip and the brand
-    typography is lost with no warning (issue #66). A trailing parenthetical is dropped; if
-    what is left is not a plausible family name, Tableau's own default is used instead.
-    Either change is logged, because the analyst chose that font on purpose.
+    typography is lost with no warning (issue #66). A trailing parenthetical is dropped; what
+    is left has to be a font family - and for Tableau's own type that means one of
+    :data:`TABLEAU_FONTS`, weight included, because no font is named plain "Tableau". Anything
+    else falls back to :data:`DEFAULT_FONT`. Either change is logged, because the analyst
+    chose that font on purpose.
 
     Args:
         value: The bullet's value, already stripped of markdown emphasis.
@@ -146,10 +158,12 @@ def _font_family(value: str) -> str:
         The font family to emit as every ``fontname=``.
     """
     family = _FONT_ANNOTATION.sub("", value).strip()
-    if not _FONT_FAMILY.fullmatch(family):
+    tableau_font = family.lower().startswith("tableau")
+    if not _FONT_FAMILY.fullmatch(family) or (tableau_font and family not in TABLEAU_FONTS):
         logger.warning(
             f"[WARN] design token 'Font family' is {value!r}, which is not a font family "
-            f"Tableau can resolve; using {DEFAULT_FONT!r}. Write the family name only."
+            f"Desktop can resolve; using {DEFAULT_FONT!r}. Name one family, weight "
+            f"included: {' | '.join(TABLEAU_FONTS)}."
         )
         return DEFAULT_FONT
     if family != value:
