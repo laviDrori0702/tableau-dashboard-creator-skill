@@ -1367,8 +1367,10 @@ def _render_sort(parent: ET.Element, plan: WorksheetPlan) -> None:
     column = plan.reference_of(plan.sort.reference)
 
     if plan.sort.order:
+        # 'manual-sort', not 'sort': the schema's sort group is computed-sort / manual-sort /
+        # natural-sort / alphabetic-sort, and a bare <sort> is rejected outright.
         manual = ET.SubElement(
-            parent, "sort", {"column": column, "direction": plan.sort.direction}
+            parent, "manual-sort", {"column": column, "direction": plan.sort.direction}
         )
         dictionary = ET.SubElement(manual, "dictionary")
         for member in plan.sort.order:
