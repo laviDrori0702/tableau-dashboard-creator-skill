@@ -19,6 +19,7 @@ Everything is pure and stdlib-only: text in, XML elements out, no filesystem.
 
 from __future__ import annotations
 
+import logging
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field, fields
@@ -27,6 +28,8 @@ from typing import Callable, NamedTuple, Optional
 # A worksheet that reads a parameter has to declare it; :mod:`features` owns what a parameter
 # column looks like and imports nothing back, so no cycle.
 from features import PARAMETERS_DATASOURCE, Parameter, render_parameter_column
+
+logger = logging.getLogger(__name__)
 
 # --- CDATA -------------------------------------------------------------------
 # ponytail: ElementTree cannot emit CDATA, and Tableau *requires* it around field
@@ -72,9 +75,28 @@ def cdata(text: str) -> str:
 #: Tableau's own defaults, used for any token DESIGN-TOKENS.md does not carry (and for every
 #: token when the file is absent) - "neutral" means Tableau's look, not an invented one.
 DEFAULT_FONT = "Tableau Book"
+
+#: The Tableau families that actually ship with Desktop. There is no font called plain
+#: "Tableau": the weight is part of the family name, so "Tableau" alone resolves to nothing
+#: and Desktop falls back silently. Real Desktop output writes one of these verbatim - see
+#: ``skill/tableau-dashboard-creator/examples/top-level-workbook-example.twb``, whose runs
+#: carry ``fontname='Tableau Medium'`` and ``fontname='Tableau Light'`` and never a bare
+#: ``Tableau``.
+TABLEAU_FONTS: tuple[str, ...] = (
+    "Tableau Bold", "Tableau Book", "Tableau Light",
+    "Tableau Medium", "Tableau Regular", "Tableau Semibold",
+)
 DEFAULT_TITLE_SIZE = 12
 DEFAULT_TITLE_COLOR = "#000000"
 DEFAULT_KPI_SIZE = 22
+
+#: A trailing prose annotation on a token value: "Tableau (Medium / Light - native)".
+_FONT_ANNOTATION = re.compile(r"\s*\(.*\)\s*$", re.DOTALL)
+
+#: What a font family Windows can resolve looks like - letters, digits, and the punctuation
+#: real family names use. An em-dash, a slash or a comma-separated stack is prose, and a
+#: prose value reaches Desktop as an unresolvable ``fontname=`` (issue #66).
+_FONT_FAMILY = re.compile(r"[A-Za-z0-9][A-Za-z0-9 .'&+-]*")
 
 _HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
 _SIZE = re.compile(r"(\d+)\s*px", re.IGNORECASE)
@@ -118,6 +140,41 @@ class DesignTokens:
     present: bool = False
 
 
+def _font_family(value: str) -> str:
+    """Reduce a ``- **Font family**:`` token value to a name Desktop can actually resolve.
+
+    The value is authored prose, so it arrives annotated: ``Tableau (Medium / Light - native,
+    no webfont)``. Taken verbatim it becomes every run's ``fontname=``, which Windows cannot
+    resolve, so Desktop silently falls back on every title, label and tooltip and the brand
+    typography is lost with no warning (issue #66). A trailing parenthetical is dropped; what
+    is left has to be a font family - and for Tableau's own type that means one of
+    :data:`TABLEAU_FONTS`, weight included, because no font is named plain "Tableau". Anything
+    else falls back to :data:`DEFAULT_FONT`. Either change is logged, because the analyst
+    chose that font on purpose.
+
+    Args:
+        value: The bullet's value, already stripped of markdown emphasis.
+
+    Returns:
+        The font family to emit as every ``fontname=``.
+    """
+    family = _FONT_ANNOTATION.sub("", value).strip()
+    tableau_font = family.lower().startswith("tableau")
+    if not _FONT_FAMILY.fullmatch(family) or (tableau_font and family not in TABLEAU_FONTS):
+        logger.warning(
+            f"[WARN] design token 'Font family' is {value!r}, which is not a font family "
+            f"Desktop can resolve; using {DEFAULT_FONT!r}. Name one family, weight "
+            f"included: {' | '.join(TABLEAU_FONTS)}."
+        )
+        return DEFAULT_FONT
+    if family != value:
+        logger.warning(
+            f"[WARN] design token 'Font family' {value!r} carries a prose annotation; "
+            f"emitting fontname={family!r}."
+        )
+    return family
+
+
 def parse_design_tokens(tokens_text: str) -> DesignTokens:
     """Read the typography and palette tokens out of a DESIGN-TOKENS.md.
 
@@ -159,7 +216,7 @@ def parse_design_tokens(tokens_text: str) -> DesignTokens:
             continue
 
         if label == "font family":
-            font = value.strip("`*")
+            font = _font_family(value.strip("`*"))
         elif label == "chart title":
             size = _SIZE.search(value)
             if size:

@@ -14,7 +14,7 @@
 
 ## Typography
 
-- **Font family**: [font]
+- **Font family**: [one installed family, weight included - e.g. Tableau Book]
 - **Dashboard title**: [size]px, [weight], [hex]
 - **Chart title**: [size]px, [weight], [hex]   *(a Text object, not the worksheet's built-in header — see Constraints)*
 - **Filter / section labels**: [size]px, [weight], [hex]

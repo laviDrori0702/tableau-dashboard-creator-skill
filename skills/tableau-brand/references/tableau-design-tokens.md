@@ -12,10 +12,19 @@ read by the skill at authoring time only; it is never a handoff artifact.
 
 ## Typography
 
-Use the native **Tableau** font family (it ships with Tableau Desktop, so the
-workbook renders identically without installing anything):
+Use the native **Tableau** fonts (they ship with Tableau Desktop, so the workbook
+renders identically without installing anything). The weight is part of the family
+name - there is no font called plain "Tableau" - and the six installed families are:
 
-- **Font family**: Tableau (Tableau Bold / Tableau Medium / Tableau Light)
+`Tableau Bold` | `Tableau Book` | `Tableau Light` | `Tableau Medium` |
+`Tableau Regular` | `Tableau Semibold`
+
+Every font value below (and in the token file) must be one of those names verbatim:
+`tableau-build` copies `Font family` into every text run's `fontname=` and into the
+worksheet's `font-family` format, so a name Desktop cannot resolve loses the whole
+brand typography silently.
+
+- **Font family**: Tableau Book
 - **Dashboard title**: 28px, Tableau Bold, `#1c2833`
 - **Chart title**: 15px, Tableau Medium, `#1c2833`
 - **Filter / section labels**: 12px, Tableau Medium, `#5d6d7e`

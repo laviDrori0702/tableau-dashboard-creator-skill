@@ -222,6 +222,42 @@ def test_validate_tokens_allows_custom_sections_when_refining():
     assert ok is True and missing_required == []
 
 
+def test_font_family_prose_value_is_named():
+    """Issue #66: an annotated font value reaches ``tableau-build`` as a machine identifier
+    and Desktop cannot resolve it. Catch it where it is written, with a fix-it."""
+    problem = brand.font_family_problem(
+        "## Typography\n\n- **Font family**: Tableau (Medium / Light — native)\n"
+    )
+
+    assert problem is not None
+    assert "Font family" in problem
+
+
+def test_a_bare_tableau_is_named():
+    """Tableau ships no font called plain 'Tableau' - the weight is part of the family name
+    (Bold / Book / Light / Medium / Regular / Semibold), so a bare 'Tableau' resolves to
+    nothing in Desktop and the message has to say which names are real."""
+    problem = brand.font_family_problem("- **Font family**: Tableau\n")
+
+    assert problem is not None
+    assert "Tableau Medium" in problem
+
+
+def test_a_plain_font_family_has_no_problem():
+    """A real Tableau family, a non-Tableau family, the unfilled template placeholder, and a
+    file with no typography bullet at all must all pass."""
+    assert brand.font_family_problem("- **Font family**: Tableau Medium\n") is None
+    assert brand.font_family_problem("- **Font family**: Segoe UI\n") is None
+    assert brand.font_family_problem("- **Font family**: [font]\n") is None
+    assert brand.font_family_problem("no typography section here") is None
+
+
+def test_shipped_reference_font_family_is_machine_usable():
+    """The bundled fallback reference is what the model copies from - issue #66's bad value
+    came straight out of it."""
+    assert brand.font_family_problem(brand.render_fallback_reference()) is None
+
+
 def test_shipped_template_is_schema_complete():
     """The bundled DESIGN-TOKENS-TEMPLATE.md contains the required core."""
     ok, missing_required, _ = brand.validate_design_tokens(brand.render_design_tokens_template())
