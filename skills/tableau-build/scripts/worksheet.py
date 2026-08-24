@@ -638,6 +638,15 @@ class FieldResolver:
         )
         datatype = declared_type or self.field_types.get(field_name, "string")
         role, column_type = self.type_facts.get(datatype, ("dimension", "nominal"))
+        if self.is_aggregate(field_name):
+            # Issue #71: a calculation that aggregates is a measure whatever it returns.
+            # Attested against Desktop output in
+            # skill/tableau-dashboard-creator/examples/top-level-workbook-example.twb: every
+            # string 'Color * Delta' calc over a plain SUM is role='measure' type='nominal',
+            # while the two over {FIXED} LODs - row-level, so not aggregates by
+            # is_aggregate_formula either - stay role='dimension'. Only the role flips; the
+            # 'type' still follows the datatype, so a string measure is nominal.
+            role = "measure"
 
         if bin_size is not None:
             # A bin is a *new* dimension column computed from the measure, not a derivation

@@ -604,14 +604,14 @@ def test_a_literal_brace_does_not_hide_an_aggregate_reference():
     assert worksheet.aggregate_calculated_fields(declared) == frozenset({"Ratio", "Badge"})
 
 
-@pytest.mark.parametrize("field,instance", [
-    ("Ratio", "[usr:Ratio:qk]"),
-    ("Ratio Label", "[usr:Ratio Label:nk]"),
-    ("Ratio Dir", "[usr:Ratio Dir:nk]"),
-    ("Ratio Scaled", "[usr:Ratio Scaled:qk]"),
-    ("Ratio Badge", "[usr:Ratio Badge:nk]"),
+@pytest.mark.parametrize("field,instance,column_type", [
+    ("Ratio", "[usr:Ratio:qk]", "quantitative"),
+    ("Ratio Label", "[usr:Ratio Label:nk]", "nominal"),
+    ("Ratio Dir", "[usr:Ratio Dir:nk]", "nominal"),
+    ("Ratio Scaled", "[usr:Ratio Scaled:qk]", "quantitative"),
+    ("Ratio Badge", "[usr:Ratio Badge:nk]", "nominal"),
 ])
-def test_an_aggregate_calc_reaches_the_shelf_as_a_user_derivation(field, instance):
+def test_an_aggregate_calc_reaches_the_shelf_as_a_user_derivation(field, instance, column_type):
     """Issue #62: a calc that aggregates - directly or by referencing one that does - has no
     row-level value, so any instance but ``usr:`` is a pill Desktop refuses with "can't be
     applied to a user-defined aggregate".
@@ -630,6 +630,19 @@ def test_an_aggregate_calc_reaches_the_shelf_as_a_user_derivation(field, instanc
     assert column_instance is not None, f"no column-instance emitted for [{field}]"
     assert column_instance.get("derivation") == "User"
     assert column_instance.get("name") == instance
+
+    # Issue #71: the *column* the 'usr:' instance derives from has to agree with it. A
+    # role='dimension' column under a derivation='User' instance says "group by this" over a
+    # field with no row-level value - the shape behind "cannot mix aggregate and
+    # non-aggregate arguments". Desktop writes role='measure' for a string aggregate calc
+    # (see the 'Color * Delta' calcs in the tracked reference workbook) and leaves 'type'
+    # following the datatype, so the string ones stay nominal.
+    column = element.find(
+        f"table/view/datasource-dependencies/column[@name='[{field}]']"
+    )
+    assert column is not None, f"no column emitted for [{field}]"
+    assert column.get("role") == "measure"
+    assert column.get("type") == column_type
 
 
 @pytest.mark.parametrize(
