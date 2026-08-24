@@ -37,7 +37,7 @@ from typing import NamedTuple
 import features
 import worksheet
 import zones
-from manifest import documented_field_types
+from manifest import VISIBILITY_TYPE, documented_field_types
 
 logger = logging.getLogger(__name__)
 
@@ -583,9 +583,13 @@ def _plan_actions(
                 )
                 if parameter is None or reference is None:
                     continue
-                # The action reads a field off the clicked mark, so the sheet has to declare
-                # it even when it is not on a shelf.
-                source.plan.declared.append(reference)
+                # The action reads the field off the clicked mark, so it has to be *on* the
+                # source sheet's Detail shelf - declaring it in the sheet's dependencies is
+                # not enough. Without it Desktop opens the workbook and the action silently
+                # never fires (verified in Desktop 2025.1.10).
+                if not any(existing.instance_name == reference.instance_name
+                           for existing in source.plan.detail):
+                    source.plan.detail.append(reference)
                 interactions.parameter_actions.append(features.ParameterAction(
                     name=name, caption=caption, source=source.plan.name,
                     source_field=source.plan.reference_of(reference),
@@ -1072,15 +1076,21 @@ def _plan_zone_visibility(
 ) -> list[features.ZoneVisibility]:
     """Qualify each ``visibility`` field against the datasource that declares it.
 
+    A boolean **parameter** is qualified against ``[Parameters]`` instead, which is what
+    Desktop writes when the zone is driven by a parameter action directly (attested in
+    ``SalesMRR.twbx`` and three others - see
+    ``references/snippets/dashboard/CLEAR-OPTION-ATTESTATION.md``). It needs no sheet: a
+    parameter is view-independent, so there is nothing to put on a Detail shelf.
+
     Args:
         manifest_document: The parsed build manifest.
-        controlled: ``{zone id: calculated field name}`` from the layout walk.
+        controlled: ``{zone id: calculated field or parameter name}`` from the layout walk.
 
     Returns:
-        One :class:`features.ZoneVisibility` per controlled zone, in zone order. A field no
-        ``calculated_fields`` entry declares is dropped - ``validate_manifest`` has already
-        named it, and a datagraph pointing at a field Tableau cannot find hides the zone for
-        good.
+        One :class:`features.ZoneVisibility` per controlled zone, in zone order. A name
+        neither ``calculated_fields`` nor ``parameters`` declares is dropped -
+        ``validate_manifest`` has already named it, and a datagraph pointing at a field
+        Tableau cannot find hides the zone for good.
     """
     owner: dict[str, str] = {}
     for entry in manifest_document.get("calculated_fields") or []:
@@ -1090,15 +1100,26 @@ def _plan_zone_visibility(
         source = str(entry.get("datasource", "")).strip()
         if name and source:
             owner.setdefault(name, source)
+    boolean_parameters = {
+        str(entry.get("name", "")).strip()
+        for entry in manifest_document.get("parameters") or []
+        if isinstance(entry, dict)
+        and str(entry.get("data_type", "")).strip().lower() == VISIBILITY_TYPE
+    }
 
     visibilities: list[features.ZoneVisibility] = []
     for zone_id in sorted(controlled, key=int):
         field_name = controlled[zone_id]
         source = owner.get(field_name)
         if source:
-            visibilities.append(features.ZoneVisibility(
-                zone_id=zone_id, field=f"[{datasource_id(source)}].[{field_name}]"
-            ))
+            qualified = f"[{datasource_id(source)}].[{field_name}]"
+        elif field_name in boolean_parameters:
+            qualified = f"[{features.PARAMETERS_DATASOURCE}].[{field_name}]"
+        else:
+            continue
+        visibilities.append(
+            features.ZoneVisibility(zone_id=zone_id, field=qualified)
+        )
     return visibilities
 
 
@@ -1127,7 +1148,9 @@ def _element_ids(node: dict) -> list[str]:
     return ids
 
 
-def _attach_visibility_fields(layout: dict, plans: list[PlannedWorksheet]) -> None:
+def _attach_visibility_fields(
+    layout: dict, plans: list[PlannedWorksheet], parameter_names: frozenset[str]
+) -> None:
     """Put every zone-visibility field on the Detail shelf of a sheet that can resolve it.
 
     Dynamic Zone Visibility evaluates the field off the *view*: a boolean no sheet in the
@@ -1140,12 +1163,15 @@ def _attach_visibility_fields(layout: dict, plans: list[PlannedWorksheet]) -> No
     Args:
         layout: The manifest's ``layout`` value.
         plans: The resolved worksheets (mutated).
+        parameter_names: Declared parameter names - a zone driven by one needs no sheet.
     """
     by_element = {
         str(planned.entry.get("element_id", "")).strip(): planned
         for planned in plans if str(planned.entry.get("element_id", "")).strip()
     }
     for node, field_name in _visibility_requests(layout.get("root")):
+        if field_name in parameter_names:
+            continue  # a parameter is view-independent; no sheet has to carry it
         candidates = [by_element[element_id] for element_id in _element_ids(node)
                       if element_id in by_element]
         candidates += [planned for planned in plans if planned not in candidates]
@@ -1205,7 +1231,9 @@ def render_workbook(
     interactions = _plan_interactions(manifest_document, plans, parameters)
     # Before _attach_parameters: a visibility field's formula reads a parameter, and the sheet
     # it lands on has to declare that parameter or Tableau cannot resolve the calculation.
-    _attach_visibility_fields(layout, plans)
+    _attach_visibility_fields(
+        layout, plans, frozenset(parameter.name for parameter in parameters)
+    )
     _attach_parameters(plans, parameters)
     derived = _collect_derived_columns(manifest_document, resolvers, plans)
 

@@ -1285,10 +1285,12 @@ def _validate_visibility(
 ) -> None:
     """Validate every layout node's ``visibility`` field (Dynamic Zone Visibility).
 
-    Tableau shows or hides a zone on a single boolean value, and the builder qualifies that
-    field against the datasource that declares it - so the field has to be a declared
-    *calculated* field of type ``boolean``. A CSV column would need one value per view, which
-    is not something the manifest can promise.
+    Tableau shows or hides a zone on a single boolean value, so the name has to be either a
+    declared *calculated* field of type ``boolean`` or a declared ``boolean`` **parameter** -
+    Desktop binds the datagraph straight to ``[Parameters].[Name]`` for the latter, which is
+    the simpler wiring when a parameter action is what drives the zone (no comparison calc in
+    between). A CSV column would need one value per view, which is not something the manifest
+    can promise.
 
     Args:
         bindings: ``(path, field name)`` pairs from the layout walk.
@@ -1303,12 +1305,18 @@ def _validate_visibility(
         if isinstance(entry, dict)
         and str(entry.get("type", "")).strip().lower() == VISIBILITY_TYPE
     }
+    boolean_parameters = {
+        str(entry.get("name", "")).strip()
+        for entry in manifest_document.get("parameters") or []
+        if isinstance(entry, dict)
+        and str(entry.get("data_type", "")).strip().lower() == VISIBILITY_TYPE
+    }
     for path, field_name in bindings:
-        if field_name not in booleans:
+        if field_name not in booleans | boolean_parameters:
             errors.append(
-                f"{path}: visibility '{field_name}' is not a declared calculated field of "
-                f"type '{VISIBILITY_TYPE}' (declared boolean: "
-                f"{', '.join(sorted(booleans)) or 'none'})"
+                f"{path}: visibility '{field_name}' is not a declared '{VISIBILITY_TYPE}' "
+                f"calculated field or parameter (declared boolean: "
+                f"{', '.join(sorted(booleans | boolean_parameters)) or 'none'})"
             )
 
 

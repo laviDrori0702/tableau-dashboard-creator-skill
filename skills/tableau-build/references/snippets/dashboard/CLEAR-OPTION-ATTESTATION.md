@@ -126,3 +126,28 @@ python -c "import re,sys; print(re.findall(r'<clear-option[^>]*>', open(sys.argv
 
 If Desktop greys out "Set value to" for a type, that type genuinely has no reset and
 belongs out of `PARAMETER_ACTION_TARGET_TYPES` permanently.
+
+
+## Two rules Desktop enforced that the XML alone does not show
+
+Both found by opening a generated workbook in Desktop 2025.1.10 (the validators passed it
+either way — see the fidelity note in `CLAUDE.md`: Desktop is the oracle, not the XSD).
+
+1. **A parameter action's source field must be on the source sheet's Detail shelf.**
+   Declaring it in the sheet's `<datasource-dependencies>` is not enough: the workbook opens
+   and the action simply never fires, with no error. `twb._plan_interactions` puts it on
+   `plan.detail` (an `<lod>` in the pane's `<encodings>`), the same shelf a DZV field uses.
+
+2. **A boolean parameter drives Dynamic Zone Visibility directly.** Desktop's "Control
+   visibility using value" accepts the parameter itself, and writes
+
+   ```xml
+   <single-value-field-node fieldname='[Parameters].[Parameter 1]' ... />
+   ```
+
+   with an edge straight into the `dashboard-zone-visibility-node` — no comparison
+   calculation in between, and no sheet carrying the field (a parameter is view-independent).
+   Attested in `SalesMRR.twbx`, `US Penetration Overview.twbx`,
+   `Rapaport Subscriptions Waterfall.twbx` and `Logistics Dashboard_v2025.1.twbx`. A
+   *string* parameter still needs the comparison calc (`[Parameters].[Region] <> "All"`),
+   which is the only shape that existed while a parameter action could target strings alone.

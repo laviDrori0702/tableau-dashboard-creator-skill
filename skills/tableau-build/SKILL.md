@@ -241,18 +241,23 @@ When one arrives:
   `filter` object is a quick-filter card over one worksheet's field, and a `parameter` object is
   that parameter's control. Endpoints are validated: an action source and its filter/highlight
   targets must be **view** zones, a parameter action's target a declared parameter.
-- **A `visibility` key on a layout node is Dynamic Zone Visibility**, and its boolean
-  calculated field must resolve to **one value, independent of the view** — so the calc compares
-  a parameter. Either shape is normal: a two-value parameter with a control (`= true` / `=
-  "on"`, the collapse-this-panel toggle) or a parameter a parameter action writes into,
-  compared against its opening value (`<> "All"`, the nothing-to-show-until-you-pick reveal,
-  which needs no control because clearing the selection resets it). **Never write a *visibility*
+- **A `visibility` key on a layout node is Dynamic Zone Visibility**, and it names either a
+  **boolean parameter** or a boolean calculated field. **Name the parameter directly whenever
+  it is already boolean** — Desktop binds the zone straight to `[Parameters].[…]` and a
+  comparison calc would be dead weight. A calc is needed only when the parameter is not boolean,
+  and it must resolve to **one value, independent of the view** — so it compares a parameter.
+  Either shape is normal: a two-value parameter with a control (`= true` / `= "on"`, the
+  collapse-this-panel toggle) or a parameter a parameter action writes into, compared against
+  its opening value (`<> "All"`, the nothing-to-show-until-you-pick reveal, which needs no
+  control because clearing the selection resets it). **Never write a *visibility*
   calc as an LOD expression** — `{FIXED : …}` is view-independent too and Tableau accepts it,
   but it is hard to reason about and hard to repair by hand. That is the only place LODs are
   ruled out; elsewhere they are ordinary `calculated_fields`. A row-level boolean is not a
   visibility field at all: it splits the marks and the zone stops toggling. The Detail-shelf
-  placement the field needs, the parameter declarations and the format flags are the builder's
-  job.
+  placement a visibility *calc* needs (a parameter needs none), the parameter declarations and
+  the format flags are the builder's job — as is putting a **parameter action's source field on
+  its source sheet's Detail shelf**, without which Desktop opens the workbook and the action
+  never fires.
 - **An unsupported construct is refused by name, never silently.** An image / button / legend
   object needs a reference the manifest does not carry (a filename, an action, a sheet + colour
   field) and Tableau does not treat those as optional, so the layout **reserves its box as an

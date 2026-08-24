@@ -228,7 +228,10 @@ calculations read it declares it automatically.
 ### Dynamic Zone Visibility
 
 **Show/hide a zone** with `visibility` on a **layout** node: `{"id": "chart-category",
-"visibility": "Show Breakdown"}`. The value must be the name of a declared **boolean**
+"visibility": "Show Breakdown"}`. When a parameter action drives the zone and the parameter
+is already `boolean`, name **the parameter itself** — Desktop binds the zone straight to it
+and the comparison calc is dead weight. A `string` parameter still needs the calc
+(`<> "All"`). Otherwise the value must be the name of a declared **boolean**
 calculated field, and the zone is shown when it is true. For a zone with a generated header or
 legend, the whole wrapper is what shows and hides.
 

@@ -588,14 +588,20 @@ def test_a_parameter_action_writes_a_field_into_a_parameter():
     }
 
 
-def test_a_parameter_actions_source_field_is_declared_by_its_sheet():
-    """The action reads the field off the clicked mark, so the sheet has to declare it even
-    though nothing places it on a shelf."""
-    dependencies = _worksheet_element("Detail Table").find(
-        "table/view/datasource-dependencies"
-    )
+def test_a_parameter_actions_source_field_is_on_its_sheets_detail_shelf():
+    """The action reads the field off the clicked mark, so it has to be *on* the source
+    sheet's Detail shelf - <lod> in the pane encodings. Declaring it in the sheet's
+    dependencies is not enough: Desktop 2025.1.10 opens the workbook and the action then
+    silently never fires."""
+    sheet = _worksheet_element("Detail Table")
+    dependencies = sheet.find("table/view/datasource-dependencies")
+    details = [
+        element.get("column")
+        for element in sheet.findall("table/panes/pane/encodings/lod")
+    ]
 
     assert dependencies.find("column-instance[@name='[none:region:nk]']") is not None
+    assert f"[{DATASOURCE_ID}].[none:region:nk]" in details
 
 
 def test_parameter_actions_come_after_the_sheet_actions():
@@ -1113,3 +1119,58 @@ def test_the_manifest_template_example_validates():
     assert manifest.validate_manifest(
         json.loads(example), DATA_MODEL, TARGET_VERSION
     ) == []
+
+
+# --- Dynamic Zone Visibility driven by a boolean parameter (issue #49) ---------
+
+def _boolean_parameter_manifest() -> dict:
+    """A manifest whose DZV zone is driven by a boolean parameter, with no comparison calc.
+
+    This is the shape Desktop writes when a parameter action drives the zone: the datagraph
+    binds straight to ``[Parameters].[<name>]`` (attested in ``SalesMRR.twbx``).
+    """
+    parameters = json.loads(json.dumps(PARAMETERS))
+    parameters.append({"name": "Show Panel", "data_type": "boolean",
+                       "current_value": False, "values": [True, False]})
+    calculated = json.loads(json.dumps(CALCULATED_FIELDS))
+    calculated.append({"name": "Panel Toggle", "formula": "TRUE",
+                       "datasource": "sales_orders", "type": "boolean"})
+    actions = json.loads(json.dumps(ACTIONS))
+    actions[-1]["targets"] = ["Show Panel"]
+    actions[-1]["field"] = "Panel Toggle"
+    layout = json.loads(json.dumps(LAYOUT))
+
+    def _mark(node):
+        if node.get("id") == "chart-category":
+            node["visibility"] = "Show Panel"
+        for child in node.get("children", []):
+            _mark(child)
+
+    _mark(layout["root"])
+    return _manifest(parameters=parameters, calculated_fields=calculated,
+                     actions=actions, layout=layout)
+
+
+def test_a_boolean_parameter_can_drive_zone_visibility_directly():
+    """Desktop binds the visibility node straight to the parameter - the comparison calc a
+    string parameter needs (`<> "All"`) is dead weight when the parameter is already boolean."""
+    document = _boolean_parameter_manifest()
+
+    assert not manifest.validate_manifest(document, DATA_MODEL, TARGET_VERSION)
+
+    root = ET.fromstring(_render(document))
+    node = root.find("datagraph/graph/nodes/single-value-field-node")
+
+    assert node.get("fieldname") == "[Parameters].[Show Panel]"
+
+
+def test_a_parameter_driven_zone_puts_nothing_on_a_detail_shelf():
+    """A parameter is view-independent, so unlike a boolean calc it needs no sheet to carry
+    it - attaching it to one would add a field the view never uses."""
+    root = ET.fromstring(_render(_boolean_parameter_manifest()))
+    details = [
+        element.get("column")
+        for element in root.findall("worksheets/worksheet/table/panes/pane/encodings/lod")
+    ]
+
+    assert not [column for column in details if "Show Panel" in column]
