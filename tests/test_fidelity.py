@@ -156,19 +156,26 @@ def test_a_bare_measure_on_rows_is_still_continuous_sum():
 def test_none_on_an_aggregate_calculated_field_stays_continuous():
     """The other scope guard. On ``SUM([revenue]) / COUNTD([order_id])``, ``"none"`` means
     "do not re-aggregate" - it is still one continuous number. Making it discrete turned the
-    demo's AOV KPI card into a row header, so this pins the KPI card's text pill."""
+    demo's AOV KPI card into a row header, so this pins the KPI card's text pill.
+
+    Issue #62 corrected the *prefix* this originally pinned: "do not re-aggregate" is the
+    ``usr:`` (User) instance, not ``none:``. ``none:`` asks for a row-level value the calc
+    does not have, and Desktop refused the pill outright. Continuous (``:qk``,
+    ``type='quantitative'``) is what this test is actually guarding, and that is unchanged.
+    """
     element = _worksheet_element("AOV KPI")
     text = element.find(
         "table/panes/pane/encodings/text"
     )
 
-    assert text.get("column").endswith("[none:Average Order Value:qk]"), text.attrib
+    assert text.get("column").endswith("[usr:Average Order Value:qk]"), text.attrib
     instance = element.find(
         f"table/view/datasource-dependencies[@datasource='{DATASOURCE_ID}']"
-        "/column-instance[@name='[none:Average Order Value:qk]']"
+        "/column-instance[@name='[usr:Average Order Value:qk]']"
     )
     assert instance is not None
     assert instance.get("type") == "quantitative"
+    assert instance.get("derivation") == "User"
 
 
 # --- Bug 3: number_formats reach the datasource column --------------------------

@@ -375,6 +375,80 @@ def test_calculated_field_may_back_a_shelf():
     assert _errors(document) == []
 
 
+def test_re_aggregating_an_aggregate_calculated_field_is_rejected():
+    """Issue #62: Tableau refuses SUM(SUM([revenue]) / 2) at load, and the builder emits the
+    un-aggregated instance whatever the key says - so an aggregation asked for here would be
+    silently dropped. Caught at validation instead, where the author can fix the manifest."""
+    document = _manifest()
+    document["calculated_fields"] = [
+        {"name": "Profit Ratio", "formula": "SUM([revenue]) / 2", "datasource": "sales_orders"}
+    ]
+    document["worksheets"][1]["shelves"]["rows"] = [
+        {"field": "Profit Ratio", "aggregation": "sum"}
+    ]
+
+    errors = _errors(document)
+
+    assert any(
+        "Profit Ratio" in error and "already aggregates" in error for error in errors
+    ), errors
+
+
+def test_none_on_an_aggregate_calculated_field_is_accepted():
+    """The scope guard: "none" on such a field is the documented way to say "do not
+    re-aggregate" (BUILD-MANIFEST-TEMPLATE.md), not a second aggregation."""
+    document = _manifest()
+    document["calculated_fields"] = [
+        {"name": "Profit Ratio", "formula": "SUM([revenue]) / 2", "datasource": "sales_orders"}
+    ]
+    document["worksheets"][1]["shelves"]["rows"] = [
+        {"field": "Profit Ratio", "aggregation": "none"}
+    ]
+
+    assert _errors(document) == []
+
+
+def test_re_aggregating_a_transitively_aggregate_calc_is_rejected():
+    """The closure, through validation: 'Doubled' calls no aggregate function itself, but it
+    references one that does, so Tableau treats it as an aggregate too."""
+    document = _manifest()
+    document["calculated_fields"] = [
+        {"name": "Profit Ratio", "formula": "SUM([revenue]) / 2",
+         "datasource": "sales_orders"},
+        {"name": "Doubled", "formula": "[Profit Ratio] * 2", "datasource": "sales_orders"},
+    ]
+    document["worksheets"][1]["shelves"]["rows"] = [
+        {"field": "Doubled", "aggregation": "avg"}
+    ]
+
+    errors = _errors(document)
+
+    assert any("Doubled" in error and "already aggregates" in error for error in errors), errors
+
+
+@pytest.mark.parametrize("modifier,described", [
+    ({"date_part": "year"}, "date_part"),
+    ({"bin": 0.1}, "bin"),
+])
+def test_deriving_a_row_level_value_from_an_aggregate_calc_is_rejected(modifier, described):
+    """Review of #62: a date part and a bin are both derived from a row-level value, which an
+    aggregate calculated field has none of - the same red pill the aggregation rule catches.
+    MIN([order_date]) with a 'year' date part validated clean and shipped as [tyr:...]."""
+    document = _manifest()
+    document["calculated_fields"] = [
+        {"name": "First Order", "formula": "MIN([order_date])",
+         "datasource": "sales_orders", "type": "date"}
+    ]
+    document["worksheets"][1]["shelves"]["rows"] = [{"field": "First Order", **modifier}]
+
+    errors = _errors(document)
+
+    assert any(
+        "First Order" in error and described in error and "already aggregates" in error
+        for error in errors
+    ), errors
+
+
 def test_unknown_datasource_reference_is_rejected():
     """A worksheet pointing at an undeclared datasource is named."""
     document = _manifest()
