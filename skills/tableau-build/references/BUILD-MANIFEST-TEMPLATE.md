@@ -64,7 +64,10 @@ Aggregations: `sum`, `avg`, `min`, `max`, `count`, `countd`, `median`, `attr`, `
 measure with none of them defaults to `SUM`. `"none"` on a plain measure makes it a
 **discrete** pill: use it for a measure that is a row header (an NPS score in a table), never
 for one that should draw an axis. On an *aggregate* calculated field `"none"` instead means
-"do not re-aggregate", and the pill stays continuous. Date parts: `year`, `quarter`, `month`,
+"do not re-aggregate", and the pill stays continuous. The builder works out which calculated
+fields aggregate on its own — including one that only *references* another aggregate calc
+(`[Avg Sale Size] = [ACV] / [Sales]`) — so never ask such a field for a real aggregation;
+that is rejected. Date parts: `year`, `quarter`, `month`,
 `week`, `day`, `date`. Never write an expression like `"SUM([revenue])"` — that is the spec's
 prose, not a field reference.
 

@@ -519,6 +519,123 @@ def test_aggregate_formula_detection(formula, aggregate):
     assert worksheet.is_aggregate_formula(formula) is aggregate
 
 
+# --- Issue #62: aggregate calcs reach the shelf as 'usr:' ---------------------------------
+
+def test_the_aggregate_closure_does_not_depend_on_declaration_order():
+    """The chain is walked to a fixpoint, not in one pass. Declared dependents-first here on
+    purpose: a single sweep in declaration order would see 'Badge' before 'Label' had joined
+    the set and leave both out, which is a 'none:' pill on every sheet that uses them."""
+    declared = {
+        "Badge": worksheet.CalculatedField("'(' + [Label] + ')'", "string"),
+        "Label": worksheet.CalculatedField("STR([Ratio])", "string"),
+        "Ratio": worksheet.CalculatedField("SUM([profit]) / SUM([revenue])", "real"),
+        "Row Level": worksheet.CalculatedField("[revenue] - [profit]", "real"),
+        # An LOD is row-level at its own grain, so neither it nor what references it is an
+        # aggregate - the distinction is_aggregate_formula already draws.
+        "Regional": worksheet.CalculatedField("{FIXED [region]: SUM([revenue])}", "real"),
+        "Regional Share": worksheet.CalculatedField("[Regional] / 2", "real"),
+    }
+
+    assert worksheet.aggregate_calculated_fields(declared) == frozenset(
+        {"Ratio", "Label", "Badge"}
+    )
+
+
+#: Three calcs one hop apart: ``Ratio`` aggregates directly, the other two only *reference*
+#: it and so are aggregate too - Tableau's rule is transitive, and both are strings, which
+#: is the case that used to fall through to ``none:``.
+_TRANSITIVE_CALCS = [
+    {"name": "Ratio", "formula": "SUM([profit]) / SUM([revenue])",
+     "datasource": "sales_orders", "type": "real"},
+    {"name": "Ratio Label", "formula": "STR([Ratio])",
+     "datasource": "sales_orders", "type": "string"},
+    {"name": "Ratio Dir", "formula": "IF [Ratio] >= 0 THEN 'up' ELSE 'down' END",
+     "datasource": "sales_orders", "type": "string"},
+    # Numeric and one hop out - the case that fell to the measure default 'sum:' and reached
+    # Desktop as a double aggregation.
+    {"name": "Ratio Scaled", "formula": "[Ratio] * 100",
+     "datasource": "sales_orders", "type": "real"},
+    # Two hops: aggregate only through 'Ratio Label', which is itself only aggregate through
+    # 'Ratio'. One pass over the calcs would miss this - it is what the closure iterates for.
+    {"name": "Ratio Badge", "formula": "'(' + [Ratio Label] + ')'",
+     "datasource": "sales_orders", "type": "string"},
+]
+
+
+def _transitive_aggregate_xml() -> str:
+    """Render a sheet placing all four calcs, the numeric one with ``aggregation: none``."""
+    document = _manifest(
+        [_sheet(
+            "Ratio Card", "text",
+            encodings={
+                "text": {"field": "Ratio", "aggregation": "none"},
+                "color": "Ratio Dir",
+            },
+            tooltip=[
+                {"label": "Label", "field": "Ratio Label"},
+                {"label": "Scaled", "field": "Ratio Scaled"},
+                {"label": "Badge", "field": "Ratio Badge"},
+            ],
+        )],
+        calculated_fields=_TRANSITIVE_CALCS,
+    )
+    return _render(document)
+
+
+def test_a_literal_brace_does_not_hide_an_aggregate_reference():
+    """Review of #62: an unclosed brace is a string literal, not an LOD. Stripping from it
+    onwards swallowed the '[Ratio]' reference, so 'Badge' escaped the closure and went back
+    to the 'none:' pill the fix exists to remove."""
+    declared = {
+        "Ratio": worksheet.CalculatedField("SUM([profit]) / SUM([revenue])", "real"),
+        "Badge": worksheet.CalculatedField('"{" + STR([Ratio])', "string"),
+    }
+
+    assert worksheet.aggregate_calculated_fields(declared) == frozenset({"Ratio", "Badge"})
+
+
+@pytest.mark.parametrize("field,instance", [
+    ("Ratio", "[usr:Ratio:qk]"),
+    ("Ratio Label", "[usr:Ratio Label:nk]"),
+    ("Ratio Dir", "[usr:Ratio Dir:nk]"),
+    ("Ratio Scaled", "[usr:Ratio Scaled:qk]"),
+    ("Ratio Badge", "[usr:Ratio Badge:nk]"),
+])
+def test_an_aggregate_calc_reaches_the_shelf_as_a_user_derivation(field, instance):
+    """Issue #62: a calc that aggregates - directly or by referencing one that does - has no
+    row-level value, so any instance but ``usr:`` is a pill Desktop refuses with "can't be
+    applied to a user-defined aggregate".
+
+    ``Ratio`` carries ``"aggregation": "none"``, which is how BUILD-MANIFEST-TEMPLATE.md tells
+    authors to say "do not re-aggregate" - that key used to route around the ``usr`` branch
+    entirely. The rest carry no aggregation and were mis-derived by role: the strings to
+    ``none:``, the numeric one to the measure default ``sum:``.
+    """
+    element = _worksheet_element(
+        "Ratio Card", ET.fromstring(_transitive_aggregate_xml())
+    )
+    column_instance = element.find(
+        f"table/view/datasource-dependencies/column-instance[@column='[{field}]']"
+    )
+    assert column_instance is not None, f"no column-instance emitted for [{field}]"
+    assert column_instance.get("derivation") == "User"
+    assert column_instance.get("name") == instance
+
+
+@pytest.mark.parametrize(
+    "field", ["Ratio", "Ratio Label", "Ratio Dir", "Ratio Scaled", "Ratio Badge"]
+)
+def test_no_re_aggregating_instance_of_an_aggregate_calc_is_emitted_anywhere(field):
+    """The wrong instance in *any* corner of the worksheet - a shelf, an encoding, a tooltip,
+    a style rule - is one red pill, so the whole sheet is swept rather than the shelves."""
+    sheet_xml = _worksheet_xml("Ratio Card", _transitive_aggregate_xml())
+    for prefix in ("none", "sum", "avg", "attr"):
+        assert f"[{prefix}:{field}:" not in sheet_xml, (
+            f"[{field}] reaches Tableau as a '{prefix}:' instance; an aggregate calc has no "
+            f"row-level value to derive one from"
+        )
+
+
 def test_map_uses_the_generated_geographic_fields():
     """A map plots Tableau's generated lat/long, with the real dimension on Detail."""
     element = _worksheet_element("Map")

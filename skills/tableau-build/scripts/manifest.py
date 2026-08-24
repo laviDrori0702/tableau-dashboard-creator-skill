@@ -46,6 +46,8 @@ from worksheet import (
     TABLE_CALC_PREFIXES,
     TEXT_ALIGNMENTS,
     VERTICAL_ALIGNMENTS,
+    CalculatedField,
+    aggregate_calculated_fields,
 )
 from zones import FILTER_MODES
 
@@ -466,6 +468,33 @@ def _calculated_field_names(
     return calculated
 
 
+def _aggregate_calculated_fields(manifest_document: dict) -> dict[str, frozenset[str]]:
+    """Return ``{datasource name: {calculated fields that aggregate}}``.
+
+    Args:
+        manifest_document: The whole manifest.
+
+    Returns:
+        Per datasource, the calculated fields whose formula aggregates directly or references
+        one that does - the builder's own closure (:func:`worksheet.aggregate_calculated_fields`),
+        so validation and emission cannot disagree about which fields these are.
+    """
+    formulas: dict[str, dict[str, CalculatedField]] = {}
+    for entry in manifest_document.get("calculated_fields") or []:
+        if not isinstance(entry, dict):
+            continue
+        source = str(entry.get("datasource", "")).strip()
+        name = str(entry.get("name", "")).strip()
+        if source and name:
+            formulas.setdefault(source, {})[name] = CalculatedField(
+                str(entry.get("formula", "")), ""
+            )
+    return {
+        source: aggregate_calculated_fields(declared)
+        for source, declared in formulas.items()
+    }
+
+
 def _worksheet_field_references(worksheet: dict) -> list[tuple[str, object]]:
     """Return the ``(where, entry)`` pairs a worksheet's fields are referenced from.
 
@@ -509,7 +538,7 @@ def _worksheet_field_references(worksheet: dict) -> list[tuple[str, object]]:
 
 def _validate_reference(
     label: str, where: str, entry: object, available: set[str], source: str,
-    errors: list[str],
+    errors: list[str], aggregate_calcs: frozenset[str] = frozenset(),
 ) -> None:
     """Validate one shelf/encoding entry against a datasource's fields.
 
@@ -521,6 +550,8 @@ def _validate_reference(
         available: Field names the worksheet's datasource offers (declared + calculated).
         source: The datasource name, for the message.
         errors: Accumulator for validation errors.
+        aggregate_calcs: The datasource's calculated fields that already aggregate; asking
+            one of them for a *second* aggregation is rejected here.
     """
     bin_size: object = None
     table_calc = ""
@@ -559,11 +590,34 @@ def _validate_reference(
             f"{label}: {where} '{field_name}' has unknown aggregation '{aggregation}' "
             f"(expected one of: {', '.join(sorted(AGGREGATIONS))})"
         )
+    elif aggregation not in ("", "none") and field_name in aggregate_calcs:
+        # Issue #62: SUM(SUM([profit]) / SUM([revenue])) is an error Tableau refuses at load.
+        # The builder emits the un-aggregated 'usr:' instance for such a field whatever the
+        # key says, so an aggregation here would be silently discarded - caught instead.
+        errors.append(
+            f"{label}: {where} '{field_name}' asks for aggregation '{aggregation}', but it "
+            f"is a calculated field that already aggregates - Tableau refuses a second "
+            f"aggregation. Drop the key, or use \"aggregation\": \"none\" to say "
+            f"'do not re-aggregate'"
+        )
     if date_part and date_part not in DATE_PARTS:
         errors.append(
             f"{label}: {where} '{field_name}' has unknown date_part '{date_part}' "
             f"(expected one of: {', '.join(sorted(DATE_PARTS))})"
         )
+    if field_name in aggregate_calcs:
+        # Issue #62, same rule as the aggregation check above: a date part and a bin are both
+        # derived from a row-level value, which an aggregate calculated field does not have.
+        # MIN([order_date]) with "date_part": "year" reached Desktop as [tyr:...] and was
+        # refused with the same "user-defined aggregate" error the usr: fix removes.
+        for key, value in (("date_part", date_part), ("bin", bin_size)):
+            if value in ("", None):
+                continue
+            errors.append(
+                f"{label}: {where} '{field_name}' asks for {key} '{value}', but it is a "
+                f"calculated field that already aggregates - Tableau cannot derive a "
+                f"{key} from a field with no row-level value"
+            )
     if bin_size is not None and not (
         isinstance(bin_size, (int, float)) and not isinstance(bin_size, bool) and bin_size > 0
     ):
@@ -708,6 +762,7 @@ def _validate_worksheets(
     layout_ids: set[str],
     container_ids: set[str],
     errors: list[str],
+    aggregate_calcs: Optional[dict[str, frozenset[str]]] = None,
 ) -> set[str]:
     """Validate the worksheets against the datasources and the layout tree.
 
@@ -719,6 +774,8 @@ def _validate_worksheets(
         container_ids: Mapped-container ids (filled by their children, not a view of
             their own - CONTRACT.md §1.1).
         errors: Accumulator for validation errors.
+        aggregate_calcs: ``{datasource: {calculated field that already aggregates}}``, from
+            :func:`_aggregate_calculated_fields`.
 
     Returns:
         The element ids the worksheets fill.
@@ -785,8 +842,11 @@ def _validate_worksheets(
             continue
 
         available = declared_fields[source] | calculated.get(source, set())
+        aggregates = (aggregate_calcs or {}).get(source, frozenset())
         for where, entry in _worksheet_field_references(worksheet):
-            _validate_reference(label, where, entry, available, source, errors)
+            _validate_reference(
+                label, where, entry, available, source, errors, aggregates
+            )
         _validate_modifiers(label, worksheet, errors)
     return filled
 
@@ -1249,7 +1309,7 @@ def validate_manifest(
     )
     filled = _validate_worksheets(
         manifest_document.get("worksheets"), declared_fields, calculated, zone_ids,
-        container_ids, errors
+        container_ids, errors, _aggregate_calculated_fields(manifest_document),
     )
 
     views = _view_zones(manifest_document.get("worksheets"))

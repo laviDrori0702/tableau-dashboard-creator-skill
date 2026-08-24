@@ -219,8 +219,17 @@ def strip_lod_expressions(formula: str) -> str:
 
     Returns:
         The formula with each ``{...}`` span (nesting included) replaced by a space, so what
-        is left is only what the formula computes *around* its LODs.
+        is left is only what the formula computes *around* its LODs. A formula whose braces
+        do not balance has no LOD to strip and is returned unchanged.
+
+    The balance check is what keeps an unclosed brace from swallowing the rest of the
+    formula: ``"{" + STR([Ratio])`` is a string literal, not an LOD, and stripping from the
+    ``{`` onwards hid the ``[Ratio]`` reference from
+    :func:`aggregate_calculated_fields` - which put the field back on the shelf as ``none:``,
+    the very bug issue #62 fixes.
     """
+    if formula.count("{") != formula.count("}"):
+        return formula
     kept: list[str] = []
     depth = 0
     for character in formula:
@@ -256,6 +265,53 @@ def is_aggregate_formula(formula: str) -> bool:
     if not formula:
         return False
     return _AGGREGATE_CALL.search(strip_lod_expressions(formula)) is not None
+
+
+#: A bracketed field reference inside a formula (``[ACV - Current]``). Field names cannot
+#: contain brackets, so the non-greedy character class is the whole grammar.
+_FIELD_REFERENCE = re.compile(r"\[([^\[\]]+)\]")
+
+
+def aggregate_calculated_fields(calculated: dict[str, CalculatedField]) -> frozenset[str]:
+    """Return the names of the calculated fields that aggregate, transitively.
+
+    Args:
+        calculated: ``{name: CalculatedField}`` for one datasource.
+
+    Returns:
+        Every name whose formula aggregates directly (:func:`is_aggregate_formula`) *or*
+        references another aggregate calculated field.
+
+    Tableau's rule is transitive: ``[Avg Sale Size] = [ACV] / [Sales]`` calls no aggregate
+    function of its own, but both operands are aggregates, so the result is one too and has
+    no row-level value to put on a shelf. Issue #62: detecting only the direct call found 5
+    of the 16 aggregates in the reporting workbook, and the other 11 reached Desktop as
+    ``sum:`` (numeric, double aggregation) or ``none:`` (string) - red pills either way.
+
+    LOD expressions are stripped before the reference scan for the same reason
+    :func:`is_aggregate_formula` strips them: ``{FIXED [region]: SUM([ACV])}`` is row-level
+    at its own grain, so referencing an aggregate from *inside* the braces does not make the
+    referring field an aggregate.
+    """
+    aggregate = {
+        name for name, calculation in calculated.items()
+        if is_aggregate_formula(calculation.formula)
+    }
+    # Fixpoint rather than one pass: a chain (YoY Change -> YoY Label -> YoY Direction) only
+    # resolves fully once each hop has joined the set. Bounded by len(calculated).
+    growing = True
+    while growing:
+        growing = False
+        for name, calculation in calculated.items():
+            if name in aggregate:
+                continue
+            referenced = set(
+                _FIELD_REFERENCE.findall(strip_lod_expressions(calculation.formula))
+            )
+            if referenced & aggregate:
+                aggregate.add(name)
+                growing = True
+    return frozenset(aggregate)
 
 
 #: manifest ``table_calc`` -> the column-instance name's extra prefix. The keys are the
@@ -419,10 +475,25 @@ class FieldResolver:
         self.field_types = field_types
         self.calculated = calculated
         self.type_facts = type_facts
+        # Computed once here rather than per reference: the closure is over the whole
+        # datasource, and one sheet resolves the same field on several shelves.
+        self.aggregate_calcs = aggregate_calculated_fields(calculated)
 
     def qualify(self, name: str) -> str:
         """Return a bracketed name qualified with the datasource (``[ds].[name]``)."""
         return f"[{self.datasource_id}].{name}"
+
+    def is_aggregate(self, field_name: str) -> bool:
+        """Return whether the named field is a calculated field that aggregates.
+
+        Args:
+            field_name: The bare field name from the manifest.
+
+        Returns:
+            True when the field's own formula aggregates or it references a calculated
+            field that does - either way it reaches a shelf un-aggregated.
+        """
+        return field_name in self.aggregate_calcs
 
     def reference(self, entry: object) -> Optional[FieldRef]:
         """Resolve one shelf/encoding entry.
@@ -481,30 +552,33 @@ class FieldResolver:
         if date_part and datatype in {"date", "datetime"}:
             prefix, derivation = DATE_PART_DERIVATIONS.get(date_part, ("none", "None"))
             instance_type = "quantitative"
+        elif self.is_aggregate(field_name):
+            # Issue #62: this branch sits *above* the aggregation one on purpose. An
+            # aggregate calculated field has no row-level value, so every instance but
+            # 'usr:' is a pill Desktop refuses ("can't be applied to a user-defined
+            # aggregate"). Whatever the entry's 'aggregation' key says, the answer is the
+            # same: BUILD-MANIFEST-TEMPLATE.md's documented "none" means "do not
+            # re-aggregate", which *is* the User derivation, and any real aggregation
+            # ("sum" on a ratio) is rejected by manifest validation before reaching here.
+            prefix, derivation = USER_DERIVATION
+            instance_type = column_type
         elif aggregation:
             prefix, derivation = AGGREGATION_DERIVATIONS.get(aggregation, ("none", "None"))
             if aggregation in _AGGREGATING:
                 instance_type = "quantitative"
-            elif (
-                aggregation == "none"
-                and role == "measure"
-                and not is_aggregate_formula(formula)
-            ):
+            elif aggregation == "none" and role == "measure":
                 # Issue #59: an explicit "none" on a plain measure is the analyst asking for a
                 # discrete pill, not a number. Left at the measure's own 'quantitative' it is
                 # continuous, and a continuous pill on Rows draws an axis - the demo's customer
                 # table grew one 90/80/70 Nps Score axis per customer. 'ordinal' is what
                 # Desktop writes for a measure set to Discrete with no aggregation.
                 #
-                # An *aggregate* calculated field is excluded: there, "none" means "do not
-                # re-aggregate SUM([revenue])/COUNTD([order_id])", which is still one
-                # continuous number - and making it discrete broke the demo's AOV KPI card.
+                # Only a *plain* measure reaches here; an aggregate calc took the branch above,
+                # where "none" keeps it one continuous number (making it discrete broke the
+                # demo's AOV KPI card).
                 instance_type = "ordinal"
             else:
                 instance_type = column_type
-        elif is_aggregate_formula(formula):
-            prefix, derivation = USER_DERIVATION
-            instance_type = column_type
         elif role == "measure":
             # A measure on a shelf without an explicit aggregation is SUM - Tableau's own
             # default, and what every spec row means by "revenue on Rows".
