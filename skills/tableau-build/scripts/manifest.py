@@ -31,7 +31,7 @@ import re
 from pathlib import Path
 from typing import NamedTuple, Optional
 
-from features import ACTIVATIONS, PARAMETER_TYPES
+from features import ACTIVATIONS, CLEAR_VALUE_TAGS, PARAMETER_TYPES
 # Names, not the module: half the functions below take a parameter called ``worksheet``.
 from worksheet import (
     CHART_SPECS,
@@ -125,14 +125,25 @@ CARD_FILTER_TYPES = frozenset({"string", "boolean"})
 #: The type a Dynamic Zone Visibility field must have - a zone is shown or hidden, nothing else.
 VISIBILITY_TYPE = "boolean"
 
-#: The parameter data type a parameter action may target. Deselecting has to reset the
-#: parameter (:data:`features.CLEAR_VALUE_PREFIX`), or a panel the parameter reveals has
-#: nothing to hide it again and the viewer is stuck - and the reset value's serialization is
-#: only attested for a string. So a non-string target is rejected rather than built without
-#: its reset.
-#: ponytail: lift this the moment a numeric parameter action is saved in Desktop and the
-#: clear-option's type tag read off it - issue #49 carries the exact steps.
-PARAMETER_ACTION_TARGET_TYPE = "string"
+#: The parameter data types a parameter action may target: exactly those whose reset value
+#: has an attested ``<clear-option>`` serialization. Deselecting has to reset the parameter
+#: (:func:`features.serialize_clear_value`), or a panel the parameter reveals has nothing to
+#: hide it again and the viewer is stuck - so a type we could not serialize the reset for is
+#: rejected rather than built without it. ``real``, ``date`` and ``datetime`` are the ones
+#: still out (issue #49).
+PARAMETER_ACTION_TARGET_TYPES = frozenset(CLEAR_VALUE_TAGS)
+
+#: Which field types may feed which parameter data type. A parameter action writes the
+#: clicked mark's value straight into the parameter with no conversion, and Desktop's Change
+#: Parameter editor only offers fields of the parameter's own type - a workbook pairing them
+#: otherwise is one Desktop refuses on open. Whole and decimal numbers count as one type
+#: here, the way Tableau's own number family does. Keys mirror
+#: :data:`PARAMETER_ACTION_TARGET_TYPES`; the lookup below relies on that.
+PARAMETER_ACTION_FIELD_TYPES: dict[str, frozenset[str]] = {
+    "string": frozenset({"string"}),
+    "integer": frozenset({"integer", "real"}),
+    "boolean": frozenset({"boolean"}),
+}
 
 # A data-source heading in DATA-MODEL.md: "## Data source: `sales.csv`" -> "sales.csv".
 _DATASOURCE_HEADING = re.compile(
@@ -1080,7 +1091,7 @@ def _validate_actions(
         actions: The manifest's ``actions`` value.
         known_ids: Element ids an action may point at (the layout's zones).
         parameter_types: ``{declared parameter name: data type}`` - a parameter action's
-            targets, and the types :data:`PARAMETER_ACTION_TARGET_TYPE` is checked against.
+            targets, and the types :data:`PARAMETER_ACTION_TARGET_TYPES` is checked against.
         views: ``{element id: ViewZone}`` - the zones an action may run from or to.
         field_types: ``{datasource: {field: type}}``, for a parameter action's source field.
         errors: Accumulator for validation errors.
@@ -1142,6 +1153,15 @@ def _validate_actions(
                     f"'{source}'s datasource '{views[source].datasource}'"
                 )
 
+        # The clicked mark's field is what lands in the parameter, so the targets loop
+        # below needs its type as well as the target's. Empty when either end is already
+        # broken - that error is reported once, above, rather than again per target.
+        source_field = _bare_field(action.get("field")) or ""
+        source_field_type = (
+            field_types.get(views[source].datasource, {}).get(source_field, "")
+            if action_type == "parameter" and source in views else ""
+        )
+
         targets = action.get("targets", [])
         target_names = [
             str(target).strip()
@@ -1168,15 +1188,27 @@ def _validate_actions(
                 )
             elif (
                 action_type == "parameter"
-                and parameter_types[target] != PARAMETER_ACTION_TARGET_TYPE
+                and parameter_types[target] not in PARAMETER_ACTION_TARGET_TYPES
             ):
                 errors.append(
                     f"{label}: target parameter '{target}' is "
-                    f"'{parameter_types[target]}' - a parameter action's target must be "
-                    f"'{PARAMETER_ACTION_TARGET_TYPE}', because only a string's reset value "
-                    f"has an attested serialization and without the reset a zone the "
-                    f"parameter reveals never hides again. Declare it as "
-                    f"'{PARAMETER_ACTION_TARGET_TYPE}' with a 'values' domain"
+                    f"'{parameter_types[target]}' - a parameter action's target must be one "
+                    f"of {', '.join(sorted(PARAMETER_ACTION_TARGET_TYPES))}, because only "
+                    f"those have an attested reset-value serialization and without the reset "
+                    f"a zone the parameter reveals never hides again. Redeclare it as "
+                    f"whichever of those the value really is, with a 'values' domain"
+                )
+            elif (
+                action_type == "parameter"
+                and source_field_type
+                and source_field_type
+                not in PARAMETER_ACTION_FIELD_TYPES[parameter_types[target]]
+            ):
+                errors.append(
+                    f"{label}: field '{source_field}' is '{source_field_type}' but target "
+                    f"parameter '{target}' is '{parameter_types[target]}' - a parameter "
+                    f"action writes the clicked mark's value straight into the parameter, so "
+                    f"Desktop only offers fields of the parameter's own type. Match them"
                 )
 
 
@@ -1253,10 +1285,12 @@ def _validate_visibility(
 ) -> None:
     """Validate every layout node's ``visibility`` field (Dynamic Zone Visibility).
 
-    Tableau shows or hides a zone on a single boolean value, and the builder qualifies that
-    field against the datasource that declares it - so the field has to be a declared
-    *calculated* field of type ``boolean``. A CSV column would need one value per view, which
-    is not something the manifest can promise.
+    Tableau shows or hides a zone on a single boolean value, so the name has to be either a
+    declared *calculated* field of type ``boolean`` or a declared ``boolean`` **parameter** -
+    Desktop binds the datagraph straight to ``[Parameters].[Name]`` for the latter, which is
+    the simpler wiring when a parameter action is what drives the zone (no comparison calc in
+    between). A CSV column would need one value per view, which is not something the manifest
+    can promise.
 
     Args:
         bindings: ``(path, field name)`` pairs from the layout walk.
@@ -1271,12 +1305,18 @@ def _validate_visibility(
         if isinstance(entry, dict)
         and str(entry.get("type", "")).strip().lower() == VISIBILITY_TYPE
     }
+    boolean_parameters = {
+        str(entry.get("name", "")).strip()
+        for entry in manifest_document.get("parameters") or []
+        if isinstance(entry, dict)
+        and str(entry.get("data_type", "")).strip().lower() == VISIBILITY_TYPE
+    }
     for path, field_name in bindings:
-        if field_name not in booleans:
+        if field_name not in booleans | boolean_parameters:
             errors.append(
-                f"{path}: visibility '{field_name}' is not a declared calculated field of "
-                f"type '{VISIBILITY_TYPE}' (declared boolean: "
-                f"{', '.join(sorted(booleans)) or 'none'})"
+                f"{path}: visibility '{field_name}' is not a declared '{VISIBILITY_TYPE}' "
+                f"calculated field or parameter (declared boolean: "
+                f"{', '.join(sorted(booleans | boolean_parameters)) or 'none'})"
             )
 
 

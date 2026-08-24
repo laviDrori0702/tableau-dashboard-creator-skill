@@ -47,14 +47,21 @@ PARAMETER_ROLE = "measure"
 #: Bare-value datatypes; everything else needs delimiters (see :func:`parameter_literal`).
 _BARE_VALUE_TYPES = frozenset({"integer", "real"})
 
-#: What a parameter action's ``<clear-option>`` value is prefixed with - Tableau's own token,
-#: read off a Desktop 2025.1-saved workbook (``s:LROOT:All`` resets a parameter to ``All``).
-#: The value that follows is *undelimited*: the plain text, not a :func:`parameter_literal`.
-#: The ``s`` is a string's type tag and is all that is attested, so a parameter action may
-#: only target a string parameter - ``manifest.PARAMETER_ACTION_TARGET_TYPE`` enforces that,
-#: which is what makes the reset below unconditional for anything that validates (issue #49
-#: lifts the restriction once the other types' tags are read off a Desktop-saved workbook).
-CLEAR_VALUE_PREFIX = "s:LROOT:"
+#: The type tag a parameter action's ``<clear-option value>`` carries, per parameter data
+#: type. The leading letter is the data type and only a string adds the ``LROOT:`` segment;
+#: the value that follows is *undelimited* (``All``, not ``"All"``). Read off Desktop-saved
+#: workbooks - see ``references/snippets/dashboard/CLEAR-OPTION-ATTESTATION.md`` for the
+#: exact elements and where each came from. ``real``, ``date`` and ``datetime`` are absent
+#: because no Desktop workbook writing one has been seen; ``manifest`` rejects a parameter
+#: action targeting them rather than building one that cannot reset (issue #49).
+CLEAR_VALUE_TAGS: dict[str, str] = {
+    "string": "s:LROOT:",
+    "integer": "i:",
+    "boolean": "b:",
+}
+
+#: What Desktop writes in a ``do-nothing`` clear-option, where the value is never read.
+CLEAR_VALUE_UNUSED = "s:LROOT:"
 
 
 def parameter_literal(value: object, data_type: str) -> str:
@@ -78,6 +85,25 @@ def parameter_literal(value: object, data_type: str) -> str:
     return text if text.startswith('"') else f'"{text}"'
 
 
+def serialize_clear_value(current: object, data_type: str) -> str:
+    """Serialize a parameter action's reset value the way Desktop writes it.
+
+    Args:
+        current: The value the parameter goes back to when the selection is cleared.
+        data_type: The parameter's manifest data type.
+
+    Returns:
+        The ``<clear-option value>`` text (``s:LROOT:All``, ``i:10``, ``b:false``), or ``""``
+        for a data type with no attested tag - which leaves the action a ``do-nothing``.
+    """
+    tag = CLEAR_VALUE_TAGS.get(data_type)
+    if tag is None:
+        return ""
+    # A string's value goes in bare; a number's and a boolean's are already bare literals.
+    body = current if data_type == "string" else parameter_literal(current, data_type)
+    return f"{tag}{body}"
+
+
 @dataclass(frozen=True)
 class Parameter:
     """One resolved parameter: its literal current value and its domain.
@@ -88,8 +114,8 @@ class Parameter:
         data_type: The manifest data type (a key of :data:`PARAMETER_TYPES`).
         value: The current value, already rendered as a Tableau literal.
         clear_value: The serialized value a parameter action resets to when the selection is
-            cleared (see :data:`CLEAR_VALUE_PREFIX`); ``""`` for a parameter whose type has no
-            attested serialization, which keeps the value the last click put there.
+            cleared (see :func:`serialize_clear_value`); ``""`` for a parameter whose type has
+            no attested serialization, which keeps the value the last click put there.
         members: A list domain's allowed values, as literals; empty for the other domains.
         bounds: A range domain's ``(min, max, granularity)`` literals, or ``None``.
         number_format: A ``default-format`` pattern for the control, or ``""``.
@@ -167,9 +193,7 @@ def plan_parameters(entries: object) -> list[Parameter]:
             name=name,
             data_type=data_type,
             value=parameter_literal(current, data_type),
-            clear_value=(
-                f"{CLEAR_VALUE_PREFIX}{current}" if data_type == "string" else ""
-            ),
+            clear_value=serialize_clear_value(current, data_type),
             members=members,
             bounds=bounds,
             number_format=str(entry.get("format", "")).strip(),
@@ -286,7 +310,7 @@ class ParameterAction:
         source_field: The qualified column-instance the value is read from.
         target_parameter: The qualified parameter the value is written to.
         clear_value: The serialized value the parameter is reset to when the selection is
-            cleared (:data:`CLEAR_VALUE_PREFIX`); ``""`` keeps the last clicked value.
+            cleared (:func:`serialize_clear_value`); ``""`` keeps the last clicked value.
         activation: ``on-select`` or ``on-hover``.
     """
 
@@ -369,7 +393,7 @@ def render_actions(
         ET.SubElement(element, "agg-type", {"type": "attr"})
         ET.SubElement(element, "clear-option", (
             {"type": "assign-fixed-value", "value": action.clear_value}
-            if action.clear_value else {"type": "do-nothing", "value": CLEAR_VALUE_PREFIX}
+            if action.clear_value else {"type": "do-nothing", "value": CLEAR_VALUE_UNUSED}
         ))
         params = ET.SubElement(element, "params")
         for name, value in (

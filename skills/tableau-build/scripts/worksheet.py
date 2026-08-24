@@ -982,14 +982,12 @@ class WorksheetPlan:
         parameters: Parameters the worksheet's calculations read - the view must declare them
             or Tableau cannot resolve the calculation. Filled in by :mod:`twb`, which owns
             the manifest's parameter list.
-        declared: Fields the worksheet must declare without placing them on the view - a
-            parameter action's source field, which is read off the clicked mark. Filled in by
-            :mod:`twb` when it resolves the actions.
-        detail: Fields pinned to the Detail shelf that no encoding names - the boolean a
-            zone's Dynamic Zone Visibility reads, which Tableau evaluates off the *view* of a
-            sheet in the dashboard. Filled in by :mod:`twb` from the layout's ``visibility``
-            keys. A DZV field is a single value (a parameter comparison), so it never splits
-            the marks.
+        detail: Fields pinned to the Detail shelf that no encoding names, filled in by
+            :mod:`twb`: the boolean a zone's Dynamic Zone Visibility reads (from the layout's
+            ``visibility`` keys), which Tableau evaluates off the *view* of a sheet in the
+            dashboard, and a parameter action's source field (from the actions), which the
+            action reads off the clicked mark. Neither splits the marks - a DZV field is a
+            single value, and an action's source field is read with ATTR.
     """
 
     name: str
@@ -1001,7 +999,6 @@ class WorksheetPlan:
     filters: list[FilterPlan] = field(default_factory=list)
     reference_lines: list[ReferenceLinePlan] = field(default_factory=list)
     parameters: list[Parameter] = field(default_factory=list)
-    declared: list[FieldRef] = field(default_factory=list)
     detail: list[FieldRef] = field(default_factory=list)
     sort: Optional[SortPlan] = None
     tooltip: list[tuple[str, FieldRef]] = field(default_factory=list)
@@ -1037,7 +1034,6 @@ class WorksheetPlan:
         references += [reference for _, reference in self.tooltip]
         references += [reference for reference, _ in self.number_formats]
         references += [line.reference for line in self.reference_lines]
-        references += self.declared
         references += self.detail
         return references
 
