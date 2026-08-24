@@ -29,6 +29,7 @@ import init  # builds a realistic STATE.md the same way a real project would
 import manifest  # the pure manifest-schema core (on sys.path via conftest.py)
 import route  # the router parses/routes the STATE.md build writes
 import twb  # the pure .twb assembler
+import worksheet  # caption_for, the shared caption rule
 
 TARGET_VERSION = "2024.2-2025.x"
 
@@ -938,6 +939,35 @@ def test_column_types_come_from_the_data_model():
     assert by_name["[region]"].get("role") == "dimension"
     assert by_name["[order_date]"].get("datatype") == "date"
     assert by_name["[revenue]"].get("caption") == "Revenue"
+
+
+@pytest.mark.parametrize("field_name, caption", [
+    ("order_date", "Order Date"),                     # raw snake_case: title-cased as before
+    ("ACV - Current", "ACV - Current"),               # acronym survives
+    ("YoY Direction - ACV", "YoY Direction - ACV"),   # mixed case survives
+    ("In KPI Window", "In KPI Window"),               # acronym mid-name survives
+])
+def test_captions_only_title_case_uncased_names(field_name, caption):
+    """A name the author already cased is a display name (issue #69): ``.title()`` would
+    turn ``ACV`` into ``Acv`` in the Data pane, on pills and in Desktop error messages."""
+    assert worksheet.caption_for(field_name) == caption
+    assert twb.Column(name=field_name, ordinal=0, datatype="string").caption == caption
+
+
+def test_a_cased_calculated_field_keeps_its_authored_caption():
+    """The path the analyst hit (issue #69): Desktop reported "Acv - Current" - a name
+    nobody wrote - because the rendered column caption had been .title()-ed."""
+    document = _manifest()
+    document["calculated_fields"] = [
+        {"name": "ACV - Current", "formula": "SUM([revenue])", "datasource": "sales_orders"}
+    ]
+    document["worksheets"][1]["shelves"]["rows"] = [
+        {"field": "ACV - Current", "aggregation": "none"}
+    ]
+    root = _render(document)
+
+    column = root.find("datasources/datasource/column[@name='[ACV - Current]']")
+    assert column is not None and column.get("caption") == "ACV - Current"
 
 
 def test_every_documented_type_renders_a_complete_column():
