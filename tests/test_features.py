@@ -675,13 +675,46 @@ def test_an_action_this_builder_cannot_emit_is_rejected(action_type):
     assert any(action_type in error for error in _errors(actions=actions))
 
 
-def test_a_parameter_action_targeting_a_non_string_parameter_is_rejected():
-    """Only a string's clear value has an attested serialization. A non-string target would
-    build an action that never resets - and a DZV panel it reveals would never hide again."""
+def test_a_parameter_action_targeting_an_unattested_type_is_rejected():
+    """A 'real' clear value has no attested serialization, so the action would never reset -
+    and a DZV panel it reveals would never hide again. Rejected rather than built."""
+    parameters = json.loads(json.dumps(PARAMETERS))
+    parameters.append({"name": "Threshold", "data_type": "real", "current_value": 0.5})
+    actions = json.loads(json.dumps(ACTIONS))
+    actions[-1]["targets"] = ["Threshold"]
+    errors = _errors(parameters=parameters, actions=actions)
+
+    assert any("Threshold" in error and "real" in error for error in errors)
+
+
+def test_a_parameter_action_targeting_an_attested_type_is_accepted():
+    """The string-only narrowing is lifted: integer and boolean resets are attested too
+    (references/snippets/dashboard/CLEAR-OPTION-ATTESTATION.md, issue #49)."""
     actions = json.loads(json.dumps(ACTIONS))
     actions[-1]["targets"] = ["Top N"]
+    actions[-1]["field"] = "revenue"
 
-    assert any("Top N" in error and "string" in error for error in _errors(actions=actions))
+    assert not [error for error in _errors(actions=actions) if "Top N" in error]
+
+
+def test_a_parameter_action_whose_field_and_parameter_types_disagree_is_rejected():
+    """The action writes the mark's value straight in, so Desktop only offers fields of the
+    parameter's own type - a string field into an integer parameter is one it refuses."""
+    actions = json.loads(json.dumps(ACTIONS))
+    actions[-1]["targets"] = ["Top N"]
+    actions[-1]["field"] = "region"
+    errors = _errors(actions=actions)
+
+    assert any("region" in error and "Top N" in error for error in errors)
+
+
+def test_the_parameter_action_type_tables_cover_the_same_types():
+    """The field-compatibility lookup is indexed by the target's type without a default, so
+    a type allowed as a target but missing a field rule would raise instead of validate."""
+    assert (
+        frozenset(manifest.PARAMETER_ACTION_FIELD_TYPES)
+        == manifest.PARAMETER_ACTION_TARGET_TYPES
+    )
 
 
 # --- Quick filters and parameter controls (AC #3) ------------------------------
@@ -883,16 +916,36 @@ def test_the_dzv_format_flags_are_present_and_alphabetical():
     assert flags == sorted(flags)
 
 
-def test_a_non_string_parameter_keeps_the_attested_clear_option():
-    """Only a string parameter's reset serialization is attested; guessing the tag for the
-    others is what makes Desktop refuse to open the action editor at all."""
+@pytest.mark.parametrize("data_type, current, expected", [
+    ("string", "All", "s:LROOT:All"),
+    ("integer", 10, "i:10"),
+    ("boolean", True, "b:true"),
+    ("boolean", False, "b:false"),
+])
+def test_the_clear_value_serialization_is_pinned_per_type(data_type, current, expected):
+    """The tag is the data type's own letter and only a string adds LROOT:; the value after
+    it is undelimited. Read off Desktop-saved workbooks - see the attestation note beside
+    references/snippets/dashboard/parameter-action.twb (issue #49)."""
+    assert features.serialize_clear_value(current, data_type) == expected
+
+
+@pytest.mark.parametrize("data_type", ["real", "date", "datetime"])
+def test_an_unattested_type_gets_no_clear_value(data_type):
+    """Guessing a tag Desktop does not write is what makes it refuse the action editor, so
+    an unattested type serializes to nothing and the caller falls back to do-nothing."""
+    assert features.serialize_clear_value(1, data_type) == ""
+
+
+def test_a_parameter_action_on_an_attested_non_string_type_still_resets():
+    """An integer target now carries a real reset, not a do-nothing - which is what keeps a
+    zone the parameter reveals closable."""
     actions = json.loads(json.dumps(ACTIONS))
     actions[-1]["targets"] = ["Top N"]
     actions[-1]["field"] = "revenue"
     root = ET.fromstring(_render(_manifest(actions=actions)))
 
     assert root.find("actions/edit-parameter-action/clear-option").attrib == {
-        "type": "do-nothing", "value": features.CLEAR_VALUE_PREFIX,
+        "type": "assign-fixed-value", "value": "i:10",
     }
 
 

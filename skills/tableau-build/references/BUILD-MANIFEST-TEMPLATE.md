@@ -193,10 +193,19 @@ name and needs a `field` — the field read off the clicked mark and written int
 Clearing the selection **resets** a parameter action's parameter to its `current_value`, so
 whatever the parameter drives returns to its opening state. That is what makes a parameter
 action safe to use without a control: the viewer cannot get stuck in a state only a control
-could undo. The reset is why **a parameter action's target must be a `string` parameter** —
-that is the only type whose reset value has an attested serialization, and a target that
-could not be reset is rejected rather than built without it. Give it a `values` domain
-(`["All", "West", "East"]`) and open it on the neutral member.
+could undo. The reset is why **a parameter action's target must be a `string`, `integer` or
+`boolean` parameter** — those are the types whose reset value has an attested serialization,
+and a target that could not be reset is rejected rather than built without it. A `real`,
+`date` or `datetime` target is refused.
+
+The **`field` must be the same type as the target parameter** (whole and decimal numbers
+count as one type): the action writes the clicked mark's value straight in with no
+conversion, so a `string` field into an `integer` parameter is a pairing Desktop refuses.
+
+Give the parameter a `values` domain (`["All", "West", "East"]`, or `[true, false]` for a
+Dynamic-Zone-Visibility toggle) and open it on the neutral member. A `range` domain works but
+clamps whatever the click writes to its bounds, which usually reads as a broken dashboard
+rather than an error — prefer `values`.
 
 `set` and `url` actions are **rejected**: the builder emits nothing for them, and a dashboard
 that validated with one would open with the interaction silently missing. A `drill`
