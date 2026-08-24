@@ -356,6 +356,59 @@ def test_an_evenly_split_flow_container_declares_the_strategy():
     assert uneven_row.get("layout-strategy-id") is None
 
 
+def test_a_near_equal_split_still_counts_as_evenly_split():
+    """Three siblings can only sum to 100 as ``33.34/33.33/33.33``. That row is even in
+    every sense that matters, so it gets the strategy and no per-child pinning (issue #63)."""
+    container, _, _ = _render({"type": "horz", "children": [
+        {"id": "a", "size": 33.34}, {"id": "b", "size": 33.33}, {"id": "c", "size": 33.33},
+    ]})
+    row = container.find("zone/zone")
+
+    assert row.get("layout-strategy-id") == "distribute-evenly"
+    assert [child.get("is-fixed") for child in row.findall("zone")] == [None, None, None]
+
+
+def test_a_proportioned_split_pins_every_child_but_the_flex_one():
+    """Desktop keeps a hand-proportioned split by writing each child's size in px along the
+    flow axis; without it the stored w/h is re-flowed away on open (issue #63)."""
+    container, _, _ = _render({"type": "horz", "children": [
+        {"id": "side", "size": 25}, {"id": "main", "size": 75},
+    ]})
+    row = container.find("zone/zone")
+    side, main = row.findall("zone")
+
+    assert row.get("layout-strategy-id") is None
+    # 25% of the root's width, inset by the root margin, in px at CANVAS.
+    assert side.get("is-fixed") == "true"
+    assert side.get("fixed-size") == str(round(int(side.get("w")) / zones.ZONE_SPACE * 1366))
+    # The last child flexes, absorbing the rounding remainder - as Desktop leaves it.
+    assert main.get("is-fixed") is None
+    assert main.get("fixed-size") is None
+
+
+def test_a_vertical_split_pins_children_by_height():
+    """The pin is the child's size along the *flow* axis, so a vertical container pins px
+    of height (issue #63)."""
+    container, _, _ = _render({"type": "vert", "children": [
+        {"id": "top", "size": 30}, {"id": "bottom", "size": 70},
+    ]})
+    top = container.find("zone/zone/zone")
+
+    assert top.get("fixed-size") == str(round(int(top.get("h")) / zones.ZONE_SPACE * 768))
+
+
+def test_a_show_hide_child_is_pinned_and_its_sibling_flexes():
+    """A show/hide panel is exactly what must not be the flex child: hiding it would leave
+    the container's slack blank. The uncontrolled sibling takes the reflow (issue #63)."""
+    container, _, _ = _render({"type": "horz", "children": [
+        {"id": "main", "size": 60}, {"id": "panel", "size": 40, "visibility": "Show Panel"},
+    ]})
+    main, panel = container.find("zone/zone").findall("zone")
+
+    assert panel.get("is-fixed") == "true"
+    assert main.get("is-fixed") is None
+
+
 # --- Content ------------------------------------------------------------------
 
 def test_a_worksheet_zone_names_its_sheet_and_reports_it_as_embedded():
