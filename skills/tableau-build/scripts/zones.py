@@ -103,6 +103,14 @@ SHEET_LAYOUT_CACHES: dict[bool, dict[str, str]] = {
 #: The ``layout-strategy-id`` Desktop writes on a flow container it splits evenly (a KPI row).
 DISTRIBUTE_EVENLY = "distribute-evenly"
 
+#: How far apart two sibling proportions may be and still count as an even split.
+#:
+#: Issue #63: three near-equal siblings can only sum to 100 as ``33.34 / 33.33 / 33.33``,
+#: which an exact-equality test reads as *proportioned* - so the intentionally even row lost
+#: its strategy and got pinned instead. Anything looser than a rounding artefact (a 60/40
+#: split, say) stays proportioned.
+EVEN_SPLIT_TOLERANCE = 0.5
+
 #: The root zone's friendly name.
 ROOT_FRIENDLY_NAME = "Dashboard"
 
@@ -265,6 +273,46 @@ class _ZoneWriter:
         """Convert a vertical px measure into zone units at the canvas height."""
         return round(pixels / self._height * ZONE_SPACE)
 
+    def _pixels_x(self, units: int) -> int:
+        """Convert a horizontal zone-unit measure back into px at the canvas width."""
+        return max(1, round(units / ZONE_SPACE * self._width))
+
+    def _pixels_y(self, units: int) -> int:
+        """Convert a vertical zone-unit measure back into px at the canvas height."""
+        return max(1, round(units / ZONE_SPACE * self._height))
+
+    @staticmethod
+    def _flex_child(children: list, sizes: list[float]) -> int:
+        """Return the index of the child left unpinned, to absorb the container's slack.
+
+        A hand-built container pins every child but one, and the one it leaves free is the
+        *largest* - never simply the last. In the reference workbook's main column the flex
+        child sits in the middle (the 51% trend section, between a pinned 150px KPI row and
+        a pinned 209px bottom section); in its trend section the trailing 22px legend is
+        pinned and the chart row flexes. The unpinned child is what absorbs the rounding
+        remainder, the room a hidden sibling gives up, and every pixel the dashboard gains
+        over its minimum size - which is right for the main content region and wrong for a
+        legend strip or a spacer, which would swallow the growth and leave the charts at
+        their authored size.
+
+        A visibility-controlled child is excluded outright: hiding the only flex child
+        would leave the container's slack blank.
+
+        Args:
+            children: The container's child nodes.
+            sizes: Each child's proportion, positionally.
+
+        Returns:
+            The index into ``children`` of the child to leave unpinned.
+        """
+        def is_controlled(index: int) -> bool:
+            child = children[index]
+            return isinstance(child, dict) and bool(str(child.get("visibility") or "").strip())
+
+        indices = range(len(children))
+        free = [index for index in indices if not is_controlled(index)] or list(indices)
+        return max(free, key=lambda index: sizes[index])
+
     def _zone(self, parent: ET.Element, box: Box, friendly_name: str, **attributes) -> ET.Element:
         """Append one zone with its geometry, id and friendly name.
 
@@ -336,20 +384,30 @@ class _ZoneWriter:
             return
 
         orientation = "vert" if str(node.get("type", "")).strip().lower() == "vert" else "horz"
+        vertical = orientation == "vert"
         sizes = child_sizes(children)
         # An evenly split container is how Desktop records a KPI row: the strategy, not four
         # stored 25%s, is what keeps the cards equal as the dashboard stretches (issue #59).
-        is_evenly_split = len(sizes) > 1 and len(set(sizes)) == 1
+        is_evenly_split = len(sizes) > 1 and max(sizes) - min(sizes) <= EVEN_SPLIT_TOLERANCE
         container = self._zone(
             parent, box, f"{CONTAINER_PREFIXES[orientation]}-{element_id or path}",
             type_v2="layout-flow", param=orientation,
             layout_strategy_id=DISTRIBUTE_EVENLY if is_evenly_split else None,
         )
         self._record_visibility(container, visibility)
+        flex = self._flex_child(children, sizes)
         for index, (child, child_box) in enumerate(
             zip(children, self._divide(box, orientation, sizes)), start=1
         ):
+            first_new = len(container)
             self._node(container, child, child_box, f"{path}.{index}")
+            if is_evenly_split or index - 1 == flex or len(container) == first_new:
+                continue
+            # A proportioned split only survives the open if each child states its own size
+            # in px along the flow axis - the stored w/h alone is re-flowed away (issue #63).
+            pin = self._pixels_y(child_box.h) if vertical else self._pixels_x(child_box.w)
+            container[first_new].set("is-fixed", "true")
+            container[first_new].set("fixed-size", str(pin))
         render_zone_style(container, ZONE_MARGIN)
 
     def _record_visibility(self, zone: ET.Element, field: str) -> None:

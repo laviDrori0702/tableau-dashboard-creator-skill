@@ -360,6 +360,37 @@ def test_reconcile_flags_insane_sibling_sizes():
     assert any("sum to 30" in error for error in validation.layout_errors)
 
 
+def test_reconcile_flags_an_equal_group_stranded_with_a_smaller_sibling():
+    """Two equal cards above a 3% legend strip cannot be distributed evenly: the build pins
+    every child but the biggest, so the cards drift apart as the dashboard grows. The author
+    is told to wrap the equal group in its own container (issue #63)."""
+    layout = (
+        '{"canvas": {"width": 1366, "height": 768}, "root": {"type": "vert", "children": '
+        '[{"id": "kpi-revenue", "size": 48.5}, {"id": "chart-trend", "size": 48.5}, '
+        '{"id": "flt-region", "size": 3}]}}'
+    )
+    validation = reconcile.reconcile(_mock_html(), _spec_md(layout=layout))
+
+    assert validation.ok is False
+    assert any(
+        "wrap the equal group in its own container" in error
+        for error in validation.layout_errors
+    )
+
+
+def test_reconcile_accepts_equal_siblings_under_a_bigger_one():
+    """Equal siblings *below* the biggest child are all pinned at equal sizes and stay
+    equal - they just do not grow. Only a stranded *largest* group is a problem."""
+    layout = (
+        '{"canvas": {"width": 1366, "height": 768}, "root": {"type": "vert", "children": '
+        '[{"id": "kpi-revenue", "size": 60}, {"id": "chart-trend", "size": 20}, '
+        '{"id": "flt-region", "size": 20}]}}'
+    )
+    validation = reconcile.reconcile(_mock_html(), _spec_md(layout=layout))
+
+    assert validation.layout_errors == []
+
+
 def test_reconcile_flags_missing_canvas():
     """The canvas dimensions are required (the mock's design size drives the build)."""
     layout = (
