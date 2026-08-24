@@ -653,12 +653,17 @@ def _dashboard_leaves(
             continue
         # Only the colour legend is placed in the dashboard; size/shape keys stay on the
         # worksheet's own right edge, where they do not compete for the element's box.
-        legend = next(
-            (zones.Legend(reference, pane_id)
-             for card_type, reference, pane_id in worksheet.legend_cards(plan)
-             if card_type == "color"),
-            None,
-        )
+        # 'legend: false' opts out entirely - a KPI card coloured by a semantic up/down field
+        # needs the colour but not the 22px key, which would eat its number (issue #65). The
+        # sheet's own right-edge legend card is unaffected either way.
+        legend = None
+        if entry.get("legend") is not False:  # absent means the default: keep the legend
+            legend = next(
+                (zones.Legend(reference, pane_id)
+                 for card_type, reference, pane_id in worksheet.legend_cards(plan)
+                 if card_type == "color"),
+                None,
+            )
         # First claimant wins: two views on one zone is a manifest bug, and picking the
         # later one would silently move the analyst's chart.
         leaves.setdefault(element_id, zones.Leaf(
