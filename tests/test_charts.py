@@ -971,9 +971,9 @@ def test_a_prose_annotated_font_family_is_sanitized(caplog):
 def test_a_bare_tableau_is_not_a_family(caplog):
     """Tableau ships six *families* - Bold, Book, Light, Medium, Regular, Semibold - and no
     font called plain 'Tableau'. The weight is part of the name, so a bare 'Tableau' resolves
-    to nothing (verified against Desktop output in
-    tests/temp-workbooks-for-tests/zones-and-containers.twb, which carries
-    fontname='Tableau Medium')."""
+    to nothing (verified against Desktop's own output in
+    skill/tableau-dashboard-creator/examples/top-level-workbook-example.twb, which carries
+    fontname='Tableau Medium' and fontname='Tableau Light')."""
     with caplog.at_level("WARNING"):
         tokens = worksheet.parse_design_tokens("## Typography\n\n- **Font family**: Tableau\n")
 

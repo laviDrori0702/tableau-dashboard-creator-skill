@@ -79,8 +79,9 @@ DEFAULT_FONT = "Tableau Book"
 #: The Tableau families that actually ship with Desktop. There is no font called plain
 #: "Tableau": the weight is part of the family name, so "Tableau" alone resolves to nothing
 #: and Desktop falls back silently. Real Desktop output writes one of these verbatim - see
-#: ``tests/temp-workbooks-for-tests/zones-and-containers.twb``, whose every run carries
-#: ``fontname='Tableau Medium'``.
+#: ``skill/tableau-dashboard-creator/examples/top-level-workbook-example.twb``, whose runs
+#: carry ``fontname='Tableau Medium'`` and ``fontname='Tableau Light'`` and never a bare
+#: ``Tableau``.
 TABLEAU_FONTS: tuple[str, ...] = (
     "Tableau Bold", "Tableau Book", "Tableau Light",
     "Tableau Medium", "Tableau Regular", "Tableau Semibold",
