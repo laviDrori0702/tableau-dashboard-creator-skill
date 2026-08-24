@@ -365,21 +365,31 @@ def test_the_same_manifest_rebuilds_byte_identical():
 # --- Mark classes and shelves --------------------------------------------------
 
 @pytest.mark.parametrize("sheet_name,mark_class", [
-    ("Bar", "Automatic"),
-    ("Line", "Automatic"),
+    ("Bar", "Bar"),
+    ("Line", "Line"),
     ("Area", "Area"),
     ("Pie", "Pie"),
-    ("Scatter", "Automatic"),
-    ("Text Table", "Automatic"),
-    ("Kpi Card", "Automatic"),
-    ("Histogram", "Automatic"),
+    ("Scatter", "Circle"),
+    ("Text Table", "Text"),
+    ("Kpi Card", "Text"),
+    ("Histogram", "Bar"),
     ("Map", "Automatic"),
 ])
 def test_mark_class_per_chart_type(sheet_name, mark_class):
-    """The mark class is what makes Tableau draw the right shape; Area and Pie must be
-    explicit or Tableau falls back to a line."""
+    """The mark class is what makes Tableau draw the right shape; every single-pane type
+    states it rather than letting Tableau's Automatic infer one from the shelves."""
     pane = _worksheet_element(sheet_name).find("table/panes/pane")
     assert pane.find("mark").get("class") == mark_class
+
+
+def test_a_bar_over_a_continuous_date_is_still_a_bar():
+    """Issue #64: the reproducing shape. Automatic reads a continuous date x measure as
+    points, so a month-spine bar chart drew scattered dots instead of bars."""
+    document = _manifest(worksheets=[_sheet("Monthly Bar", "bar", shelves={
+        "columns": [{"field": "order_date", "date_part": "month"}], "rows": ["revenue"],
+    })])
+    element = _worksheet_element("Monthly Bar", ET.fromstring(_render(document)))
+    assert element.find("table/panes/pane/mark").get("class") == "Bar"
 
 
 def test_pie_and_kpi_put_everything_on_encodings():

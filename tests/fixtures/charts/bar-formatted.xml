@@ -49,7 +49,7 @@
             <view>
               <breakdown value="auto" />
             </view>
-            <mark class="Automatic" />
+            <mark class="Bar" />
           </pane>
         </panes>
         <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]</rows>
