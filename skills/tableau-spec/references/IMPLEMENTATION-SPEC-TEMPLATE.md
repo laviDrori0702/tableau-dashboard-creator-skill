@@ -44,6 +44,11 @@ of being guessed. Start with a short human-readable summary of the layout, then 
   siblings must sum to ~100. The root itself needs no size.
 - Every mapped **zone** id appears **exactly once**. Interaction ids (`int-*`) are
   dashboard actions, not zones — never place them in the tree.
+- Children meant to be **equal** must be their container's **only** children — wrap them
+  in a container of their own rather than listing them beside a smaller sibling. Equal cards
+  stay equal only when the whole container is distributed evenly, so
+  `[card 32, card 32, card 32, legend 4]` drifts apart, while
+  `[[card 33, card 33, card 34] 96, legend 4]` holds.
 
 <Example: a filter bar over a KPI row, a chart row, and a collapsible details panel.>
 

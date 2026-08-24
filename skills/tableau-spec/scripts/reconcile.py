@@ -217,6 +217,11 @@ INTERACTION_PREFIX = "int-"
 #: How far sibling sizes may drift from 100% before they "don't sum sanely" (rounding slack).
 SIBLING_SIZE_TOLERANCE = 2.0
 
+#: How close two sibling sizes must be to read as "the author meant these to be equal".
+#: Matches ``zones.EVEN_SPLIT_TOLERANCE`` in tableau-build, which is what decides whether a
+#: container is written as an evenly-distributed one.
+EQUAL_SIBLING_TOLERANCE = 0.5
+
 # Exactly '## Layout' (the level the contract/template mandate) so the section reliably
 # ends at the next '## ' heading.
 _LAYOUT_HEADING = re.compile(r"^##\s+Layout\b.*$", re.MULTILINE)
@@ -248,6 +253,40 @@ def extract_layout_block(spec_text: str) -> Optional[str]:
 def _is_number(value: object) -> bool:
     """Return True for a real (non-bool) JSON number."""
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _stranded_equal_group(path: str, sizes: list[float]) -> list[str]:
+    """Flag a container whose *largest* children are equal but which also holds a smaller one.
+
+    Tableau keeps a set of equal siblings equal by distributing the whole container evenly -
+    a property of the container, not of the children - so a group meant to stay equal has to
+    be the container's *only* children. Stranded among a smaller sibling (three chart cards
+    above a 3% legend strip), the group cannot be distributed: the build pins every child but
+    the biggest, so on any dashboard taller than its minimum one card of the group grows and
+    the rest stay put (issue #63).
+
+    Only the largest group matters. Equal siblings *below* the biggest child are all pinned,
+    at equal sizes, and stay equal - they simply do not grow.
+
+    Args:
+        path: The container's position in the tree, for the error message.
+        sizes: The children's sizes, positionally.
+
+    Returns:
+        One error message when the container strands an equal group, otherwise no messages.
+    """
+    if len(sizes) < 3:
+        return []
+    largest = max(sizes)
+    group = [index for index, size in enumerate(sizes) if largest - size <= EQUAL_SIBLING_TOLERANCE]
+    if len(group) < 2 or len(group) == len(sizes):
+        return []  # a unique biggest child, or a container that is evenly split as it stands
+    shares = " / ".join(f"{sizes[index]:g}" for index in group)
+    return [
+        f"{path}: children {group} are equal ({shares}) but share the container with a "
+        f"smaller sibling, so they cannot be distributed evenly and will drift apart as the "
+        f"dashboard grows - wrap the equal group in its own container"
+    ]
 
 
 def _walk_layout_node(
@@ -311,6 +350,7 @@ def _walk_layout_node(
                 f"{path}: sibling sizes sum to {total:g}, expected ~100 "
                 f"(each child's share of its parent)"
             )
+        errors.extend(_stranded_equal_group(path, sizes))
 
 
 def validate_layout(spec_text: str, mapped_ids: list[str]) -> list[str]:

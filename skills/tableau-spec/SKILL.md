@@ -48,6 +48,11 @@ single **Element Mapping table** and a **Layout section** (see
   mapped **zone** id appears **exactly once**; interaction ids (`int-*`) are actions, not
   zones, and never appear. This is how the mock's geometry reaches `tableau-build` — a
   missing or inconsistent Layout blocks approval exactly like an unmapped element.
+- **Siblings meant to stay equal must be a container's only children.** Tableau holds a row
+  of equal cards equal by distributing the *container* evenly, so an equal group stranded
+  beside a smaller sibling (three chart cards above a 3% legend strip) cannot be held — the
+  build pins every child but the biggest, and the group drifts apart on any dashboard taller
+  than its minimum. Wrap the group in its own container; the validator flags this.
 
 ## The simplest-primitive guard
 
