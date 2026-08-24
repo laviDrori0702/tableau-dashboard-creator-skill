@@ -1487,6 +1487,26 @@ def test_an_unsupported_construct_is_named_and_the_rest_still_builds(tmp_path):
     assert (tmp_path / build.VERSION_DIR / "v_1" / build.WORKBOOK_FILENAME).exists()
 
 
+def test_the_gate_refuses_to_run_without_lxml(tmp_path, monkeypatch):
+    """Issue #68: a validator that can silently not run is not a validator. Without lxml
+    the XSD check cannot execute, so the gate fails instead of reporting green degraded."""
+    real_find_spec = build.importlib.util.find_spec
+    monkeypatch.setattr(
+        build.importlib.util, "find_spec",
+        lambda name, *args: None if name == "lxml" else real_find_spec(name, *args),
+    )
+
+    result = _built_project(tmp_path)
+
+    assert result.ok is False
+    assert any("lxml" in error for error in result.errors)
+    assert any("pip install lxml" in error for error in result.errors)
+    # The absence is never a mere warning, and nothing is packaged for commit to approve.
+    assert not any("lxml" in warning for warning in result.warnings)
+    assert "[BUILT]" not in build.format_build(result)
+    assert build.commit(tmp_path).ok is False
+
+
 # --- STATE.md transition (CONTRACT.md §4.3) ----------------------------------
 
 def test_commit_refuses_without_a_workbook(tmp_path):

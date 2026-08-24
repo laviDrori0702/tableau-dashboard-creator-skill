@@ -6,4 +6,4 @@ python-dotenv>=1.0,<2.0
 requests>=2.31,<3.0
 
 # Step E — XSD validation of generated .twb files
-lxml>=5.0,<6.0
+lxml>=5.0,<7.0

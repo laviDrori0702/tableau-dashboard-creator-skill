@@ -596,7 +596,7 @@ class BuildResult:
         twb_path: Project-relative path of the workbook XML (written even on a validator
             failure, so the XML can be inspected).
         twbx_path: Project-relative path of the package; ``""`` when nothing was packaged.
-        warnings: Non-fatal notes (a skipped XSD check, the documented version shift).
+        warnings: Non-fatal notes (the documented version shift, reserved-but-empty boxes).
         gated: Whether the validation gate actually ran. A failure *before* it - an invalid
             manifest, a missing CSV, no ``.twb`` to gate - must not be reported as a failed
             gate, or the analyst debugs the wrong thing.
@@ -640,10 +640,15 @@ def _xsd_errors(twb_path: Path, target_tableau_version: str) -> tuple[list[str],
     Returns:
         ``(errors, warnings)``. For the 2026.1+ target every schema error is fatal; for
         2024.2-2025.x the single ``<explain-data>`` complaint is downgraded to a warning.
-        When ``lxml`` is absent the check is skipped with a warning.
+        When ``lxml`` is absent the check *cannot* run, so it fails: a gate that reports
+        green while one of its validators silently sat out is worse than a red one.
     """
     if importlib.util.find_spec("lxml") is None:
-        return [], ["XSD check skipped: lxml is not installed (pip install lxml)."]
+        return [
+            "the XSD check cannot run: lxml is not installed, and the gate refuses to run "
+            "partially. Install it with 'pip install lxml' (it is in requirements.txt) and "
+            "re-run."
+        ], []
 
     import validate_twb_xsd  # imports lxml at module level - guarded above
 
@@ -680,8 +685,8 @@ class GateReport:
 
     Attributes:
         results: ``{validator name: errors}`` for each of :data:`GATE_VALIDATORS`.
-        warnings: Non-fatal notes - a skipped XSD check, the documented version shift, and
-            each unsupported construct the build reserved a box for but did not draw.
+        warnings: Non-fatal notes - the documented version shift, and each unsupported
+            construct the build reserved a box for but did not draw.
     """
 
     results: dict[str, list[str]]
