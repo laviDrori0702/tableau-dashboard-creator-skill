@@ -48,6 +48,7 @@ from worksheet import (
     VERTICAL_ALIGNMENTS,
     CalculatedField,
     aggregate_calculated_fields,
+    parse_design_tokens,
 )
 from zones import FILTER_MODES
 
@@ -772,6 +773,7 @@ def _validate_worksheets(
     container_ids: set[str],
     errors: list[str],
     aggregate_calcs: Optional[dict[str, frozenset[str]]] = None,
+    palette_names: Optional[set[str]] = None,
 ) -> set[str]:
     """Validate the worksheets against the datasources and the layout tree.
 
@@ -785,6 +787,8 @@ def _validate_worksheets(
         errors: Accumulator for validation errors.
         aggregate_calcs: ``{datasource: {calculated field that already aggregates}}``, from
             :func:`_aggregate_calculated_fields`.
+        palette_names: The lower-cased field names DESIGN-TOKENS.md carries a series table
+            for - what a worksheet's ``palette`` key may name (issue #67).
 
     Returns:
         The element ids the worksheets fill.
@@ -810,6 +814,16 @@ def _validate_worksheets(
         elif name in seen_names:
             errors.append(f"{label}: duplicate worksheet name '{name}'")
         seen_names.add(name)
+
+        # A 'palette' that names no series table would silently fall back to the whole
+        # ordered list - the exact wrong-colours symptom the key exists to fix (issue #67).
+        palette = str(worksheet.get("palette", "")).strip()
+        if palette and palette.lower() not in (palette_names or set()):
+            known = ", ".join(sorted(palette_names or set())) or "none"
+            errors.append(
+                f"{label}: palette '{palette}' names no series table in DESIGN-TOKENS.md "
+                f"under '### Chart series colors' (tables found: {known})"
+            )
 
         chart_type = str(worksheet.get("chart_type", "")).strip().lower()
         if chart_type not in CHART_TYPES:
@@ -1267,7 +1281,10 @@ def _validate_visibility(
 
 
 def validate_manifest(
-    manifest_document: dict, data_model_text: str, target_tableau_version: str
+    manifest_document: dict,
+    data_model_text: str,
+    target_tableau_version: str,
+    design_tokens_text: str = "",
 ) -> list[str]:
     """Validate a build manifest against the data model and the project's target version.
 
@@ -1278,6 +1295,8 @@ def validate_manifest(
         manifest_document: The parsed ``build-manifest.json``.
         data_model_text: The contents of ``DATA-MODEL.md`` (the field authority).
         target_tableau_version: STATE.md's ``target_tableau_version`` (CONTRACT.md §2).
+        design_tokens_text: The contents of ``DESIGN-TOKENS.md`` (``""`` when there was no
+            branding step) - the authority for a worksheet's ``palette`` name.
 
     Returns:
         A list of error messages; empty when the manifest is buildable.
@@ -1319,6 +1338,7 @@ def validate_manifest(
     filled = _validate_worksheets(
         manifest_document.get("worksheets"), declared_fields, calculated, zone_ids,
         container_ids, errors, _aggregate_calculated_fields(manifest_document),
+        set(parse_design_tokens(design_tokens_text).field_palettes),
     )
 
     views = _view_zones(manifest_document.get("worksheets"))

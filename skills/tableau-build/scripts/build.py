@@ -527,10 +527,14 @@ def validate(project_dir: Path | str) -> ValidationResult:
     if document is None:
         return ValidationResult(False, [load_error or ""], version, manifest_rel)
 
+    tokens_path = project_root / DESIGN_TOKENS_FILENAME
     errors = validate_manifest(
         document,
         (project_root / DATA_MODEL_FILENAME).read_text(encoding="utf-8-sig"),
         read_target_tableau_version(text),
+        # Optional read (CONTRACT.md §4.1): with no branding step there are no series tables,
+        # so a worksheet naming one is an error worth catching here rather than at render.
+        tokens_path.read_text(encoding="utf-8-sig") if tokens_path.exists() else "",
     )
     errors += spec_layout_errors(
         (project_root / VERSION_DIR / version / SPEC_FILENAME).read_text(

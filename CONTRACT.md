@@ -61,7 +61,7 @@ silently un-styles every workbook while both skills still pass their own checks:
 | heading | what `build` does with it |
 |---|---|
 | `## Typography` | The `- **Font family**:` and `- **Chart title**:` bullets become the worksheet font and title run. |
-| `### Chart series colors` | The ordered hex list becomes **every worksheet's colour palette**, emitted as an inline `<color-palette>` on the mark's colour encoding, plus the default mark colour for charts with nothing on Colour. |
+| `### Chart series colors` | The ordered hex list becomes a worksheet's colour palette, emitted as an inline `<color-palette>` on the mark's colour encoding, plus the default mark colour for charts with nothing on Colour. One table per coloured field (each introduced by its field name in backticks) binds each colour encoding to **its own** table, in row order; a field no table names takes the whole list. |
 
 The palette needs **no data member values** — that was the open question that kept it unbuilt.
 A member-bound palette (`<map to='#…'><bucket>"West"</bucket>`) is impossible from a manifest,
