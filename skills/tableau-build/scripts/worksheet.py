@@ -107,6 +107,11 @@ BRAND_PALETTE_NAME = "Brand"
 
 _SERIES_HEADING = re.compile(r"^#+\s*.*series colors", re.IGNORECASE)
 
+#: A field name naming the sub-palette that follows it, in the tokens convention's backticks
+#: (``**`country_bucket`**``, or a `` `field` `` in the prose introducing a table). A hex is
+#: backticked too, hence the leading letter/underscore.
+_TOKEN_FIELD_NAME = re.compile(r"`([A-Za-z_][A-Za-z0-9_ .-]*)`")
+
 
 @dataclass(frozen=True)
 class DesignTokens:
@@ -128,7 +133,12 @@ class DesignTokens:
         title_size: Chart-title point size.
         title_color: Chart-title colour, lower-cased hex.
         kpi_size: Point size for a KPI card's big number.
-        series_colors: The brand's ordered chart-series colours, lower-cased hex.
+        series_colors: Every chart-series colour in file order, lower-cased hex - the
+            fallback for an encoding no sub-palette names.
+        field_palettes: ``{lower-cased field name: that field's ordered colours}``, one entry
+            per named series table. A tokens file that colours more than one dimension writes
+            a table per field; walking a domain against the *concatenation* colours every
+            encoding but the first with another field's ramp (issue #67).
         present: Whether a DESIGN-TOKENS.md was actually supplied.
     """
 
@@ -137,7 +147,21 @@ class DesignTokens:
     title_color: str = DEFAULT_TITLE_COLOR
     kpi_size: int = DEFAULT_KPI_SIZE
     series_colors: tuple[str, ...] = ()
+    field_palettes: dict[str, tuple[str, ...]] = field(default_factory=dict)
     present: bool = False
+
+    def palette_for(self, field_name: str) -> tuple[str, ...]:
+        """Return the sub-palette a field names, or the whole ordered list.
+
+        Args:
+            field_name: The name of the field on Colour, or the manifest's ``palette``
+                override.
+
+        Returns:
+            The field's own colours when a series table names it, else
+            :attr:`series_colors`.
+        """
+        return self.field_palettes.get(field_name.strip().lower(), self.series_colors)
 
 
 def _font_family(value: str) -> str:
@@ -181,8 +205,11 @@ def parse_design_tokens(tokens_text: str) -> DesignTokens:
     The parse is tolerant by design (the file is prose an agent authored from a template):
     it looks for the ``- **Font family**:`` and ``- **Chart title**:`` bullets and takes the
     first font name / px size / hex colour on each, and reads every hex under the
-    ``### Chart series colors`` heading as the ordered palette. Anything it cannot find keeps
-    its Tableau default.
+    ``### Chart series colors`` heading as the ordered palette. When that section names
+    fields - a `` `field_name` `` in the prose or bold-code heading introducing a table - the
+    colours under each name are also kept as that field's own sub-palette, so a sheet
+    coloured by it walks its ramp instead of the concatenation (issue #67). Anything it
+    cannot find keeps its Tableau default.
 
     Args:
         tokens_text: The contents of a ``DESIGN-TOKENS.md`` (``""`` when absent).
@@ -195,6 +222,8 @@ def parse_design_tokens(tokens_text: str) -> DesignTokens:
 
     font, title_size, title_color = DEFAULT_FONT, DEFAULT_TITLE_SIZE, DEFAULT_TITLE_COLOR
     series_colors: list[str] = []
+    field_palettes: dict[str, list[str]] = {}
+    named_field = ""
     in_series = False
     for raw_line in tokens_text.splitlines():
         line = raw_line.strip()
@@ -203,9 +232,21 @@ def parse_design_tokens(tokens_text: str) -> DesignTokens:
             # and every author formats that differently (one comma-separated run, a bullet
             # each), so every hex until the next heading is a series colour.
             in_series = _SERIES_HEADING.match(line) is not None
+            named_field = ""
             continue
         if in_series:
-            series_colors += [match.group(0).lower() for match in _HEX.finditer(line)]
+            colors = [match.group(0).lower() for match in _HEX.finditer(line)]
+            if not colors:
+                # A line with no colour is prose or a table header, and prose is where a
+                # sub-palette gets its name: `country_bucket` introduces the table under it.
+                name = _TOKEN_FIELD_NAME.search(line)
+                if name:
+                    named_field = name.group(1).strip().lower()
+                    field_palettes.setdefault(named_field, [])
+                continue
+            series_colors += colors
+            if named_field:
+                field_palettes[named_field] += colors
             continue
         if not line.startswith("-"):
             continue
@@ -231,6 +272,9 @@ def parse_design_tokens(tokens_text: str) -> DesignTokens:
         title_color=title_color,
         kpi_size=max(title_size + 8, DEFAULT_KPI_SIZE),
         series_colors=tuple(series_colors),
+        field_palettes={
+            name: tuple(colors) for name, colors in field_palettes.items() if colors
+        },
         present=True,
     )
 
@@ -922,6 +966,9 @@ class WorksheetPlan:
         fit: How the sheet fills its zone - a :data:`FIT_ZOOMS` key.
         sheet_format: The resolved Format Borders / Lines / Shading / Alignment block.
         geo_role: A map's geographic semantic role, or ``""``.
+        palette: The DESIGN-TOKENS.md series table to colour the marks from, when the field
+            on Colour does not carry that table's name (a calculated ``Package Bucket``
+            coloured from ``package_group_name``). ``""`` means "the field's own name".
         reference_lines: Resolved reference lines, in manifest order.
         parameters: Parameters the worksheet's calculations read - the view must declare them
             or Tableau cannot resolve the calculation. Filled in by :mod:`twb`, which owns
@@ -954,6 +1001,7 @@ class WorksheetPlan:
     fit: str = DEFAULT_FIT
     sheet_format: SheetFormat = field(default_factory=SheetFormat)
     geo_role: str = ""
+    palette: str = ""
 
     def qualify(self, name: str) -> str:
         """Return a bracketed name qualified with this worksheet's datasource."""
@@ -1030,6 +1078,7 @@ def plan_worksheet(entry: dict, resolver: FieldResolver) -> WorksheetPlan:
         fit=_plan_fit(entry.get("fit"), chart_type),
         sheet_format=_plan_sheet_format(entry.get("format")),
         geo_role=str(entry.get("geo_role", "")).strip() if spec.geographic else "",
+        palette=str(entry.get("palette", "")).strip(),
     )
 
 
@@ -1540,10 +1589,16 @@ def _add_palette(add: AddRule, plan: WorksheetPlan, tokens: DesignTokens) -> Non
     """Add the brand palette to whatever the worksheet colours its marks by.
 
     The colours ride along inline (see :class:`DesignTokens`), so no data member has to be
-    known. Three shapes, decided by what is on Colour: a *dimension* takes the whole ordered
-    palette and Tableau walks the domain against it; a *measure* is a continuous ramp, and a
-    ramp has two ends - the first and last brand colours, low to high; *nothing* on Colour has
-    no domain at all, so it gets the brand's first colour as the flat mark colour.
+    known. Three shapes, decided by what is on Colour: a *dimension* takes an ordered palette
+    and Tableau walks the domain against it; a *measure* is a continuous ramp, and a ramp has
+    two ends - the first and last brand colours, low to high; *nothing* on Colour has no
+    domain at all, so it gets the brand's first colour as the flat mark colour.
+
+    *Which* ordered palette a dimension takes is the fix for issue #67: a tokens file that
+    colours several fields writes a table per field, and walking a domain against all of them
+    concatenated gives every encoding but the first another field's ramp. The field on Colour
+    names its own table (or the manifest's ``palette`` key does); only a field no table names
+    falls back to the whole list.
 
     Args:
         add: ``_render_style``'s rule accumulator.
@@ -1552,6 +1607,9 @@ def _add_palette(add: AddRule, plan: WorksheetPlan, tokens: DesignTokens) -> Non
     """
     if not tokens.series_colors:
         return
+    # The manifest's 'palette' always wins: it exists for the field whose name the tokens
+    # file does not carry.
+    palette_name = plan.palette
     if plan.spec.dual:
         # A dual chart colours its two measures apart by Measure Names - a dimension, whatever
         # the measures are.
@@ -1560,14 +1618,17 @@ def _add_palette(add: AddRule, plan: WorksheetPlan, tokens: DesignTokens) -> Non
         reference = plan.encodings["color"]
         field_reference = plan.reference_of(reference)
         quantitative = reference.instance_type == "quantitative"
+        palette_name = palette_name or reference.field_name
     else:
         # Nothing on Colour, so there is no domain to walk - but the marks still have *a*
         # colour, and Tableau's is its default blue. The brand's first series colour is what
         # keeps a plain bar or line from reading as "generated" too.
-        add("mark", "format", {"attr": "mark-color", "value": tokens.series_colors[0]})
+        add("mark", "format", {
+            "attr": "mark-color", "value": tokens.palette_for(palette_name)[0],
+        })
         return
 
-    colors = tokens.series_colors
+    colors = tokens.palette_for(palette_name)
     if quantitative:
         colors = (colors[0], colors[-1])
     # ponytail: XSD-legal, but only Desktop can confirm it keeps the palette on save rather

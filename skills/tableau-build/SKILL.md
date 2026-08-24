@@ -48,7 +48,10 @@ any chart mark labels. Reach for a modifier before reaching for a new chart type
 Styling comes from `DESIGN-TOKENS.md` when the analyst ran `tableau-brand`: its font family,
 chart-title size/colour and ordered `### Chart series colors` are applied to every worksheet
 automatically — the series colours ride along as an inline palette, so no data member values
-are needed. When it is absent, Tableau's own defaults apply and nothing is invented. The
+are needed. When that section carries **one table per coloured field** (each introduced by its
+field name in backticks), each `color` encoding is bound to its own table; a field no table
+names takes the whole list, and the optional worksheet key `"palette": "<field name>"` names a
+table explicitly when the encoding field's name differs. When it is absent, Tableau's own defaults apply and nothing is invented. The
 manifest carries no fonts or brand colours; its per-sheet `format` block covers only sheet
 furniture (borders, lines, shading, alignment).
 

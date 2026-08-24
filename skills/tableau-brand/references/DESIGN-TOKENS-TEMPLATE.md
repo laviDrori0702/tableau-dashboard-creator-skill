@@ -38,6 +38,18 @@
 ### Chart series colors
 [Ordered list of hex colors for chart data series.]
 
+[When the dashboard colors by more than one dimension, write one table per colored field
+instead, each introduced by its field name in backticks — `tableau-build` binds each color
+encoding to the table named for its field, and a field no table names falls back to the flat
+list above. Row order is the domain walk order: Tableau pairs the first color with the first
+domain member, so order the rows the way the members will appear (the chart's sort order).]
+
+**`[field_name]`**
+
+| Member | Token | Hex |
+|--------|-------|-----|
+| [member] | [Indigo 700] | `[hex]` |
+
 ### Text
 - Dark (titles): [hex]
 - Medium (labels): [hex]

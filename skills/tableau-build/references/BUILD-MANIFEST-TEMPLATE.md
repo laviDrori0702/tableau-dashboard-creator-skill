@@ -143,7 +143,8 @@ colour encoding carries an inline `<color-palette>` listing the brand's colours 
 and Tableau walks the field's domain against them exactly as it does with its own default 10.
 So:
 
-- a **dimension** on `color` (a stacked bar, a pie, a treemap) takes the whole ordered palette;
+- a **dimension** on `color` (a stacked bar, a pie, a treemap) takes an ordered palette — **its
+  own**, when the tokens file carries a series table named for that field (see below);
 - a **measure** on `color` (a filled map, a heatmap) is a continuous ramp, and gets the first
   and last brand colours as its low and high ends;
 - a `dual-axis` / `combo` chart is coloured by the built-in Measure Names and takes the
@@ -156,6 +157,23 @@ So:
 Tokens with no `### Chart series colors` section leave Tableau's default 10 in place. That
 heading is required by `tableau-brand`'s validator precisely because `build` binds to its name
 (CONTRACT.md §1).
+
+### One table per coloured field
+
+A dashboard that colours by more than one dimension gets one series table per field under that
+heading, each introduced by its field name in backticks (`` `country_bucket` ``). Each field on
+`color` is bound to **its own** table; a field no table names falls back to the whole ordered
+list, which is what keeps a single-table tokens file rendering exactly as before.
+
+**A table's row order is the domain walk order.** Tableau pairs the first colour with the first
+domain member, so a table has to be written in the order the members will appear — the same
+order the sheet's `sort.order` pins, or the ACV/rank order the brand step sorted by. Reordering
+the rows recolours the chart.
+
+Optional worksheet key **`"palette": "<field name>"`** names the table explicitly, for when the
+field on `color` does not carry the table's name — a calculated `Package Bucket` coloured from
+the `package_group_name` table, say. A name no table in `DESIGN-TOKENS.md` carries is a
+validation error (silently falling back to the whole list is the bug the key exists to prevent).
 
 ## Interactions
 

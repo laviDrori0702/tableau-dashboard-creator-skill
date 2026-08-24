@@ -1088,6 +1088,118 @@ def test_no_series_colours_means_tableau_default_10():
     ) is None
 
 
+# --- Per-field sub-palettes (issue #67) ----------------------------------------
+
+#: A tokens file whose ``### Chart series colors`` section carries one table per coloured
+#: field - the shape tableau-brand writes for a dashboard that colours by more than one
+#: dimension. Order-walking the *concatenation* of these tables hands every encoding the
+#: first table's colours, which is issue #67.
+PER_FIELD_TOKENS = """# Design Tokens
+
+## Typography
+
+- **Font family**: Open Sans
+
+## Colors
+
+### Chart series colors
+
+**`region`** - the primary split, ordered by revenue rank.
+
+| Member | Token | Hex |
+|--------|-------|-----|
+| West | Purple 700 | `#6941C6` |
+| East | Purple 500 | `#9E77ED` |
+
+**`product_category`**
+
+| Member | Token | Hex |
+|--------|-------|-----|
+| Technology | Indigo 700 | `#3538CD` |
+| Furniture | Indigo 500 | `#6172F3` |
+"""
+
+#: One sheet per colour field, plus one coloured by a field no table names.
+PER_FIELD_SHEETS = [
+    _sheet("By Region", "bar", shelves={"columns": ["region"], "rows": ["revenue"]},
+           encodings={"color": "region"}),
+    _sheet("By Category", "bar", shelves={"columns": ["region"], "rows": ["revenue"]},
+           encodings={"color": "product_category"}),
+    _sheet("By Country", "bar", shelves={"columns": ["region"], "rows": ["revenue"]},
+           encodings={"color": "country"}),
+]
+
+
+def _palette_of(sheet_name: str, root: ET.Element) -> list[str]:
+    """Return the colours of a sheet's mark colour encoding, in order."""
+    encoding = _worksheet_element(sheet_name, root).find(
+        "table/style/style-rule[@element='mark']/encoding"
+    )
+    return [color.text for color in encoding.find("color-palette")]
+
+
+def test_a_named_series_table_binds_to_its_own_field():
+    """Issue #67: with a table per field, each colour encoding walks *its* table. Handing
+    both sheets the concatenation coloured 'By Category' with the region purples."""
+    root = ET.fromstring(_render(_manifest(PER_FIELD_SHEETS), tokens=PER_FIELD_TOKENS))
+
+    assert _palette_of("By Region", root) == ["#6941c6", "#9e77ed"]
+    assert _palette_of("By Category", root) == ["#3538cd", "#6172f3"]
+
+
+def test_an_unnamed_colour_field_falls_back_to_the_whole_list():
+    """No table names 'country', so the brand's full ordered list is still the best guess -
+    which is also what keeps a single-table tokens file rendering exactly as before."""
+    root = ET.fromstring(_render(_manifest(PER_FIELD_SHEETS), tokens=PER_FIELD_TOKENS))
+
+    assert _palette_of("By Country", root) == [
+        "#6941c6", "#9e77ed", "#3538cd", "#6172f3",
+    ]
+
+
+def test_the_palette_key_binds_a_table_the_encoding_field_does_not_name():
+    """The escape hatch: a calculated encoding field ('Package Bucket') rarely carries the
+    name of the tokens table that colours it, so the manifest says which one."""
+    sheets = [_sheet(
+        "By Country", "bar", shelves={"columns": ["region"], "rows": ["revenue"]},
+        encodings={"color": "country"}, palette="product_category",
+    )]
+    root = ET.fromstring(_render(_manifest(sheets), tokens=PER_FIELD_TOKENS))
+
+    assert _palette_of("By Country", root) == ["#3538cd", "#6172f3"]
+
+
+def test_a_palette_name_no_tokens_table_carries_is_rejected():
+    """A typo'd name would silently fall back to the flat list - the symptom #67 is about."""
+    document = _manifest([_sheet(
+        "By Country", "bar", shelves={"columns": ["region"], "rows": ["revenue"]},
+        encodings={"color": "country"}, palette="no_such_table",
+    )])
+    errors = manifest.validate_manifest(
+        document, DATA_MODEL, TARGET_VERSION, PER_FIELD_TOKENS
+    )
+    assert any("palette 'no_such_table'" in error for error in errors)
+
+
+def test_the_palette_key_validates_against_the_tokens_file():
+    """The same manifest with a name the tokens file does carry is buildable."""
+    document = _manifest([_sheet(
+        "By Country", "bar", shelves={"columns": ["region"], "rows": ["revenue"]},
+        encodings={"color": "country"}, palette="product_category",
+    )])
+    assert manifest.validate_manifest(
+        document, DATA_MODEL, TARGET_VERSION, PER_FIELD_TOKENS
+    ) == []
+
+
+def test_a_single_table_tokens_file_names_no_sub_palette():
+    """The demo's prose-and-commas section has no per-field tables, so nothing changes."""
+    tokens = worksheet.parse_design_tokens(DESIGN_TOKENS)
+
+    assert tokens.field_palettes == {}
+    assert tokens.series_colors == ("#1b4f72", "#2e86c1", "#48c9b0", "#f39c12")
+
+
 def test_a_measure_on_text_labels_the_marks_of_any_chart_type():
     """A bar with SUM on Text is labelled bars - and the labels are what make its
     number_format visible, which is why a styled bar used to look identical to a plain one."""
