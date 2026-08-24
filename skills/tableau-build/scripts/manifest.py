@@ -691,6 +691,15 @@ def _validate_modifiers(label: str, worksheet: dict, errors: list[str]) -> None:
                         f"'{value}' (expected one of: {', '.join(sorted(allowed))})"
                     )
 
+    # 'legend' opts out of the generated dashboard legend zone (issue #65). A truthy string
+    # like "false" would read as opt-in, so only a real boolean is accepted.
+    legend = worksheet.get("legend")
+    if legend is not None and not isinstance(legend, bool):
+        errors.append(
+            f"{label}: 'legend' must be true or false (it suppresses the generated "
+            f"dashboard legend zone); got {legend!r}"
+        )
+
     sort = worksheet.get("sort")
     if isinstance(sort, dict):
         order = sort.get("order")

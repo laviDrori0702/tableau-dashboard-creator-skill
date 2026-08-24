@@ -223,8 +223,12 @@ When one arrives:
   draws it inside the zone out of the sheet's own height, so a short zone (a KPI card) loses
   its number to it. Give every `worksheets[]` entry a `title` — it becomes a text zone above
   the sheet zone — or have the layout place a `text` object beside it; a view with neither
-  gets no header at all. A colour-encoded chart also gets a legend zone below it. Both
-  generated zones stack *inside* the element's own box, so they never disturb its siblings.
+  gets no header at all. A colour-encoded chart also gets a legend zone below it — set
+  `"legend": false` on the entry to suppress it. Both generated zones stack *inside* the
+  element's own box, so they never disturb its siblings — and they are *fixed* heights (30px +
+  22px), so a short box pays them in full: a ~70px KPI card is left ~17px of invisible number.
+  The build logs a `[WARN]` when that happens; a KPI card wants semantic colour and
+  `"legend": false`, and its header from a `text` object in the layout.
 - **Field labels are off on every sheet.** They repeat what the zone's header already says
   and cost the chart a whole band of the sheet.
 - **The dashboard is interactive** (CONTRACT.md §6). An `actions` entry of type `filter`

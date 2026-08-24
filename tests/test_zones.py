@@ -743,3 +743,71 @@ def test_the_layout_rich_workbook_passes_the_xsd(layout_rich_workbook, tmp_path)
     )
 
     assert not [f"line {error.line}: {error.message}" for error in errors]
+
+
+def test_a_short_box_losing_most_of_itself_to_generated_zones_warns(caplog):
+    """A 30px header + 22px legend inside a ~70px KPI box leaves ~17px of number (issue #65)."""
+    root = {"type": "vert", "children": [
+        {"id": "kpi-net-new-mrr", "size": 8}, {"id": "rest", "size": 92},
+    ]}
+
+    with caplog.at_level("WARNING"):
+        _render(
+            root,
+            {"kpi-net-new-mrr": zones.Leaf(
+                worksheet="Net New MRR", title="Net New MRR",
+                legend=zones.Legend("[c]", "0"), single_cell=True,
+            )},
+            canvas={"width": 1366, "height": 900},
+        )
+
+    assert "kpi-net-new-mrr" in caplog.text
+    assert "legend: false" in caplog.text
+
+
+def test_a_tall_box_with_the_same_generated_zones_is_silent(caplog):
+    """52px of header and legend out of a 400px chart box is normal, not a squeeze."""
+    root = {"type": "vert", "children": [
+        {"id": "chart-trend", "size": 50}, {"id": "rest", "size": 50},
+    ]}
+
+    with caplog.at_level("WARNING"):
+        _render(
+            root,
+            {"chart-trend": zones.Leaf(
+                worksheet="Trend", title="Trend", legend=zones.Legend("[c]", "0"),
+            )},
+            canvas={"width": 1366, "height": 900},
+        )
+
+    assert caplog.text == ""
+
+
+def test_legend_false_suppresses_the_generated_legend_zone():
+    """A KPI card coloured by a semantic up/down field needs the colour, not the key (#65)."""
+    import copy
+    import manifest
+    import twb as twb_module
+
+    document = copy.deepcopy(LAYOUT_RICH_MANIFEST)
+    document["worksheets"][0]["legend"] = False
+
+    assert manifest.validate_manifest(document, DATA_MODEL, TARGET_VERSION) == []
+
+    root = ET.fromstring(twb_module.render_workbook(document, DATA_MODEL, CSV_HEADERS))
+    wrapper = next(
+        zone for zone in root.find("dashboards/dashboard/zones").iter("zone")
+        if zone.get("friendly-name") == "V-chart-revenue"
+    )
+    parts = wrapper.findall("zone")
+
+    assert [zone.get("friendly-name") for zone in parts] == [
+        "H-chart-revenue header", "chart-revenue",  # no legend zone
+    ]
+    # The sheet reclaims the legend's height: header + view tile the wrapper exactly.
+    assert sum(int(zone.get("h")) for zone in parts) == int(wrapper.get("h"))
+    # The sheet's own right-edge legend card is untouched - only the dashboard zone is gone.
+    right_edge = root.find(
+        "windows/window[@name='Revenue by Region']/cards/edge[@name='right']"
+    )
+    assert right_edge is not None

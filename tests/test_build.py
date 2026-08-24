@@ -1650,3 +1650,21 @@ def test_router_reports_done_after_build_is_approved(tmp_path):
     assert build.commit(tmp_path).ok is True
 
     assert route.compute_next_step(tmp_path).is_done is True
+
+
+def test_a_non_boolean_legend_key_is_rejected():
+    """"legend": "false" is a truthy string - reading it as opt-in would silently keep the
+    zone the analyst asked to drop (issue #65)."""
+    document = _manifest()
+    document["worksheets"][0]["legend"] = "false"
+
+    assert any("'legend' must be true or false" in error for error in _errors(document))
+
+
+def test_a_boolean_legend_key_is_accepted():
+    """Both values are legal; false is the opt-out, true is the documented default."""
+    for value in (True, False):
+        document = _manifest()
+        document["worksheets"][0]["legend"] = value
+
+        assert _errors(document) == []

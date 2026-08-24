@@ -22,12 +22,15 @@ a button and a standalone legend still reserve their box as an empty zone - see
 
 from __future__ import annotations
 
+import logging
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import NamedTuple, Optional
 
 # For DesignTokens only; :mod:`worksheet` does not import this module, so no cycle.
 from worksheet import DesignTokens
+
+logger = logging.getLogger(__name__)
 
 #: Dashboard zones live in a 100,000 x 100,000 virtual coordinate space, whatever the canvas.
 ZONE_SPACE = 100000
@@ -43,6 +46,13 @@ ZONE_MARGIN = "4"
 #: Height in px of a generated title text zone and of a colour legend zone.
 TITLE_HEIGHT_PX = 30
 LEGEND_HEIGHT_PX = 22
+
+#: The share of its own box a view must keep once the generated title and legend zones
+#: are stacked inside it. Below this the view is a stub - a 70px KPI card losing 52px to
+#: a header and a legend renders ~17px of number (issue #65) - so the build warns. The
+#: fixed zones only cross this line on a box under ~90px, which is exactly the KPI-card
+#: case; a 400px chart box spending the same 52px never trips it.
+VIEW_SQUEEZE_FLOOR = 0.4
 
 #: The share of the header row's width the title text takes. The rest is a blank spacer, so
 #: dropping a filter or a button into the row in Desktop needs no restructuring - which is
@@ -159,7 +169,8 @@ class Leaf:
             view zone has no header at all - the sheet's own title never renders on a
             dashboard (see :meth:`_ZoneWriter._content`).
         text: The text a ``text`` object zone displays.
-        legend: The colour legend to stack below the content, or ``None`` for no legend.
+        legend: The colour legend to stack below the content, or ``None`` for no legend -
+            which is what the manifest's ``legend: false`` resolves to (issue #65).
         param: What a ``filter`` / ``parameter`` zone controls - a qualified column-instance
             (``[federated.x].[none:region:nk]``) or a qualified parameter
             (``[Parameters].[Top N]``). Without it the kind falls back to an empty zone.
@@ -483,6 +494,7 @@ class _ZoneWriter:
         title_height = min(title_height, box.h)
         legend_height = min(legend_height, box.h - title_height)
         content_height = box.h - title_height - legend_height
+        self._warn_if_squeezed(label, box.h, title_height, legend_height, content_height)
         cursor = box.y
         if title_height:
             self._title(wrapper, leaf.title, Box(box.x, cursor, box.w, title_height), label)
@@ -494,6 +506,41 @@ class _ZoneWriter:
                 wrapper, leaf, Box(box.x, cursor, box.w, legend_height), label
             )
         render_zone_style(wrapper, ZONE_MARGIN)
+
+    def _warn_if_squeezed(
+        self, label: str, box_height: int, title_height: int, legend_height: int,
+        content_height: int,
+    ) -> None:
+        """Warn when the generated zones leave the view too little of the element's box.
+
+        The header and the legend are *fixed* heights, so a short zone pays them in full and
+        the view keeps the remainder - which on a KPI card can be a few px of invisible
+        number. The geometry is the analyst's call, so this is a note, not an error.
+
+        Args:
+            label: The element id (or tree path) naming the squeezed element.
+            box_height: The element's own box height, in zone units.
+            title_height: What the generated header takes, in zone units.
+            legend_height: What the generated legend takes, in zone units.
+            content_height: What is left for the view, in zone units.
+        """
+        if content_height >= box_height * VIEW_SQUEEZE_FLOOR:
+            return
+        consumers = [
+            name for name, height in (("header", title_height), ("legend", legend_height))
+            if height
+        ]
+        remedy = (
+            "'legend: false' on its worksheets[] entry, or a 'text' object header in the "
+            "layout" if legend_height else
+            "a 'text' object header in the layout instead of the element's 'title'"
+        )
+        logger.warning(
+            f"[WARN] {label}: a {self._pixels_y(box_height)}px zone loses "
+            f"{self._pixels_y(title_height + legend_height)}px to its generated "
+            f"{'+'.join(consumers)}, leaving {self._pixels_y(content_height)}px for the "
+            f"view; consider {remedy}"
+        )
 
     def _content(
         self, parent: ET.Element, leaf: Leaf, box: Box, label: str

@@ -32,6 +32,14 @@ leave.
 a `worksheets[]` entry without a `title` (or a `text` object placed beside it in the tree)
 shows up with no header at all.
 
+**Watch what the generated zones cost a short element.** A `title` adds a fixed 30px header
+row inside the element's own box and a `color` encoding adds a fixed 22px legend below it —
+52px the view never gets back. On a ~70px KPI card that leaves ~17px and the number is
+invisible, so the build logs a `[WARN]` naming the element. The **KPI-card pattern** is
+semantic colour with no key: colour the card by an `up`/`down`/`flat` direction field and set
+`"legend": false`, then either drop `title` for a `text` object header in the layout or give
+the element a taller box.
+
 **Every leaf zone must be filled** by exactly one worksheet or one `objects` entry — an
 unfilled zone would build an empty container. A *mapped container* (a node with both an `id`
 and `children`, e.g. a DZV panel) is filled by its children and needs no entry of its own.
@@ -101,6 +109,7 @@ On `chart_type: "text"` the same encoding is the KPI card's big number instead.
 | `number_formats` | `[{"field": "revenue", "format": "$#,##0"}]` | The field's number format, emitted twice: as this sheet's cell format *and* as the datasource column's `default-format`, which is what Desktop reads for mark labels and axis ticks. One format per field per datasource — on a conflict the first worksheet wins and a `[WARN]` is logged. |
 | `reference_lines` | `[{"field": "revenue", "aggregation": "sum", "formula": "average", "scope": "per-table", "label": "<Computation>: <Value>"}]` | A line drawn at an aggregate of the measure. `formula` from `constant`/`total`/`sum`/`min`/`max`/`average`/`median`/`quantiles`/`percentile`/`stdev`/`confidence`/`medianconfidence` (default `average`); `scope` from `per-cell`/`per-pane`/`per-table` (default `per-table`). A `label` string is used verbatim; without one, `label_type` from `none`/`automatic`/`value`/`computation`/`custom` (default `computation`). |
 | `title` | `"Revenue by region"` | Puts a styled text zone above the sheet's zone in the dashboard and suppresses the sheet's own title. Omit to keep Tableau's sheet title. |
+| `legend` | `false` | Suppresses the generated dashboard legend zone. A colour-encoded chart gets a 22px legend strip below its sheet by default; `false` drops it and the sheet reclaims the height. The sheet's own right-edge legend card is unaffected. |
 | `fit` | `"entire-view"` | How the sheet fills its zone: `entire-view` (the default), `standard`, `fit-width`, `fit-height`. |
 | `format` | `{"shading": "#FFFFFF", "borders": "none", "gridlines": "#E5E8E8", "zero_lines": "none", "align": "center", "vertical_align": "top"}` | Format Shading / Borders / Lines / Alignment. Every colour is a `#rrggbb`; `borders`, `gridlines` and `zero_lines` also take `"none"` to turn the border or line off. `align` is `left`/`center`/`right`, `vertical_align` is `top`/`center`/`bottom`. |
 
