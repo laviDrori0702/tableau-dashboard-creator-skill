@@ -1,0 +1,49 @@
+<worksheet name="Gantt">
+      <layout-options>
+        <title>
+          <formatted-text>
+            <run fontcolor="#7f56d9" fontname="Open Sans" fontsize="14">&lt;Sheet Name&gt;</run>
+          </formatted-text>
+        </title>
+      </layout-options>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption="sales_orders" name="federated.b2993893834e8f0306a282d0a717d7a9" />
+          </datasources>
+          <datasource-dependencies datasource="federated.b2993893834e8f0306a282d0a717d7a9">
+            <column caption="Order Date" datatype="date" name="[order_date]" role="dimension" type="ordinal" />
+            <column caption="Product Category" datatype="string" name="[product_category]" role="dimension" type="nominal" />
+            <column caption="Revenue" datatype="real" name="[revenue]" role="measure" type="quantitative" />
+            <column-instance column="[product_category]" derivation="None" name="[none:product_category:nk]" pivot="key" type="nominal" />
+            <column-instance column="[revenue]" derivation="Sum" name="[sum:revenue:qk]" pivot="key" type="quantitative" />
+            <column-instance column="[order_date]" derivation="Month-Trunc" name="[tmn:order_date:qk]" pivot="key" type="quantitative" />
+          </datasource-dependencies>
+          <aggregation value="true" />
+        </view>
+        <style>
+          <style-rule element="mark">
+            <format attr="mark-color" value="#1b4f72" />
+          </style-rule>
+          <style-rule element="worksheet">
+            <format attr="font-family" value="Open Sans" />
+            <format attr="display-field-labels" scope="cols" value="false" />
+            <format attr="display-field-labels" scope="rows" value="false" />
+          </style-rule>
+        </style>
+        <panes>
+          <pane selection-relaxation-option="selection-relaxation-allow">
+            <view>
+              <breakdown value="auto" />
+            </view>
+            <mark class="GanttBar" />
+            <encodings>
+              <size column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
+            </encodings>
+          </pane>
+        </panes>
+        <rows>[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]</rows>
+        <cols>[federated.b2993893834e8f0306a282d0a717d7a9].[tmn:order_date:qk]</cols>
+      </table>
+      <simple-id uuid="{F25AA523-0C46-5080-9AC5-991D62B6FA75}" />
+    </worksheet>
