@@ -16,22 +16,20 @@ have no shared shape at all: `cum`, `diff`, `rank`.
 ## `table-calculations-attestation.twb`
 
 The workbook beside this file, authored in **Desktop 2025.1.10 (20251.25.1121.1650), win**,
-for issue #50. Four sheets, one calculation each, identical base setup: `Order Date`
+for issue #50. Five sheets, one calculation each, identical base setup: `Order Date`
 (continuous Month) on Columns, `SUM(Sales)` on Rows, `Sample - Superstore`.
 
 `tests/test_features.py::test_the_attested_prefixes_match_desktops_own_output` parses it and
-asserts `FieldRef.instance_name` reproduces Desktop's `<rows>` shelf byte for byte, so the
-table cannot drift from this file without a test failing.
+asserts `FieldRef.instance_name` reproduces Desktop's `<rows>` shelf, so the table cannot
+drift from this file without a test failing.
 
-| sheet | `<table-calc type>` | Desktop's instance name | prefix |
-|---|---|---|---|
-| `1-total` | `CumTotal` | `[cum:sum:Sales:qk]` | `cum` |
-| `2-difference` | `Difference` | `[diff:sum:Sales:qk]` | `diff` |
-| `3-percent-from` | `PctValue` | `[pcva:sum:Sales:qk]` | `pcva` |
-| `4-percentile` | `PctRank` | `[pcrk:sum:Sales:qk]` | `pcrk` |
-
-Sheet `1-total` is named for the *requested* calculation but carries **Running Total** -
-`type='CumTotal'`. It re-attests `CumTotal` and leaves `WindowTotal` unsettled.
+| sheet | applied as | `<table-calc type>` | Desktop's instance name | prefix |
+|---|---|---|---|---|
+| `1a-total` | `TOTAL(sum([Sales]))` | *absent* | `[usr:Calculation_1660139451271188481:qk]` | *none* |
+| `1b-running-total` | Running Total | `CumTotal` | `[cum:sum:Sales:qk]` | `cum` |
+| `2-difference` | Difference | `Difference` | `[diff:sum:Sales:qk]` | `diff` |
+| `3-percent-from` | Percent From | `PctValue` | `[pcva:sum:Sales:qk]` | `pcva` |
+| `4-percentile` | Percentile | `PctRank` | `[pcrk:sum:Sales:qk]` | `pcrk` |
 
 ```xml
 <!-- 2-difference -->
@@ -46,6 +44,44 @@ Sheet `1-total` is named for the *requested* calculation but carries **Running T
 <column-instance column='[Sales]' derivation='Sum' name='[pcrk:sum:Sales:qk]' pivot='key' type='quantitative'>
   <table-calc ordering-type='Rows' rank-options='Competition,Ascending' type='PctRank' />
 ```
+
+### A window total has no type and no prefix
+
+Sheet `1a-total` is the important negative result. Desktop's **Total** is not a
+Quick Table Calculation - it is authored as a **calculated field**, and the
+`<table-calc>` it carries has **no `type` attribute at all**, only addressing:
+
+```xml
+<column caption='Total Sales' datatype='real' name='[Calculation_1660139451271188481]' role='measure' type='quantitative'>
+  <calculation class='tableau' formula='TOTAL(sum([Sales]))'>
+    <table-calc ordering-type='Rows' />
+  </calculation>
+</column>
+<column-instance column='[Calculation_1660139451271188481]' derivation='User' name='[usr:Calculation_1660139451271188481:qk]' pivot='key' type='quantitative'>
+  <table-calc ordering-type='Rows' />
+</column-instance>
+```
+
+The instance keeps the plain `usr` prefix a calculated field always gets - it gains no
+table-calc prefix. So the builder's way to express a window total is a **calculated field
+with the `TOTAL(...)` formula**, not `table_calc: WindowTotal`.
+`test_a_total_table_calc_is_a_calculated_field_with_no_type` pins this.
+
+### The Calculation Type menu, mapped
+
+Desktop 2025.1.10's **Add Table Calculation -> Calculation Type** dropdown offers eight
+entries. Seven map to an attested `TCType-ST`; there is **no "Total" entry**.
+
+| menu entry | `TCType-ST` | prefix |
+|---|---|---|
+| Difference From | `Difference` | `diff` |
+| Percent Difference From | `PctDiff` | `pcdf` |
+| Percent From | `PctValue` | `pcva` |
+| Percent of Total | `PctTotal` | `pcto` |
+| Rank | `Rank` | `rank` |
+| Percentile | `PctRank` | `pcrk` |
+| Running Total | `CumTotal` | `cum` |
+| Moving Calculation | *unchecked* - the `WindowTotal` candidate | *unknown* |
 
 ## Attested from the wider corpus
 
@@ -95,9 +131,23 @@ A percent-of-total *of* a running total nests both prefixes, outermost first:
 
 ## Still inferred
 
-`WindowTotal` (`wnd`) is the last guess. It appears in no workbook checked. To settle it:
-apply **Add Table Calculation -> Calculation Type = Total** to a `SUM(Sales)` pill, save as
-`.twb`, and read the `<rows>` shelf.
+`WindowTotal` -> `wnd` is the last guess, and the weakest thing in this table. What is known:
+
+- It is in the XSD's `TCType-ST`, so Tableau does write it somewhere.
+- It appears in **none of the 196 workbooks** swept. Neither does `Custom`, the other
+  `TCType-ST` value the builder does not offer, nor the `window-options` attribute.
+- Desktop's `TOTAL(...)` - the function an analyst means by "window total" - does **not**
+  produce it. See the negative result above.
+- Of the eight Calculation Type entries, **Moving Calculation** is the only one not yet
+  traced to a type. `WindowOptions-ST` is `IncludeCurrent` / `NullIfIncomplete`, which are
+  exactly Moving Calculation's two checkboxes, and `window-options` sits beside `type` on
+  the same element. That makes Moving Calculation the strong candidate for `WindowTotal`.
+
+To settle it: apply **Quick Table Calculation -> Moving Average** (or **Add Table
+Calculation -> Moving Calculation**) to a `SUM(Sales)` pill, save as `.twb`, and read the
+`<rows>` shelf. If it writes `WindowTotal`, correct the prefix and note that the type means
+*moving calculation*, not *total*. If it writes something else, `WindowTotal` is unreachable
+from the UI and should be dropped from the table and rejected at validation.
 
 ## How to attest a new one
 

@@ -331,6 +331,36 @@ _ATTESTATION_TWB = (
 )
 
 
+def _attested_sheets():
+    """dict: sheet name -> (``<table-calc>`` type or None, instance name, the <rows> shelf).
+
+    Reads the vendored Desktop workbook. Sheet names are asserted here so a re-authored
+    reference fails loudly instead of silently checking fewer types than it looks like.
+    """
+    workbook = ET.parse(_ATTESTATION_TWB).getroot()
+    sheets = workbook.findall("worksheets/worksheet")
+    assert [sheet.get("name") for sheet in sheets] == [
+        "1a-total", "1b-running-total", "2-difference", "3-percent-from", "4-percentile",
+    ], "the reference workbook changed - re-read TABLE-CALCS.md before touching this test"
+
+    read = {}
+    for sheet in sheets:
+        instances = [
+            instance
+            for instance in sheet.findall("table/view/datasource-dependencies/column-instance")
+            if instance.find("table-calc") is not None
+        ]
+        # One calculation per sheet is the whole design of the reference workbook; two would
+        # mean the sheet no longer isolates a single type.
+        assert len(instances) == 1, f"{sheet.get('name')} carries {len(instances)} table calcs"
+        read[sheet.get("name")] = (
+            instances[0].find("table-calc").get("type"),
+            instances[0].get("name"),
+            sheet.findtext("table/rows"),
+        )
+    return read
+
+
 def _field_ref(table_calc, field_name="revenue"):
     """A minimal measure FieldRef carrying ``table_calc``, for naming assertions."""
     return worksheet.FieldRef(
@@ -371,40 +401,47 @@ def test_the_attested_prefixes_match_desktops_own_output():
     a typo there and in TABLE_CALC_PREFIXES would agree with each other. This reads the
     reference workbook instead, so the four types it covers cannot drift silently.
     """
-    workbook = ET.parse(_ATTESTATION_TWB).getroot()
-    sheets = workbook.findall("worksheets/worksheet")
-    assert [sheet.get("name") for sheet in sheets] == [
-        "1-total", "2-difference", "3-percent-from", "4-percentile",
-    ], "the reference workbook changed - re-read TABLE-CALCS.md before touching this test"
+    checked = dict(_attested_sheets())
+    # '1a-total' is excluded on purpose - see
+    # test_a_total_table_calc_is_a_calculated_field_with_no_type.
+    checked.pop("1a-total")
 
-    checked = {}
-    for sheet in sheets:
-        instances = [
-            instance
-            for instance in sheet.findall("table/view/datasource-dependencies/column-instance")
-            if instance.find("table-calc") is not None
-        ]
-        # One calculation per sheet is the whole design of the reference workbook; two would
-        # mean the sheet no longer isolates a single type.
-        assert len(instances) == 1, f"{sheet.get('name')} carries {len(instances)} table calcs"
-
-        table_calc = instances[0].find("table-calc").get("type")
-        rows = sheet.findtext("table/rows")
-        checked[table_calc] = instances[0].get("name")
-
+    for sheet_name, (table_calc, instance_name, rows) in checked.items():
         # The field is Sales here, and <rows> qualifies the name with the datasource id, so
         # compare the bracketed tail rather than the whole shelf.
         expected = _field_ref(table_calc, "Sales").instance_name
+        assert instance_name == expected, f"{sheet_name}: Desktop wrote {instance_name}"
         assert rows.endswith(expected), (
-            f"{sheet.get('name')}: Desktop wrote {rows}, we build {expected}"
+            f"{sheet_name}: Desktop wrote {rows}, we build {expected}"
         )
 
-    assert checked == {
-        "CumTotal": "[cum:sum:Sales:qk]",
-        "Difference": "[diff:sum:Sales:qk]",
-        "PctValue": "[pcva:sum:Sales:qk]",
-        "PctRank": "[pcrk:sum:Sales:qk]",
+    assert {name: pair[:2] for name, pair in checked.items()} == {
+        "1b-running-total": ("CumTotal", "[cum:sum:Sales:qk]"),
+        "2-difference": ("Difference", "[diff:sum:Sales:qk]"),
+        "3-percent-from": ("PctValue", "[pcva:sum:Sales:qk]"),
+        "4-percentile": ("PctRank", "[pcrk:sum:Sales:qk]"),
     }
+
+
+def test_a_total_table_calc_is_a_calculated_field_with_no_type():
+    """Desktop has no *type* for a window total - so neither should a manifest.
+
+    Sheet '1a-total' is ``TOTAL(SUM([Sales]))`` applied through the UI. Desktop authored it as
+    a **calculated field**: the ``<table-calc>`` carries only ``ordering-type``, with no
+    ``type`` attribute, and the instance keeps the ordinary ``usr`` prefix rather than gaining
+    a table-calc one. That is why ``WindowTotal`` is still the unattested row - the Quick
+    Table Calculation menu has no entry that writes it, and this is what "Total" does instead.
+    """
+    table_calc, instance_name, rows = _attested_sheets()["1a-total"]
+
+    assert table_calc is None, f"Desktop grew a type for TOTAL(): {table_calc}"
+    assert instance_name.startswith("[usr:"), instance_name
+    assert rows.endswith(instance_name)
+    # No prefix from our table appears in a name Desktop wrote for a window total.
+    assert not any(
+        instance_name.startswith(f"[{prefix}:")
+        for prefix in worksheet.TABLE_CALC_PREFIXES.values()
+    )
 
 
 def test_the_prefix_table_holds_exactly_the_documented_types():
