@@ -32,13 +32,23 @@ _HOME_PATH = re.compile(
 _TEXT_SUFFIXES = (".twb", ".md", ".json", ".py", ".xml", ".txt", ".tds", ".yml", ".yaml")
 
 
+#: This file is exempt from its own scan: the fixtures in
+#: :func:`test_the_check_would_catch_an_unmasked_path` are unmasked paths on purpose. The
+#: exemption is one file wide and named literally, so it cannot be used to hide a real leak.
+_SELF = Path(__file__).name
+
+
 def _tracked_text_files():
-    """list[Path]: every git-tracked file this check can read as text."""
+    """list[Path]: every git-tracked file this check can read as text, minus this one."""
     listing = subprocess.run(
         ["git", "ls-files"], cwd=_REPO_ROOT,
         capture_output=True, text=True, check=True,
     ).stdout.splitlines()
-    return [_REPO_ROOT / name for name in listing if name.endswith(_TEXT_SUFFIXES)]
+    return [
+        _REPO_ROOT / name
+        for name in listing
+        if name.endswith(_TEXT_SUFFIXES) and not name.endswith(f"tests/{_SELF}")
+    ]
 
 
 def test_no_tracked_file_embeds_a_home_directory_path():
