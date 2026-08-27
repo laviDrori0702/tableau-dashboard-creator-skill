@@ -341,6 +341,7 @@ def _attested_sheets():
     sheets = workbook.findall("worksheets/worksheet")
     assert [sheet.get("name") for sheet in sheets] == [
         "1a-total", "1b-running-total", "2-difference", "3-percent-from", "4-percentile",
+        "5-moving-average",
     ], "the reference workbook changed - re-read TABLE-CALCS.md before touching this test"
 
     read = {}
@@ -372,8 +373,8 @@ def _field_ref(table_calc, field_name="revenue"):
 
 # One row per TCType-ST value. Do NOT derive the expected prefix from TABLE_CALC_PREFIXES -
 # a test that reads its expectation out of the table under test cannot fail, and a wrong
-# prefix in that table is exactly the defect: of the five originally guessed, 'pctdiff',
-# 'pctval' and 'pctrank' were all wrong. The percent family is 'pc' + two letters.
+# prefix in that table is exactly the defect: four of the seven originally guessed were wrong
+# ('pctdiff', 'pctval', 'pctrank', 'wnd'). Every row below is read off Desktop output.
 @pytest.mark.parametrize("table_calc,prefix", [
     ("CumTotal", "cum"),        # attested: table-calculations-attestation.twb, 2025.1.10
     ("Difference", "diff"),     # attested: table-calculations-attestation.twb, 2025.1.10
@@ -382,7 +383,7 @@ def _field_ref(table_calc, field_name="revenue"):
     ("PctDiff", "pcdf"),        # attested: appsfortableau HierarchyFilter demo, 2024.3.0
     ("PctTotal", "pcto"),       # attested: lavi_webpage_test.twbx, 2025.2.0
     ("Rank", "rank"),           # attested: Embedded Filters Test.twbx, 2024.2.10
-    ("WindowTotal", "wnd"),     # INFERRED - no Desktop workbook checked uses it
+    ("WindowTotal", "win"),     # attested: table-calculations-attestation.twb, 2025.1.10
 ])
 def test_table_calc_instance_name_prefix(table_calc, prefix):
     """The prefix Tableau puts on the instance name, per calculation type.
@@ -420,21 +421,27 @@ def test_the_attested_prefixes_match_desktops_own_output():
         "2-difference": ("Difference", "[diff:sum:Sales:qk]"),
         "3-percent-from": ("PctValue", "[pcva:sum:Sales:qk]"),
         "4-percentile": ("PctRank", "[pcrk:sum:Sales:qk]"),
+        "5-moving-average": ("WindowTotal", "[win:sum:Sales:qk]"),
     }
 
 
 def test_a_total_table_calc_is_a_calculated_field_with_no_type():
-    """Desktop has no *type* for a window total - so neither should a manifest.
+    """A formula-authored table calc writes no ``type`` and takes no prefix.
 
-    Sheet '1a-total' is ``TOTAL(SUM([Sales]))`` applied through the UI. Desktop authored it as
-    a **calculated field**: the ``<table-calc>`` carries only ``ordering-type``, with no
-    ``type`` attribute, and the instance keeps the ordinary ``usr`` prefix rather than gaining
-    a table-calc one. That is why ``WindowTotal`` is still the unattested row - the Quick
-    Table Calculation menu has no entry that writes it, and this is what "Total" does instead.
+    Sheet '1a-total' is ``TOTAL(sum([Sales]))``. ``TOTAL`` *is* a table calculation - it is
+    simply not offered by the Add Table Calculation dialog, so it is written as a formula, and
+    the same is true of ``WINDOW_SUM`` and friends. On that path Desktop authors a
+    **calculated field**: the ``<table-calc>`` carries addressing only, with no ``type``, and
+    the instance keeps the ordinary ``usr`` prefix instead of gaining a table-calc one.
+
+    So :data:`worksheet.TABLE_CALC_PREFIXES` governs the dialog-driven calculations only; a
+    ``TOTAL(...)`` belongs in a manifest as a calculated field's ``formula``, not a
+    ``table_calc``. This test is the guard on that boundary.
     """
     table_calc, instance_name, rows = _attested_sheets()["1a-total"]
 
     assert table_calc is None, f"Desktop grew a type for TOTAL(): {table_calc}"
+    # Not WindowTotal in particular: that type exists, and Moving Calculation writes it.
     assert instance_name.startswith("[usr:"), instance_name
     assert rows.endswith(instance_name)
     # No prefix from our table appears in a name Desktop wrote for a window total.

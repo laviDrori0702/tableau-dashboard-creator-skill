@@ -420,18 +420,23 @@ def aggregate_calculated_fields(calculated: dict[str, CalculatedField]) -> froze
 #: are cosmetic identifiers - ``cum:sum:revenue:qk`` is what Tableau writes for a running
 #: total, and ``manifest.TABLE_CALCS`` reads this table so an unknown type fails validation
 #: rather than rendering a calc Tableau does not have.
-#: Seven of the eight are attested - read off Desktop-saved workbooks. The verbatim XML and
-#: its provenance is in ``references/snippets/worksheets/TABLE-CALCS.md``; the workbook most
-#: of them come from is vendored beside it. Note the percent family abbreviates to ``pc`` plus
-#: two letters - four characters, never the ``pct`` + verb shape guesswork reaches for first.
-#: ponytail: ``WindowTotal`` is the one guess left. It is in the XSD but appears in none of
-#: the 196 workbooks swept, and no Quick-Table-Calculation entry produces it - Desktop's
-#: ``TOTAL(SUM([x]))`` is a *calculated field* whose ``<table-calc>`` carries only
-#: ``ordering-type`` and whose instance keeps the plain ``usr`` prefix. A wrong prefix costs a
-#: rewrite on open, not a refused workbook - issue #50 has the remaining step.
+#: All eight are attested - read off Desktop-saved workbooks, none inferred. The verbatim XML
+#: and its provenance is in ``references/snippets/worksheets/TABLE-CALCS.md``; the workbook
+#: six of them come from is vendored beside it.
+#:
+#: Four of the seven originally guessed were wrong, so do not extend this table by analogy.
+#: A long type name is squeezed to four characters and the vowels go first (``PctDiff`` ->
+#: ``pcdf``, ``PctValue`` -> ``pcva``, ``PctRank`` -> ``pcrk``); a short one passes through
+#: (``cum``, ``diff``, ``rank``); ``WindowTotal`` becomes ``win``. Read a new one off Desktop.
+#:
+#: This table covers only the calculations applied through *Add Table Calculation*, which are
+#: the ones that write a ``type`` and take a prefix. A table calc written as a **formula** -
+#: ``TOTAL(...)``, ``WINDOW_SUM(...)`` - is a calculated field: its ``<table-calc>`` carries
+#: addressing only, with no ``type``, and the instance keeps the plain ``usr`` prefix. Both
+#: are table calculations; only the dialog-driven ones reach this table.
 TABLE_CALC_PREFIXES: dict[str, str] = {
     "CumTotal": "cum",          # attested
-    "WindowTotal": "wnd",       # INFERRED - the last guess in this table
+    "WindowTotal": "win",       # attested - not "wnd"; written by Moving Calculation
     "Difference": "diff",       # attested
     "PctDiff": "pcdf",          # attested - not "pctdiff"
     "PctValue": "pcva",         # attested - not "pctval"
