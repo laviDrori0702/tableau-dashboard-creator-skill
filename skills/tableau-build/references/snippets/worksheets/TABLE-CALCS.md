@@ -187,7 +187,7 @@ A percent-of-total *of* a running total nests both prefixes, outermost first:
 
 - **`None`** - "no table calc", so there is nothing to prefix.
 - **`Custom`** - appears in none of the 195 workbooks swept, and no dropdown entry produces
-  it. Unattested, so `manifest.TABLE_CALCS` rejects it rather than guessing a prefix.
+  it. Unattested, so `manifest` rejects it rather than guessing a prefix.
 
 ## How to attest a new one
 

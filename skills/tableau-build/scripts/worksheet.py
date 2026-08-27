@@ -418,7 +418,7 @@ def aggregate_calculated_fields(calculated: dict[str, CalculatedField]) -> froze
 #: manifest ``table_calc`` -> the column-instance name's extra prefix. The keys are the
 #: XSD's ``TCType-ST`` enumeration minus ``None`` ("no table calc") and ``Custom``; the prefixes
 #: are cosmetic identifiers - ``cum:sum:revenue:qk`` is what Tableau writes for a running
-#: total, and ``manifest.TABLE_CALCS`` reads this table so an unknown type fails validation
+#: total, and ``manifest`` reads this table so an unknown type fails validation
 #: rather than rendering a calc Tableau does not have.
 #: All eight are attested - read off Desktop-saved workbooks, none inferred. The verbatim XML
 #: and its provenance is in ``references/snippets/worksheets/TABLE-CALCS.md``; the workbook
