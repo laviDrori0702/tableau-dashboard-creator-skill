@@ -408,6 +408,9 @@ def test_the_same_manifest_rebuilds_byte_identical():
     ("Kpi Card", "Text"),
     ("Histogram", "Bar"),
     ("Map", "Automatic"),
+    # Do not derive these from CHART_SPECS - each row is a hand-checked pin against the
+    # XSD, and a test that reads its expected value out of the code under test always
+    # passes - issue #76 is exactly CHART_SPECS holding the wrong value.
     ("Gantt", "GanttBar"),
 ])
 def test_mark_class_per_chart_type(sheet_name, mark_class):
