@@ -322,6 +322,36 @@ def test_an_unknown_table_calc_is_rejected():
     assert any("CumAvg" in error for error in _errors(worksheets=sheets))
 
 
+# One row per TCType-ST value. Do NOT derive the expected prefix from TABLE_CALC_PREFIXES -
+# a test that reads its expectation out of the table under test cannot fail, and a wrong
+# prefix in that table is exactly the defect (issue #50: 'pctdiff' should have been 'pcdf').
+# 'attested' rows are copied from Desktop-saved workbooks; see
+# skills/tableau-build/references/snippets/worksheets/TABLE-CALCS.md for the XML and source.
+@pytest.mark.parametrize("table_calc,prefix", [
+    ("CumTotal", "cum"),        # attested: FINANCIAL SERVICES - Trading.twbx, 2023.3.0
+    ("PctDiff", "pcdf"),        # attested: appsfortableau HierarchyFilter demo, 2024.3.0
+    ("PctTotal", "pcto"),       # attested: lavi_webpage_test.twbx, 2025.2.0
+    ("Rank", "rank"),           # attested: Embedded Filters Test.twbx, 2024.2.10
+    ("WindowTotal", "wnd"),     # inferred - no Desktop workbook uses it yet
+    ("Difference", "diff"),     # inferred
+    ("PctValue", "pctval"),     # inferred
+    ("PctRank", "pctrank"),     # inferred
+])
+def test_table_calc_instance_name_prefix(table_calc, prefix):
+    """The prefix Tableau puts on the instance name, per calculation type.
+
+    Rendered through :class:`worksheet.FieldRef` rather than asserted on the table so the
+    nesting rule is covered too: the calc prefix goes *outside* the aggregation prefix.
+    """
+    entry = worksheet.FieldRef(
+        field_name="revenue", datatype="real", role="measure",
+        column_type="quantitative", instance_type="quantitative",
+        prefix="sum", derivation="Sum", table_calc=table_calc,
+    )
+
+    assert entry.instance_name == f"[{prefix}:sum:revenue:qk]"
+
+
 # --- Reference lines (AC #1) ---------------------------------------------------
 
 def test_a_reference_line_is_a_pane_child_with_qualified_columns():

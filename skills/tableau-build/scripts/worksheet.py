@@ -420,19 +420,19 @@ def aggregate_calculated_fields(calculated: dict[str, CalculatedField]) -> froze
 #: are cosmetic identifiers - ``cum:sum:revenue:qk`` is what Tableau writes for a running
 #: total, and ``manifest.TABLE_CALCS`` reads this table so an unknown type fails validation
 #: rather than rendering a calc Tableau does not have.
-#: ponytail: only ``PctTotal`` -> ``pcto`` is attested (Desktop 2025.1 renamed ours on save).
-#: The rest are inferred; a wrong one costs nothing but a rewrite on open, and is fixed by
-#: reading the name out of a Desktop-saved workbook that uses that calc - issue #50 carries
-#: the exact sheet-by-sheet steps.
+#: Four of the eight are attested - read off Desktop-saved workbooks, see
+#: ``references/snippets/worksheets/TABLE-CALCS.md`` for the verbatim XML and its provenance.
+#: ponytail: the other four stay inferred until a workbook using them turns up. A wrong
+#: prefix costs a rewrite on open, not a refused workbook - issue #50 carries the steps.
 TABLE_CALC_PREFIXES: dict[str, str] = {
-    "CumTotal": "cum",
-    "WindowTotal": "wnd",
-    "Difference": "diff",
-    "PctDiff": "pctdiff",
-    "PctValue": "pctval",
-    "PctTotal": "pcto",
-    "Rank": "rank",
-    "PctRank": "pctrank",
+    "CumTotal": "cum",          # attested
+    "WindowTotal": "wnd",       # inferred
+    "Difference": "diff",       # inferred
+    "PctDiff": "pcdf",          # attested - not "pctdiff", which is what we guessed
+    "PctValue": "pctval",       # inferred
+    "PctTotal": "pcto",         # attested
+    "Rank": "rank",             # attested
+    "PctRank": "pctrank",       # inferred
 }
 
 #: How a table calc walks the view. ``Rows`` is Tableau's default "Table (across)" addressing
