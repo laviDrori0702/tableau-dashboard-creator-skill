@@ -422,7 +422,7 @@ def aggregate_calculated_fields(calculated: dict[str, CalculatedField]) -> froze
 #: rather than rendering a calc Tableau does not have.
 #: All eight are attested - read off Desktop-saved workbooks, none inferred. The verbatim XML
 #: and its provenance is in ``references/snippets/worksheets/TABLE-CALCS.md``; the workbook
-#: six of them come from is vendored beside it.
+#: five of them come from is vendored beside it, and a corpus sweep supplies the other three.
 #:
 #: Four of the seven originally guessed were wrong, so do not extend this table by analogy.
 #: A long type name is squeezed to four characters and the vowels go first (``PctDiff`` ->
@@ -434,9 +434,11 @@ def aggregate_calculated_fields(calculated: dict[str, CalculatedField]) -> froze
 #: ``TOTAL(...)``, ``WINDOW_SUM(...)`` - is a calculated field: its ``<table-calc>`` carries
 #: addressing only, with no ``type``, and the instance keeps the plain ``usr`` prefix. Both
 #: are table calculations; only the dialog-driven ones reach this table.
+#: ponytail: the builder emits neither ``<table-calc>`` on the formula path, so Desktop infers
+#: the addressing and rewrites the file on open - issue #85, not this table's problem.
 TABLE_CALC_PREFIXES: dict[str, str] = {
     "CumTotal": "cum",          # attested
-    "WindowTotal": "win",       # attested - not "wnd"; written by Moving Calculation
+    "WindowTotal": "win",       # attested - not "wnd"; the type Moving Calculation writes
     "Difference": "diff",       # attested
     "PctDiff": "pcdf",          # attested - not "pctdiff"
     "PctValue": "pcva",         # attested - not "pctval"
@@ -1361,9 +1363,15 @@ def render_column_instance(parent: ET.Element, reference: FieldRef) -> None:
     if reference.table_calc:
         # A table calc is a property of the instance: the same measure can be plain on one
         # shelf and a running total on another.
-        # No 'aggregation': Desktop 2025.1 strips it on save (the aggregation is already the
-        # instance's own 'derivation'), and a workbook it rewrites on open is one whose calc
-        # may not be the calc that was asked for.
+        #
+        # Addressing and type only. Desktop writes more than this, and what it writes varies
+        # by type - 'aggregation' on CumTotal/WindowTotal (but not PctTotal, where 2025.1
+        # strips it), 'diff-options' plus an <address> on Difference/PctDiff/PctValue,
+        # 'rank-options' on Rank/PctRank, 'from'/'to'/'window-options' on WindowTotal. All are
+        # optional per the XSD, so both validators pass without them, but the omission means
+        # the *options* of a calculation are not expressible from a manifest: a WindowTotal
+        # renders an unbounded window, not a moving average, and a Difference has no "relative
+        # to previous" target. Attested in references/snippets/worksheets/ - issue #85.
         ET.SubElement(instance, "table-calc", {
             "ordering-type": TABLE_CALC_ORDERING,
             "type": reference.table_calc,

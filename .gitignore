@@ -72,3 +72,7 @@ skill/tableau-dashboard-creator/scripts/__pycache__/
 **/.env
 **/.env.local
 **/.env.*.local
+
+# Scratch Tableau workbooks used while attesting Desktop behaviour - never committed.
+# The attestation copies that *are* tracked live under skills/*/references/snippets/.
+tests/temp-workbooks-for-tests/

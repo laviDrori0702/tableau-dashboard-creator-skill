@@ -322,7 +322,7 @@ def test_an_unknown_table_calc_is_rejected():
     assert any("CumAvg" in error for error in _errors(worksheets=sheets))
 
 
-#: The Desktop-authored workbook that settles four of the eight prefixes - see
+#: The Desktop-authored workbook that settles five of the eight prefixes - see
 #: skills/tableau-build/references/snippets/worksheets/TABLE-CALCS.md.
 _ATTESTATION_TWB = (
     Path(__file__).resolve().parent.parent
@@ -400,7 +400,8 @@ def test_the_attested_prefixes_match_desktops_own_output():
 
     The parametrize list above is hand-transcribed, so it pins the table but not the truth -
     a typo there and in TABLE_CALC_PREFIXES would agree with each other. This reads the
-    reference workbook instead, so the four types it covers cannot drift silently.
+    reference workbook instead, so the five types it covers cannot drift silently. PctDiff,
+    PctTotal and Rank are not in it - their provenance is in TABLE-CALCS.md.
     """
     checked = dict(_attested_sheets())
     # '1a-total' is excluded on purpose - see

@@ -198,14 +198,23 @@ Table calculations are **view-level computations** — they don't create new dat
 
 ### Table Calculation Types
 
+> **Corrected against Desktop output (issue #50).** This table was inferred, and most of it
+> was wrong: `PctTotal` is `pcto:`, not `pct:`; `PctDiff` is `pcdf:`, not `pctdiff:`; the type
+> is `Difference`, not `Diff`; and `CumAvg` is not a `TCType-ST` value at all. The attested
+> table lives in `skills/tableau-build/references/snippets/worksheets/TABLE-CALCS.md` with the
+> workbook each prefix was read from. **Do not infer a prefix from the type name** - four of
+> seven guesses missed.
+
 | `type` | Name Prefix | Description |
 |--------|-------------|-------------|
 | `CumTotal` | `cum:sum:` | Running/cumulative total |
-| `CumAvg` | `cum:avg:` | Running average |
-| `PctTotal` | `pct:sum:` | Percent of total |
-| `Diff` | `diff:sum:` | Difference from previous |
-| `PctDiff` | `pctdiff:sum:` | Percent difference from previous |
+| `WindowTotal` | `win:sum:` | Moving calculation |
+| `Difference` | `diff:sum:` | Difference from previous |
+| `PctDiff` | `pcdf:sum:` | Percent difference from previous |
+| `PctValue` | `pcva:sum:` | Percent from |
+| `PctTotal` | `pcto:sum:` | Percent of total |
 | `Rank` | `rank:sum:` | Rank |
+| `PctRank` | `pcrk:sum:` | Percentile |
 
 ### Ordering
 

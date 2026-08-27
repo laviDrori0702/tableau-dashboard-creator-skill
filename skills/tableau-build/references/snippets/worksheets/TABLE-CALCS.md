@@ -100,6 +100,15 @@ drift from this file without a test failing.
 </column-instance>
 ```
 
+### The builder emits the name, not the options
+
+Read the fragments above for the prefixes only. Desktop also writes per-type options that
+carry the calculation's *meaning* - `aggregation`, `diff-options` plus an `<address>` child,
+`rank-options`, and `from` / `to` / `window-options` - and the builder emits none of them.
+All are optional per the XSD, so both validators pass, but a `WindowTotal` with no `from` /
+`to` is an unbounded window rather than a moving average. Tracked as issue #85; the prefixes
+this file attests are unaffected.
+
 ### The Calculation Type menu, mapped
 
 Desktop 2025.1.10's dropdown offers eight entries, all now traced. There is no "Total"
@@ -118,9 +127,10 @@ entry - that is the formula path above.
 
 ## Attested from the wider corpus
 
-Two prefixes are not in the reference workbook. They come from a 195-workbook sweep of
-`~/Downloads`, `~/Documents/My Tableau Repository/Workbooks` and this repo. Fragments
-verbatim; `source-build` is each workbook's own. All are `version='18.1'`.
+The reference workbook settles five prefixes - `1a-total` is the untyped formula case, so six
+sheets yield five types. The other **three** come from a 195-workbook sweep of `~/Downloads`,
+`~/Documents/My Tableau Repository/Workbooks` and this repo. Fragments verbatim;
+`source-build` is each workbook's own. All are `version='18.1'`.
 
 ### `PctDiff` -> `pcdf`
 
@@ -145,6 +155,18 @@ saved its own guess - the original attestation.
 <column-instance column='[Sales]' derivation='Sum' name='[pcto:sum:Sales:qk]' pivot='key' type='quantitative'>
 ```
 
+### `Rank` -> `rank`
+
+`Embedded Filters Test.twbx`, 2024.2.10, win. Note `ordering-type='Columns'` here - the
+addressing is part of the calculation, not of the prefix, and the prefix is the same either
+way.
+
+```xml
+<column-instance column='[Sales]' derivation='Sum' name='[rank:sum:Sales:qk]' pivot='key' type='quantitative'>
+  <table-calc ordering-type='Columns' rank-options='Competition,Descending' type='Rank' />
+</column-instance>
+```
+
 ### Nesting
 
 A percent-of-total *of* a running total nests both prefixes, outermost first:
@@ -157,7 +179,7 @@ A percent-of-total *of* a running total nests both prefixes, outermost first:
 `TCType-ST` enumerates ten values. `TABLE_CALC_PREFIXES` holds eight:
 
 - **`None`** - "no table calc", so there is nothing to prefix.
-- **`Custom`** - appears in none of the 196 workbooks swept, and no dropdown entry produces
+- **`Custom`** - appears in none of the 195 workbooks swept, and no dropdown entry produces
   it. Unattested, so `manifest.TABLE_CALCS` rejects it rather than guessing a prefix.
 
 ## How to attest a new one
