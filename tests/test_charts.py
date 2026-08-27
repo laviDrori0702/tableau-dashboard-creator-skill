@@ -158,6 +158,13 @@ CHART_CASES: list[tuple[str, dict]] = [
         "columns": [{"field": "order_date", "date_part": "month"}],
         "rows": ["revenue", "profit"],
     })),
+    # Issue #76: gantt shipped a mark class ("Gantt") that is not in the XSD enum, because
+    # no test had ever built one. A golden per chart type is what stops the next
+    # never-exercised type from inventing a mark name.
+    ("gantt", _sheet("Gantt", "gantt", shelves={
+        "columns": [{"field": "order_date", "date_part": "month"}],
+        "rows": ["product_category"],
+    }, encodings={"size": "revenue"})),
     ("custom-tooltip", _sheet(
         "Custom Tooltip", "bar",
         shelves={"columns": ["product_category"], "rows": ["revenue"]},
@@ -331,6 +338,33 @@ def test_every_legacy_pattern_has_a_case():
     }
 
 
+def test_every_mark_class_is_in_the_xsd_enumeration():
+    """Every mark class the assembler can emit is a member of the XSD's PrimitiveType-ST.
+
+    Issue #76: a mark class the enumeration does not list is a fatal gate error, and a chart
+    type nothing ever builds hides one forever - gantt shipped "Gantt" for "GanttBar". This
+    reads the enumeration once and covers every spec, including the types with no golden
+    case. Stdlib-only on purpose: importing validate_twb_xsd without lxml exits the process.
+    """
+    # Whatever twb_*.xsd the skill ships - no version string to keep in sync with the
+    # validator's own XSD_PATH.
+    xsd_dir = Path(worksheet.__file__).parent.parent / "references" / "xsd"
+    namespace = {"xs": "http://www.w3.org/2001/XMLSchema"}
+    schema = ET.parse(sorted(xsd_dir.glob("twb_*.xsd"))[-1])
+    mark_class_enum = schema.find(".//xs:simpleType[@name='PrimitiveType-ST']", namespace)
+    assert mark_class_enum is not None, "PrimitiveType-ST is gone from the XSD"
+    legal = {
+        enumeration.get("value")
+        for enumeration in mark_class_enum.findall("xs:restriction/xs:enumeration", namespace)
+    }
+
+    emitted = set()
+    for spec in worksheet.CHART_SPECS.values():
+        emitted.add(spec.mark_class)
+        emitted.update(spec.pane_marks)
+    assert emitted <= legal, f"mark class(es) not in PrimitiveType-ST: {sorted(emitted - legal)}"
+
+
 def test_every_chart_type_is_buildable():
     """Every type manifest.CHART_TYPES accepts has a spec - otherwise validate lets through
     a chart the assembler renders as a bare Automatic mark."""
@@ -374,6 +408,10 @@ def test_the_same_manifest_rebuilds_byte_identical():
     ("Kpi Card", "Text"),
     ("Histogram", "Bar"),
     ("Map", "Automatic"),
+    # Do not derive these from CHART_SPECS - each row is a hand-checked pin against the
+    # XSD, and a test that reads its expected value out of the code under test always
+    # passes - issue #76 is exactly CHART_SPECS holding the wrong value.
+    ("Gantt", "GanttBar"),
 ])
 def test_mark_class_per_chart_type(sheet_name, mark_class):
     """The mark class is what makes Tableau draw the right shape; every single-pane type
@@ -1485,3 +1523,9 @@ def test_build_packages_a_workbook_holding_every_chart_type(tmp_path):
             (project / result.twb_path).read_text(encoding="utf-8")
         ).findall("worksheets/worksheet")
     ) == len(CHART_CASES)
+
+    # Issue #76: the gate, not the build, is what an analyst hits - a gantt chart's invalid
+    # mark class passed assembly and died here. All three validators, over every type.
+    report = build.run_gate(project / result.twb_path, document, TARGET_VERSION)
+    assert set(report.results) == set(build.GATE_VALIDATORS)
+    assert report.ok, report.errors

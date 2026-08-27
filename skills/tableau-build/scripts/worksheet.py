@@ -779,7 +779,7 @@ CHART_SPECS: dict[str, ChartSpec] = {
     "histogram": ChartSpec(mark_class="Bar"),
     "treemap": ChartSpec(mark_class="Square", label_marks=True),
     "bullet": ChartSpec(mark_class="Bar"),
-    "gantt": ChartSpec(mark_class="Gantt"),
+    "gantt": ChartSpec(mark_class="GanttBar"),
     "boxplot": ChartSpec(mark_class="Circle"),
     "dual-axis": ChartSpec(dual=True),
     "combo": ChartSpec(dual=True, pane_marks=("Bar", "Line")),
