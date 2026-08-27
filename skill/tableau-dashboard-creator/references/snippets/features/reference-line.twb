@@ -23,7 +23,7 @@
       <connection class='federated'>
         <named-connections>
           <named-connection caption='sales_orders' name='textscan.16xkalt18d1a7p1cjzge51xf66r6'>
-            <connection class='textscan' directory='C:/Users/lavid/PyCharmMiscProject/tableau-skills/tableau-dashboard-creator-skill/demo/input/sample-data' filename='sales_orders.csv' password='' server='' />
+            <connection class='textscan' directory='C:/Users/%USERNAME%/PyCharmMiscProject/tableau-skills/tableau-dashboard-creator-skill/demo/input/sample-data' filename='sales_orders.csv' password='' server='' />
           </named-connection>
         </named-connections>
         <relation connection='textscan.16xkalt18d1a7p1cjzge51xf66r6' name='sales_orders.csv' table='[sales_orders#csv]' type='table'>
@@ -252,7 +252,7 @@
       <column caption='Revenue' datatype='real' name='[revenue]' role='measure' type='quantitative' />
       <column caption='Unit Price' datatype='real' name='[unit_price]' role='measure' type='quantitative' />
       <extract _.fcp.VConnDownstreamExtractsWithWarnings.true...user-specific='false' count='-1' enabled='true' object-id='' units='records'>
-        <connection access_mode='readonly' authentication='auth-none' author-locale='en_US' class='hyper' dbname='C:/Users/lavid/Documents/My Tableau Repository/Datasources/sales_orders.hyper' default-settings='yes' schema='Extract' sslmode='' tablename='Extract' update-time='03/16/2026 06:44:43 AM' username='tableau_internal_user'>
+        <connection access_mode='readonly' authentication='auth-none' author-locale='en_US' class='hyper' dbname='C:/Users/%USERNAME%/Documents/My Tableau Repository/Datasources/sales_orders.hyper' default-settings='yes' schema='Extract' sslmode='' tablename='Extract' update-time='03/16/2026 06:44:43 AM' username='tableau_internal_user'>
           <relation name='Extract' table='[Extract].[Extract]' type='table' />
           <refresh>
             <refresh-event add-from-file-path='sales_orders' increment-value='%null%' refresh-type='create' rows-inserted='40' timestamp-start='2026-03-16 06:44:42.736' />
