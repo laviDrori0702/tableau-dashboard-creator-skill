@@ -29,7 +29,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import Iterator, NamedTuple, Optional
 
 from features import ACTIVATIONS, CLEAR_VALUE_TAGS, PARAMETER_TYPES
 # Names, not the module: half the functions below take a parameter called ``worksheet``.
@@ -111,12 +111,6 @@ FORMAT_ALIGNMENTS: dict[str, frozenset[str]] = {
 
 #: A colour value in a ``format`` block: a hex, or ``none`` for "no such border/line".
 _FORMAT_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
-
-#: Table calculations a shelf entry may ask for, and the parameter data types / action
-#: activations the builder can emit - all read off the builder's own tables.
-TABLE_CALCS = frozenset(TABLE_CALC_PREFIXES)
-PARAMETER_DATA_TYPES = frozenset(PARAMETER_TYPES)
-ACTION_RUN_ON = frozenset(ACTIVATIONS)
 
 #: Types a quick-filter card can render: it lists the field's *members*, so a date or numeric
 #: field belongs in a worksheet filter with bounds instead (see :data:`zones.FILTER_MODES`).
@@ -241,11 +235,34 @@ def load_manifest(path: Path | str) -> tuple[Optional[dict], Optional[str]]:
 
 # --- Layout tree --------------------------------------------------------------
 
+def walk_layout(node: object, path: str = "root") -> Iterator[tuple[str, object]]:
+    """Yield ``(path, node)`` for the layout subtree at ``node``, parents before children.
+
+    The one recursion over the tree that reads it: :func:`_collect_layout_ids` and
+    ``twb``'s visibility wiring each filter what they need out of it. (``zones`` keeps its
+    own recursion - it divides a rectangle and nests XML on the way down, so it needs the
+    call stack, not a flat sequence of nodes.) Every child is yielded whatever its type,
+    because a caller that validates has to see a non-object node to reject it; only nodes
+    that are objects with a ``children`` *list* are descended into.
+
+    Args:
+        node: The JSON value at this position in the tree.
+        path: Human-readable position of ``node`` (e.g. ``layout.root.children[1]``).
+
+    Yields:
+        ``(path, node)`` per node, depth-first and pre-order.
+    """
+    yield path, node
+    if isinstance(node, dict) and isinstance(node.get("children"), list):
+        for index, child in enumerate(node["children"]):
+            yield from walk_layout(child, f"{path}.children[{index}]")
+
+
 def _collect_layout_ids(
-    node: object, path: str, ids: list[str], container_ids: set[str], errors: list[str],
+    root: object, path: str, ids: list[str], container_ids: set[str], errors: list[str],
     visibility: Optional[list[tuple[str, str]]] = None,
 ) -> None:
-    """Walk one layout node, recording every placed id and any structural error.
+    """Walk a layout subtree, recording every placed id and any structural error.
 
     A node is a container (``type`` + non-empty ``children``), a leaf (``id``), or both (a
     **mapped container**, e.g. a DZV panel that is itself an element and holds further
@@ -256,58 +273,58 @@ def _collect_layout_ids(
     the worksheets.
 
     Args:
-        node: The JSON value at this position in the tree.
-        path: Human-readable position (e.g. ``layout.root.children[1]``) for messages.
+        root: The JSON value at the root of the subtree.
+        path: Human-readable position of ``root`` (e.g. ``layout.root``) for messages.
         ids: Accumulator for placed element ids.
         container_ids: Accumulator for the ids of nodes that hold children.
         errors: Accumulator for validation errors.
         visibility: Accumulator for ``(path, field name)`` of every node whose zone is shown
             or hidden by a boolean field (Dynamic Zone Visibility), or ``None`` to ignore them.
     """
-    if not isinstance(node, dict):
-        errors.append(f"{path}: every layout node must be a JSON object")
-        return
+    for node_path, node in walk_layout(root, path):
+        if not isinstance(node, dict):
+            errors.append(f"{node_path}: every layout node must be a JSON object")
+            continue
 
-    if visibility is not None and node.get("visibility") is not None:
-        shown_by = node.get("visibility")
-        if isinstance(shown_by, str) and shown_by.strip():
-            visibility.append((path, shown_by.strip()))
-        else:
+        if visibility is not None and node.get("visibility") is not None:
+            shown_by = node.get("visibility")
+            if isinstance(shown_by, str) and shown_by.strip():
+                visibility.append((node_path, shown_by.strip()))
+            else:
+                errors.append(
+                    f"{node_path}: 'visibility' must be the name of a boolean calculated "
+                    f"field (got {shown_by!r})"
+                )
+
+        element_id, children = node.get("id"), node.get("children")
+        if element_id is None and children is None:
             errors.append(
-                f"{path}: 'visibility' must be the name of a boolean calculated field "
-                f"(got {shown_by!r})"
+                f"{node_path}: a node needs an 'id' (leaf), 'children' (container), or both"
             )
+            continue
+        if isinstance(element_id, str) and element_id.strip():
+            placed = element_id.strip()
+            ids.append(placed)
+            if children is not None:
+                container_ids.add(placed)
+            if placed.startswith(INTERACTION_PREFIX):
+                errors.append(
+                    f"{node_path}: interaction id '{placed}' occupies no zone - dashboard "
+                    f"actions belong in 'actions', never in the layout tree (CONTRACT.md §1.1)"
+                )
+        elif element_id is not None:
+            errors.append(f"{node_path}: 'id' must be a non-empty string")
 
-    element_id, children = node.get("id"), node.get("children")
-    if element_id is None and children is None:
-        errors.append(f"{path}: a node needs an 'id' (leaf), 'children' (container), or both")
-        return
-    if isinstance(element_id, str) and element_id.strip():
-        placed = element_id.strip()
-        ids.append(placed)
-        if children is not None:
-            container_ids.add(placed)
-        if placed.startswith(INTERACTION_PREFIX):
+        if children is None:
+            continue
+        if node.get("type") not in CONTAINER_TYPES:
             errors.append(
-                f"{path}: interaction id '{placed}' occupies no zone - dashboard actions "
-                f"belong in 'actions', never in the layout tree (CONTRACT.md §1.1)"
+                f"{node_path}: container 'type' must be 'vert' or 'horz' "
+                f"(got {node.get('type')!r})"
             )
-    elif element_id is not None:
-        errors.append(f"{path}: 'id' must be a non-empty string")
-
-    if children is None:
-        return
-    if node.get("type") not in CONTAINER_TYPES:
-        errors.append(
-            f"{path}: container 'type' must be 'vert' or 'horz' (got {node.get('type')!r})"
-        )
-    if not isinstance(children, list) or not children:
-        errors.append(f"{path}: 'children' must be a non-empty list")
-        return
-    for index, child in enumerate(children):
-        _collect_layout_ids(
-            child, f"{path}.children[{index}]", ids, container_ids, errors, visibility
-        )
+        # walk_layout descends the list itself; an unusable 'children' is only reported here.
+        if not isinstance(children, list) or not children:
+            errors.append(f"{node_path}: 'children' must be a non-empty list")
 
 
 def placed_layout_ids(layout: object) -> set[str]:
@@ -637,10 +654,10 @@ def _validate_reference(
             f"{label}: {where} '{field_name}' has a 'bin' of {bin_size!r} - a bin width "
             f"must be a positive number (e.g. 500 for a histogram of 0-500, 500-1000, ...)"
         )
-    if table_calc and table_calc not in TABLE_CALCS:
+    if table_calc and table_calc not in TABLE_CALC_PREFIXES:
         errors.append(
             f"{label}: {where} '{field_name}' has unknown table_calc '{table_calc}' "
-            f"(expected one of: {', '.join(sorted(TABLE_CALCS))})"
+            f"(expected one of: {', '.join(sorted(TABLE_CALC_PREFIXES))})"
         )
 
 
@@ -897,6 +914,26 @@ class ViewZone(NamedTuple):
     datasource: str
 
 
+class ValidationContext(NamedTuple):
+    """The tables the objects/actions validators all read, travelling as one value.
+
+    ``errors`` is the *same* accumulator list every other validator appends to - the tuple
+    holds a reference to that list, it does not copy it.
+
+    Attributes:
+        views: ``{element id: ViewZone}`` - the zones a filter card may filter and an action
+            may run from or to.
+        field_types: ``{datasource: {field: type}}``.
+        parameter_types: ``{declared parameter name: data type}``.
+        errors: Accumulator for validation errors.
+    """
+
+    views: dict[str, ViewZone]
+    field_types: dict[str, dict[str, str]]
+    parameter_types: dict[str, str]
+    errors: list[str]
+
+
 def _view_zones(worksheets: object) -> dict[str, ViewZone]:
     """Map ``{element id: ViewZone}`` for the worksheets that name a zone.
 
@@ -960,8 +997,7 @@ def _field_types(
 
 def _validate_objects(
     objects: object, layout_ids: set[str], container_ids: set[str],
-    views: dict[str, ViewZone], field_types: dict[str, dict[str, str]],
-    parameter_types: dict[str, str], errors: list[str],
+    context: ValidationContext,
 ) -> set[str]:
     """Validate the non-worksheet dashboard objects and return the zones they fill.
 
@@ -970,14 +1006,12 @@ def _validate_objects(
         layout_ids: The element ids the layout tree places.
         container_ids: Mapped-container ids (filled by their children, not an object of
             their own - CONTRACT.md §1.1).
-        views: ``{element id: ViewZone}`` - the sheets a filter card may filter.
-        field_types: ``{datasource: {field: type}}``.
-        parameter_types: ``{declared parameter name: data type}``.
-        errors: Accumulator for validation errors.
+        context: The shared validation tables, and the error accumulator.
 
     Returns:
         The element ids the objects fill.
     """
+    errors = context.errors
     filled: set[str] = set()
     if not isinstance(objects, list):
         errors.append("objects: must be a list of {element_id, kind}")
@@ -1007,23 +1041,20 @@ def _validate_objects(
                 f"(expected one of: {', '.join(sorted(OBJECT_KINDS))})"
             )
         elif kind == "filter":
-            _validate_filter_card(
-                label, dashboard_object, views, field_types, errors
-            )
+            _validate_filter_card(label, dashboard_object, context)
         elif kind == "parameter":
             parameter = str(dashboard_object.get("parameter", "")).strip()
-            if parameter not in parameter_types:
+            if parameter not in context.parameter_types:
                 errors.append(
                     f"{label}: 'parameter' is {parameter or 'missing'} - a parameter control "
                     f"names one declared parameter (declared: "
-                    f"{', '.join(sorted(parameter_types)) or 'none'})"
+                    f"{', '.join(sorted(context.parameter_types)) or 'none'})"
                 )
     return filled
 
 
 def _validate_filter_card(
-    label: str, dashboard_object: dict, views: dict[str, ViewZone],
-    field_types: dict[str, dict[str, str]], errors: list[str],
+    label: str, dashboard_object: dict, context: ValidationContext,
 ) -> None:
     """Validate one quick-filter card against the worksheet it filters.
 
@@ -1035,11 +1066,10 @@ def _validate_filter_card(
     Args:
         label: The object's error label.
         dashboard_object: The ``objects`` entry.
-        views: ``{element id: ViewZone}``.
-        field_types: ``{datasource: {field: type}}``.
-        errors: Accumulator for validation errors.
+        context: The shared validation tables, and the error accumulator.
     """
-    sheet_names = {view.name: view.datasource for view in views.values()}
+    errors = context.errors
+    sheet_names = {view.name: view.datasource for view in context.views.values()}
     sheet = str(dashboard_object.get("worksheet", "")).strip()
     field_name = _bare_field(dashboard_object.get("field"))
 
@@ -1052,7 +1082,7 @@ def _validate_filter_card(
             f"(declared: {', '.join(sorted(sheet_names)) or 'none'})"
         )
     elif field_name:
-        datatype = field_types.get(sheet_names[sheet], {}).get(field_name)
+        datatype = context.field_types.get(sheet_names[sheet], {}).get(field_name)
         if datatype is None:
             errors.append(
                 f"{label}: field '{field_name}' is not a field of worksheet '{sheet}'s "
@@ -1075,9 +1105,7 @@ def _validate_filter_card(
 
 
 def _validate_actions(
-    actions: object, known_ids: set[str], parameter_types: dict[str, str],
-    views: dict[str, ViewZone], field_types: dict[str, dict[str, str]],
-    errors: list[str],
+    actions: object, known_ids: set[str], context: ValidationContext,
 ) -> None:
     """Validate the dashboard actions' types and endpoints.
 
@@ -1090,12 +1118,13 @@ def _validate_actions(
     Args:
         actions: The manifest's ``actions`` value.
         known_ids: Element ids an action may point at (the layout's zones).
-        parameter_types: ``{declared parameter name: data type}`` - a parameter action's
-            targets, and the types :data:`PARAMETER_ACTION_TARGET_TYPES` is checked against.
-        views: ``{element id: ViewZone}`` - the zones an action may run from or to.
-        field_types: ``{datasource: {field: type}}``, for a parameter action's source field.
-        errors: Accumulator for validation errors.
+        context: The shared validation tables, and the error accumulator - ``views`` are the
+            zones an action may run from or to, ``field_types`` types a parameter action's
+            source field, and ``parameter_types`` holds its possible targets, whose data type
+            is what :data:`PARAMETER_ACTION_TARGET_TYPES` is checked against.
     """
+    views, field_types = context.views, context.field_types
+    parameter_types, errors = context.parameter_types, context.errors
     if not isinstance(actions, list):
         errors.append("actions: must be a list (use [] when the dashboard has none)")
         return
@@ -1124,10 +1153,10 @@ def _validate_actions(
             )
 
         run_on = str(action.get("run_on", "")).strip().lower()
-        if run_on and run_on not in ACTION_RUN_ON:
+        if run_on and run_on not in ACTIVATIONS:
             errors.append(
                 f"{label}: unknown run_on '{run_on}' "
-                f"(expected one of: {', '.join(sorted(ACTION_RUN_ON))})"
+                f"(expected one of: {', '.join(sorted(ACTIVATIONS))})"
             )
 
         source = str(action.get("source", "")).strip()
@@ -1244,10 +1273,10 @@ def _validate_parameters(parameters: object, errors: list[str]) -> dict[str, str
         seen[name] = data_type
         if not data_type:
             errors.append(f"{label}: needs a 'data_type' (string/integer/real/boolean/date)")
-        elif data_type not in PARAMETER_DATA_TYPES:
+        elif data_type not in PARAMETER_TYPES:
             errors.append(
                 f"{label}: unknown data_type '{data_type}' "
-                f"(expected one of: {', '.join(sorted(PARAMETER_DATA_TYPES))})"
+                f"(expected one of: {', '.join(sorted(PARAMETER_TYPES))})"
             )
 
         # A parameter *is* its current value: the value is the column's calculation, so
@@ -1381,12 +1410,14 @@ def validate_manifest(
         set(parse_design_tokens(design_tokens_text).field_palettes),
     )
 
-    views = _view_zones(manifest_document.get("worksheets"))
-    field_types = _field_types(manifest_document, data_model_text)
-    parameter_types = _validate_parameters(manifest_document.get("parameters", []), errors)
+    context = ValidationContext(
+        views=_view_zones(manifest_document.get("worksheets")),
+        field_types=_field_types(manifest_document, data_model_text),
+        parameter_types=_validate_parameters(manifest_document.get("parameters", []), errors),
+        errors=errors,
+    )
     filled |= _validate_objects(
-        manifest_document.get("objects", []), zone_ids, container_ids, views, field_types,
-        parameter_types, errors,
+        manifest_document.get("objects", []), zone_ids, container_ids, context
     )
     _validate_visibility(visibility, manifest_document, errors)
 
@@ -1400,8 +1431,5 @@ def validate_manifest(
             "filter card / text / image zone)"
         )
 
-    _validate_actions(
-        manifest_document.get("actions", []), zone_ids, parameter_types, views, field_types,
-        errors,
-    )
+    _validate_actions(manifest_document.get("actions", []), zone_ids, context)
     return errors

@@ -37,7 +37,7 @@ from typing import NamedTuple
 import features
 import worksheet
 import zones
-from manifest import VISIBILITY_TYPE, documented_field_types
+from manifest import VISIBILITY_TYPE, documented_field_types, walk_layout
 
 logger = logging.getLogger(__name__)
 
@@ -1123,29 +1123,21 @@ def _plan_zone_visibility(
     return visibilities
 
 
-def _visibility_requests(node: object) -> list[tuple[dict, str]]:
-    """Collect ``(layout node, field name)`` for every node carrying a ``visibility`` key."""
-    if not isinstance(node, dict):
-        return []
-    requests = []
-    field_name = str(node.get("visibility", "") or "").strip()
-    if field_name:
-        requests.append((node, field_name))
-    for child in node.get("children") or []:
-        requests.extend(_visibility_requests(child))
-    return requests
+def _layout_string(node: object, key: str) -> str:
+    """Read ``key`` off a layout node as a stripped string - ``""`` when it has none.
+
+    ``walk_layout`` yields a node whatever its type, so both callers below have to tolerate
+    one that is not an object (``validate_manifest`` already rejected it).
+    """
+    return str(node.get(key, "") or "").strip() if isinstance(node, dict) else ""
 
 
-def _element_ids(node: dict) -> list[str]:
+def _element_ids(node: object) -> list[str]:
     """Return the node's own element id first, then its descendants' - the search order."""
-    ids = []
-    element_id = str(node.get("id", "") or "").strip()
-    if element_id:
-        ids.append(element_id)
-    for child in node.get("children") or []:
-        if isinstance(child, dict):
-            ids.extend(_element_ids(child))
-    return ids
+    return [
+        element_id for _, descendant in walk_layout(node)
+        if (element_id := _layout_string(descendant, "id"))
+    ]
 
 
 def _attach_visibility_fields(
@@ -1169,8 +1161,9 @@ def _attach_visibility_fields(
         str(planned.entry.get("element_id", "")).strip(): planned
         for planned in plans if str(planned.entry.get("element_id", "")).strip()
     }
-    for node, field_name in _visibility_requests(layout.get("root")):
-        if field_name in parameter_names:
+    for _, node in walk_layout(layout.get("root")):
+        field_name = _layout_string(node, "visibility")
+        if not field_name or field_name in parameter_names:
             continue  # a parameter is view-independent; no sheet has to carry it
         candidates = [by_element[element_id] for element_id in _element_ids(node)
                       if element_id in by_element]

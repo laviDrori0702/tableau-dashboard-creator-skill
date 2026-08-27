@@ -268,7 +268,7 @@ def render_parameters_datasource(
 
 # --- Actions -------------------------------------------------------------------
 
-#: manifest ``run_on`` -> the ``<activation>`` type. ``manifest.ACTION_RUN_ON`` reads this.
+#: manifest ``run_on`` -> the ``<activation>`` type. ``manifest`` reads this table.
 ACTIVATIONS: dict[str, str] = {"select": "on-select", "hover": "on-hover"}
 
 #: The Tableau command behind each sheet-to-sheet action type.
