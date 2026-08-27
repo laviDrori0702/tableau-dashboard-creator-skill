@@ -322,20 +322,37 @@ def test_an_unknown_table_calc_is_rejected():
     assert any("CumAvg" in error for error in _errors(worksheets=sheets))
 
 
+#: The Desktop-authored workbook that settles four of the eight prefixes - see
+#: skills/tableau-build/references/snippets/worksheets/TABLE-CALCS.md.
+_ATTESTATION_TWB = (
+    Path(__file__).resolve().parent.parent
+    / "skills/tableau-build/references/snippets/worksheets"
+    / "table-calculations-attestation.twb"
+)
+
+
+def _field_ref(table_calc, field_name="revenue"):
+    """A minimal measure FieldRef carrying ``table_calc``, for naming assertions."""
+    return worksheet.FieldRef(
+        field_name=field_name, datatype="real", role="measure",
+        column_type="quantitative", instance_type="quantitative",
+        prefix="sum", derivation="Sum", table_calc=table_calc,
+    )
+
+
 # One row per TCType-ST value. Do NOT derive the expected prefix from TABLE_CALC_PREFIXES -
 # a test that reads its expectation out of the table under test cannot fail, and a wrong
-# prefix in that table is exactly the defect (issue #50: 'pctdiff' should have been 'pcdf').
-# 'attested' rows are copied from Desktop-saved workbooks; see
-# skills/tableau-build/references/snippets/worksheets/TABLE-CALCS.md for the XML and source.
+# prefix in that table is exactly the defect: of the five originally guessed, 'pctdiff',
+# 'pctval' and 'pctrank' were all wrong. The percent family is 'pc' + two letters.
 @pytest.mark.parametrize("table_calc,prefix", [
-    ("CumTotal", "cum"),        # attested: FINANCIAL SERVICES - Trading.twbx, 2023.3.0
+    ("CumTotal", "cum"),        # attested: table-calculations-attestation.twb, 2025.1.10
+    ("Difference", "diff"),     # attested: table-calculations-attestation.twb, 2025.1.10
+    ("PctValue", "pcva"),       # attested: table-calculations-attestation.twb, 2025.1.10
+    ("PctRank", "pcrk"),        # attested: table-calculations-attestation.twb, 2025.1.10
     ("PctDiff", "pcdf"),        # attested: appsfortableau HierarchyFilter demo, 2024.3.0
     ("PctTotal", "pcto"),       # attested: lavi_webpage_test.twbx, 2025.2.0
     ("Rank", "rank"),           # attested: Embedded Filters Test.twbx, 2024.2.10
-    ("WindowTotal", "wnd"),     # inferred - no Desktop workbook uses it yet
-    ("Difference", "diff"),     # inferred
-    ("PctValue", "pctval"),     # inferred
-    ("PctRank", "pctrank"),     # inferred
+    ("WindowTotal", "wnd"),     # INFERRED - no Desktop workbook checked uses it
 ])
 def test_table_calc_instance_name_prefix(table_calc, prefix):
     """The prefix Tableau puts on the instance name, per calculation type.
@@ -343,13 +360,63 @@ def test_table_calc_instance_name_prefix(table_calc, prefix):
     Rendered through :class:`worksheet.FieldRef` rather than asserted on the table so the
     nesting rule is covered too: the calc prefix goes *outside* the aggregation prefix.
     """
-    entry = worksheet.FieldRef(
-        field_name="revenue", datatype="real", role="measure",
-        column_type="quantitative", instance_type="quantitative",
-        prefix="sum", derivation="Sum", table_calc=table_calc,
-    )
+    assert _field_ref(table_calc).instance_name == f"[{prefix}:sum:revenue:qk]"
 
-    assert entry.instance_name == f"[{prefix}:sum:revenue:qk]"
+
+def test_the_attested_prefixes_match_desktops_own_output():
+    """The attestation, enforced: rebuild each sheet's shelf and compare to what Desktop
+    wrote.
+
+    The parametrize list above is hand-transcribed, so it pins the table but not the truth -
+    a typo there and in TABLE_CALC_PREFIXES would agree with each other. This reads the
+    reference workbook instead, so the four types it covers cannot drift silently.
+    """
+    workbook = ET.parse(_ATTESTATION_TWB).getroot()
+    sheets = workbook.findall("worksheets/worksheet")
+    assert [sheet.get("name") for sheet in sheets] == [
+        "1-total", "2-difference", "3-percent-from", "4-percentile",
+    ], "the reference workbook changed - re-read TABLE-CALCS.md before touching this test"
+
+    checked = {}
+    for sheet in sheets:
+        instances = [
+            instance
+            for instance in sheet.findall("table/view/datasource-dependencies/column-instance")
+            if instance.find("table-calc") is not None
+        ]
+        # One calculation per sheet is the whole design of the reference workbook; two would
+        # mean the sheet no longer isolates a single type.
+        assert len(instances) == 1, f"{sheet.get('name')} carries {len(instances)} table calcs"
+
+        table_calc = instances[0].find("table-calc").get("type")
+        rows = sheet.findtext("table/rows")
+        checked[table_calc] = instances[0].get("name")
+
+        # The field is Sales here, and <rows> qualifies the name with the datasource id, so
+        # compare the bracketed tail rather than the whole shelf.
+        expected = _field_ref(table_calc, "Sales").instance_name
+        assert rows.endswith(expected), (
+            f"{sheet.get('name')}: Desktop wrote {rows}, we build {expected}"
+        )
+
+    assert checked == {
+        "CumTotal": "[cum:sum:Sales:qk]",
+        "Difference": "[diff:sum:Sales:qk]",
+        "PctValue": "[pcva:sum:Sales:qk]",
+        "PctRank": "[pcrk:sum:Sales:qk]",
+    }
+
+
+def test_the_prefix_table_holds_exactly_the_documented_types():
+    """Adding a ninth type must not skip the attestation.
+
+    The parametrize list above covers today's eight keys, but nothing makes a *new* key grow
+    a row - it would ship un-pinned and un-attested. This is the guard that notices.
+    """
+    assert set(worksheet.TABLE_CALC_PREFIXES) == {
+        "CumTotal", "WindowTotal", "Difference", "PctDiff",
+        "PctValue", "PctTotal", "Rank", "PctRank",
+    }
 
 
 # --- Reference lines (AC #1) ---------------------------------------------------

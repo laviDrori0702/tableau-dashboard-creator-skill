@@ -420,19 +420,21 @@ def aggregate_calculated_fields(calculated: dict[str, CalculatedField]) -> froze
 #: are cosmetic identifiers - ``cum:sum:revenue:qk`` is what Tableau writes for a running
 #: total, and ``manifest.TABLE_CALCS`` reads this table so an unknown type fails validation
 #: rather than rendering a calc Tableau does not have.
-#: Four of the eight are attested - read off Desktop-saved workbooks, see
-#: ``references/snippets/worksheets/TABLE-CALCS.md`` for the verbatim XML and its provenance.
-#: ponytail: the other four stay inferred until a workbook using them turns up. A wrong
-#: prefix costs a rewrite on open, not a refused workbook - issue #50 carries the steps.
+#: Seven of the eight are attested - read off Desktop-saved workbooks. The verbatim XML and
+#: its provenance is in ``references/snippets/worksheets/TABLE-CALCS.md``; the workbook four
+#: of them come from is vendored beside it. Note the percent family abbreviates to ``pc`` plus
+#: two letters - four characters, never the ``pct`` + verb shape guesswork reaches for first.
+#: ponytail: ``WindowTotal`` is the one guess left, and the only one nothing has settled. A
+#: wrong prefix costs a rewrite on open, not a refused workbook - issue #50 has the steps.
 TABLE_CALC_PREFIXES: dict[str, str] = {
     "CumTotal": "cum",          # attested
-    "WindowTotal": "wnd",       # inferred
-    "Difference": "diff",       # inferred
-    "PctDiff": "pcdf",          # attested - not "pctdiff", which is what we guessed
-    "PctValue": "pctval",       # inferred
+    "WindowTotal": "wnd",       # INFERRED - the last guess in this table
+    "Difference": "diff",       # attested
+    "PctDiff": "pcdf",          # attested - not "pctdiff"
+    "PctValue": "pcva",         # attested - not "pctval"
     "PctTotal": "pcto",         # attested
     "Rank": "rank",             # attested
-    "PctRank": "pctrank",       # inferred
+    "PctRank": "pcrk",          # attested - not "pctrank"
 }
 
 #: How a table calc walks the view. ``Rows`` is Tableau's default "Table (across)" addressing
