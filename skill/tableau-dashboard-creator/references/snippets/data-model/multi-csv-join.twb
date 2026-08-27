@@ -21,7 +21,7 @@
       <connection class='federated'>
         <named-connections>
           <named-connection caption='sales_orders' name='textscan.088jbb100rppdo1c7uw7519si2hd'>
-            <connection class='textscan' directory='C:/Users/lavid/PyCharmMiscProject/tableau-skills/tableau-dashboard-creator-skill/demo/input/sample-data' filename='sales_orders.csv' password='' server='' />
+            <connection class='textscan' directory='C:/Users/%USERNAME%/PyCharmMiscProject/tableau-skills/tableau-dashboard-creator-skill/demo/input/sample-data' filename='sales_orders.csv' password='' server='' />
           </named-connection>
         </named-connections>
         <relation join='inner' type='join'>
@@ -428,7 +428,7 @@
       <column caption='Segment' datatype='string' name='[segment]' role='dimension' type='nominal' />
       <column caption='Unit Price' datatype='real' name='[unit_price]' role='measure' type='quantitative' />
       <extract _.fcp.VConnDownstreamExtractsWithWarnings.true...user-specific='false' count='-1' enabled='false' object-id='' units='records'>
-        <connection access_mode='readonly' authentication='auth-none' author-locale='en_US' class='hyper' dbname='C:/Users/lavid/Documents/My Tableau Repository/Datasources/sales_orders+join.hyper' default-settings='yes' schema='Extract' sslmode='' tablename='Extract' update-time='03/16/2026 06:43:00 AM' username='tableau_internal_user'>
+        <connection access_mode='readonly' authentication='auth-none' author-locale='en_US' class='hyper' dbname='C:/Users/%USERNAME%/Documents/My Tableau Repository/Datasources/sales_orders+join.hyper' default-settings='yes' schema='Extract' sslmode='' tablename='Extract' update-time='03/16/2026 06:43:00 AM' username='tableau_internal_user'>
           <relation name='Extract' table='[Extract].[Extract]' type='table' />
           <cols>
             <map key='[account_manager]' value='[Extract].[account_manager]' />

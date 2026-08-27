@@ -55,6 +55,13 @@ for issue #50. Six sheets, one calculation each, identical base setup: `Order Da
 asserts `FieldRef.instance_name` reproduces Desktop's `<rows>` shelf, so the table cannot
 drift from this file without a test failing.
 
+**One edit was made to Desktop's output, and only one.** The `<connection>` element recorded
+the author's local data path, `C:/Users/<name>/Documents/My Tableau Repository/...`; the
+username is replaced by `%USERNAME%`. This is a public repository, so a real home-directory
+path does not belong in it. Nothing else was altered - every `<column>`, `<column-instance>`
+and `<table-calc>` below is byte-for-byte what Desktop 2025.1.10 wrote. The same masking was
+applied to the other tracked `.twb` snippets, which carried the same path.
+
 | sheet | applied as | `<table-calc type>` | Desktop's instance name | prefix |
 |---|---|---|---|---|
 | `1a-total` | `TOTAL(sum([Sales]))` formula | *absent* | `[usr:Calculation_1660139451271188481:qk]` | *none* |
