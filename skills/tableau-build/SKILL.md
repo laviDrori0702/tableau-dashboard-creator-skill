@@ -258,17 +258,24 @@ When one arrives:
   the format flags are the builder's job — as is putting a **parameter action's source field on
   its source sheet's Detail shelf**, without which Desktop opens the workbook and the action
   never fires.
-- **An unsupported construct is refused by name, never silently.** An image / button / legend
-  object needs a reference the manifest does not carry (a filename, an action, a sheet + colour
-  field) and Tableau does not treat those as optional, so the layout **reserves its box as an
-  empty zone** — the approved geometry holds and everything else builds. `filter`, `parameter`,
-  `text` and `blank` objects render fully today. The gate emits a `[WARN]` naming each gap:
-  relay it to the analyst with both ways forward — **either** they build that one object in
-  Tableau Desktop and save a reference `.twb` for the repo (the permanent fix: a snippet under
-  `references/snippets/` and a template in the builder), **or** say the word and you hand-write
-  that one block into the `.twb` and prove it with `build.py gate` (the move-on fix, good for
-  this workbook only). Ask which; never pick silently, and never let the analyst discover the
-  gap as a blank rectangle in Desktop.
+- **An image / button / legend object reserves an empty box.** Each needs a reference the
+  manifest does not carry (a filename, an action, a sheet + colour field) and Tableau does not
+  treat those as optional, so the layout **reserves its box as an empty zone** — the approved
+  geometry holds and everything else builds. `filter`, `parameter`, `text` and `blank` objects
+  render fully today. The gate emits a `[WARN]` naming each gap: always relay it, and never let
+  the analyst discover the gap as a blank rectangle in Desktop. What you offer differs by kind:
+  - **An image and a standalone legend are manual by decision** (issue #46). Tell the analyst
+    to drop the picture in, or place the legend, in Tableau Desktop once — the box is already
+    the right size in the right place. Emitting a `bitmap` zone would also mean packaging the
+    image file into the `.twbx` under `Image/`, and a standalone legend zone needs a sheet +
+    encoding the plan does not name; neither is worth the build complexity for a one-time drag
+    in Desktop. **Do not offer to hand-write those blocks.** A chart's *own* colour legend is
+    generated and unaffected (see the view-zone note above).
+  - **A button is a real gap.** Offer both ways forward — **either** they build that one object
+    in Tableau Desktop and save a reference `.twb` for the repo (the permanent fix: a snippet
+    under `references/snippets/` and a template in the builder), **or** say the word and you
+    hand-write that one block into the `.twb` and prove it with `build.py gate` (the move-on
+    fix, good for this workbook only). Ask which; never pick silently.
 
 > The full `STATE.md` schema and the ordering / staleness / versioning rules live in
 > `CONTRACT.md` at the repo root. This skill restates only its own slice; `build.py`,
