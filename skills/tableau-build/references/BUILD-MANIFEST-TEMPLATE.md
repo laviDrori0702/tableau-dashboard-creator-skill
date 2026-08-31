@@ -138,10 +138,11 @@ defaults apply.
 
 The palette needs **no data member values**, which is what previously blocked it. A palette
 that binds hexes to concrete members (`<map to='#…'><bucket>"West"</bucket>`) is unbuildable
-from a manifest — the builder never sees the data — but it does not have to be: the mark's
-colour encoding carries an inline `<color-palette>` listing the brand's colours *in order*,
-and Tableau walks the field's domain against them exactly as it does with its own default 10.
-So:
+from a manifest — the builder never sees the data — but it does not have to be: a
+`<color-palette>` lists the brand's colours *in order*, and Tableau walks the field's domain
+against them exactly as it does with its own default 10. The palette is defined once under
+`<workbook><preferences>` and the mark's colour encoding references it by name
+(`palette='Brand'`), which is the shape Desktop keeps — see issue #52's attestation. So:
 
 - a **dimension** on `color` (a stacked bar, a pie, a treemap) takes an ordered palette — **its
   own**, when the tokens file carries a series table named for that field (see below);

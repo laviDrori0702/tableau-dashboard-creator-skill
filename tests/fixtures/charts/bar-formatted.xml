@@ -41,7 +41,7 @@
             <format attr="display-field-labels" scope="rows" value="false" />
           </style-rule>
           <style-rule element="zeroline">
-            <format attr="display" value="false" />
+            <format attr="line-visibility" value="off" />
           </style-rule>
         </style>
         <panes>

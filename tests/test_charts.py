@@ -1078,6 +1078,19 @@ def test_style_rules_are_alphabetical_by_element():
 
 # --- Worksheet formatting (issue #44) ------------------------------------------
 
+def _preferences(root: ET.Element = ALL_CHARTS_ROOT) -> ET.Element:
+    """Return the workbook's ``<preferences>``, where every custom palette is defined."""
+    return root.find("preferences")
+
+
+def _preference_palette(
+    name: str, root: ET.Element = ALL_CHARTS_ROOT
+) -> tuple[str, list[str]]:
+    """Return a named preferences palette as ``(type, colours)``."""
+    palette = _preferences(root).find(f"color-palette[@name='{name}']")
+    return palette.get("type"), [color.text for color in palette]
+
+
 def _mark_encoding(sheet_name: str) -> ET.Element:
     """Return a sheet's worksheet-level mark colour encoding (its palette)."""
     return _worksheet_element(sheet_name).find(
@@ -1086,20 +1099,29 @@ def _mark_encoding(sheet_name: str) -> ET.Element:
 
 
 def test_the_brand_palette_needs_no_member_values():
-    """The decision this ticket asked for: an inline <color-palette> orders the brand's hexes
-    and Tableau walks the domain against them, so a palette needs no data members at all."""
+    """The decision this ticket asked for: an ordered palette orders the brand's hexes and
+    Tableau walks the domain against them, so a palette needs no data members at all."""
     encoding = _mark_encoding("Bar Stacked")
 
     assert encoding.get("attr") == "color"
     assert encoding.get("type") == "palette"
     assert encoding.get("field").endswith("[none:region:nk]")
-    palette = encoding.find("color-palette")
-    assert palette.get("type") == "regular"
-    assert [color.text for color in palette] == [
-        "#1b4f72", "#2e86c1", "#48c9b0", "#f39c12",
-    ]
-    # Nothing binds a member: the encoding carries the palette and no <map to=.../> at all.
+    assert _preference_palette(encoding.get("palette")) == (
+        "regular", ["#1b4f72", "#2e86c1", "#48c9b0", "#f39c12"]
+    )
+    # Nothing binds a member: the encoding names the palette and no <map to=.../> at all.
     assert encoding.find("map") is None
+
+
+def test_a_categorical_palette_is_defined_once_and_referenced_by_name():
+    """Issue #52: Desktop defines a custom palette under <workbook><preferences> and every
+    encoding carries only palette='<name>'. An inline categorical palette appears in no
+    Desktop-saved workbook, so emitting one risks Desktop dropping it on open."""
+    encoding = _mark_encoding("Bar Stacked")
+
+    assert encoding.get("palette") == "Brand"
+    assert encoding.find("color-palette") is None
+    assert _preferences().find("color-palette[@name='Brand']").get("custom") == "true"
 
 
 def test_a_measure_on_colour_gets_a_two_ended_ramp():
@@ -1107,9 +1129,10 @@ def test_a_measure_on_colour_gets_a_two_ended_ramp():
     encoding = _mark_encoding("Map")
 
     assert encoding.get("type") == "interpolated"
-    palette = encoding.find("color-palette")
-    assert palette.get("type") == "ordered-sequential"
-    assert [color.text for color in palette] == ["#1b4f72", "#f39c12"]
+    assert encoding.find("color-palette") is None
+    assert _preference_palette(encoding.get("palette")) == (
+        "ordered-sequential", ["#1b4f72", "#f39c12"]
+    )
 
 
 @pytest.mark.parametrize("sheet_name", ["Dual Axis", "Combo"])
@@ -1182,11 +1205,14 @@ PER_FIELD_SHEETS = [
 
 
 def _palette_of(sheet_name: str, root: ET.Element) -> list[str]:
-    """Return the colours of a sheet's mark colour encoding, in order."""
+    """Return the colours of a sheet's mark colour encoding, in order.
+
+    The encoding names its palette; the definition lives once in ``<preferences>``.
+    """
     encoding = _worksheet_element(sheet_name, root).find(
         "table/style/style-rule[@element='mark']/encoding"
     )
-    return [color.text for color in encoding.find("color-palette")]
+    return _preference_palette(encoding.get("palette"), root)[1]
 
 
 def test_a_named_series_table_binds_to_its_own_field():
@@ -1278,7 +1304,7 @@ def test_borders_lines_shading_and_alignment_come_off_the_manifest():
     assert formats[("cell", "border-style")] == "none"
     assert formats[("cell", "border-width")] == "0"
     assert formats[("gridline", "stroke-color")] == "#e5e8e8"
-    assert formats[("zeroline", "display")] == "false"
+    assert formats[("zeroline", "line-visibility")] == "off"
     assert formats[("cell", "text-align")] == "center"
     assert formats[("cell", "vertical-align")] == "bottom"
 
@@ -1392,6 +1418,22 @@ def test_the_all_charts_workbook_passes_the_semantic_validator(tmp_path):
         f"{result.name}: {result.details}" for result in report.results if not result.passed
     ]
     assert not failures
+
+
+def test_a_dangling_palette_reference_fails_the_semantic_validator(tmp_path):
+    """The failure mode `_lift_palettes` could introduce is silent: an encoding naming a
+    palette no <preferences> defines still opens, and Tableau quietly draws its default ten.
+    Nothing else in the build would catch it, so the semantic validator does."""
+    import validate_twb
+
+    root = ET.fromstring(ALL_CHARTS_XML)
+    root.remove(root.find("preferences"))
+    twb_path = tmp_path / "dangling.twb"
+    twb_path.write_text(ET.tostring(root, encoding="unicode"), encoding="utf-8")
+
+    report = validate_twb.TwbValidator(str(twb_path)).validate()
+    failed = {result.name for result in report.results if not result.passed}
+    assert "Palette references resolve" in failed
 
 
 def test_the_all_charts_workbook_passes_the_xsd(tmp_path):

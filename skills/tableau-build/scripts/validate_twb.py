@@ -34,6 +34,11 @@ logger = logging.getLogger(__name__)
 
 # ── Data classes ─────────────────────────────────────────────────────────────
 
+#: The prefix ``twb._lift_palettes`` gives every palette it defines. A ``palette=`` name
+#: without it is a Tableau built-in, which the workbook never defines.
+BRAND_PALETTE_PREFIX = "Brand"
+
+
 @dataclass
 class CheckResult:
     """Result of a single validation check."""
@@ -107,6 +112,7 @@ class TwbValidator:
         self._check_dashboard_datasource_declarations()
         self._check_filter_slices_consistency()
         self._check_worksheet_window_match()
+        self._check_palette_references_resolve()
 
         return self.report
 
@@ -495,6 +501,41 @@ class TwbValidator:
                 errors.append(
                     f"Window '{win_name}' (class='worksheet') has no "
                     f"matching <worksheet name='{win_name}'>"
+                )
+
+        self.report.results.append(CheckResult(
+            name=check_name,
+            passed=len(errors) == 0,
+            details=errors,
+        ))
+
+    # ── Check 8: palette references resolve ──────────────────────────────
+
+    def _check_palette_references_resolve(self) -> None:
+        """Every ``<encoding palette='...'>` must name a palette the workbook defines.
+
+        A custom palette is defined once under ``<workbook><preferences>`` and referenced by
+        name (issue #52). A dangling name is silent: Tableau falls back to its default ten and
+        the workbook still opens, so nothing else in the build would catch it.
+
+        Built-in Tableau palette names (``tableau10_10_0``, ``blue_10_0``, ...) are not
+        defined in the workbook, so only the names this builder generates are checked.
+        """
+        check_name = "Palette references resolve"
+        errors: List[str] = []
+
+        defined = {
+            palette.get("name", "")
+            for palette in self.root.findall("preferences/color-palette")
+        }
+        for encoding in self.root.iter("encoding"):
+            name = encoding.get("palette")
+            if not name or not name.startswith(BRAND_PALETTE_PREFIX):
+                continue  # a built-in palette is Tableau's to resolve, not the workbook's
+            if name not in defined:
+                errors.append(
+                    f"Encoding attr='{encoding.get('attr')}' references palette "
+                    f"'{name}', which no <preferences><color-palette> defines"
                 )
 
         self.report.results.append(CheckResult(

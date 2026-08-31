@@ -61,12 +61,20 @@ silently un-styles every workbook while both skills still pass their own checks:
 | heading | what `build` does with it |
 |---|---|
 | `## Typography` | The `- **Font family**:` and `- **Chart title**:` bullets become the worksheet font and title run. |
-| `### Chart series colors` | The ordered hex list becomes a worksheet's colour palette, emitted as an inline `<color-palette>` on the mark's colour encoding, plus the default mark colour for charts with nothing on Colour. One table per coloured field (each introduced by its field name in backticks) binds each colour encoding to **its own** table, in row order; a field no table names takes the whole list. |
+| `### Chart series colors` | The ordered hex list becomes a worksheet's colour palette, defined once as a `<color-palette>` under `<workbook><preferences>` and referenced by the mark's colour encoding as `palette='Brand…'`, plus the default mark colour for charts with nothing on Colour. One table per coloured field (each introduced by its field name in backticks) binds each colour encoding to **its own** table, in row order; a field no table names takes the whole list. |
 
 The palette needs **no data member values** — that was the open question that kept it unbuilt.
 A member-bound palette (`<map to='#…'><bucket>"West"</bucket>`) is impossible from a manifest,
-but an inline `<color-palette>` only lists colours *in order* and lets Tableau walk the field's
-domain against them. So profiling never has to pass distinct members to the manifest.
+but a `<color-palette>` only lists colours *in order* and lets Tableau walk the field's domain
+against them. So profiling never has to pass distinct members to the manifest.
+
+Where that palette *lives* is issue #52's answer: Desktop defines a custom palette once under
+`<workbook><preferences>` and has every encoding reference it by name — it writes no inline
+categorical palette in any attested workbook. `twb._lift_palettes` does that lift, and
+`validate_twb`'s "Palette references resolve" check fails a build whose `palette=` name no
+`<preferences>` entry defines. See
+`skills/tableau-build/references/snippets/worksheets/SHEET-FORMAT-ATTESTATION.md` for what is
+attested and the one step that is still inferred.
 
 Both headings are in `brand.DESIGN_TOKENS_REQUIRED_SECTIONS`; keep them there. Absent
 `DESIGN-TOKENS.md` ⇒ Tableau's own defaults, never an invented font or colour.
