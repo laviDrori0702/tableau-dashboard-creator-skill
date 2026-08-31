@@ -169,6 +169,7 @@ Every file there was produced by its owning skill's real flow, so it doubles as 
 - **No rounded corners below Tableau 2026.1** — `border-radius` only renders in 2026.1+; for older targets keep the mock square-cornered unless you accept the divergence.
 - **No box shadows** — not natively supported in Tableau.
 - **Container hierarchy** must follow Tableau's zone model (layout-basic → layout-flow → sheets).
+- **Images and standalone legends are added by hand** — `tableau-build` reserves the box at the approved size and position but leaves it empty, and the build warns by name. Drop the picture in, or place the legend, in Tableau Desktop. A chart's own colour legend is generated normally.
 - **Fallback-driven choices are disclosed** — when a skill uses a Tableau default for missing input, it says so.
 - **`tableau-build` is experimental** — the workbook passes three validators before it is packaged, but validators are not Tableau: always open the generated workbook in Tableau Desktop and review it against the mock before publishing, and please report anything Desktop rejects or redraws (see the status note above).
 
