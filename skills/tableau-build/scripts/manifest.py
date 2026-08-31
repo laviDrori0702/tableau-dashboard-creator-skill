@@ -565,9 +565,60 @@ def _worksheet_field_references(worksheet: dict) -> list[tuple[str, object]]:
     return references
 
 
+class FieldCatalog(NamedTuple):
+    """One datasource's field authority - what a field reference may resolve to.
+
+    ``errors`` is the *same* accumulator list every other validator appends to - the tuple
+    holds a reference to that list, it does not copy it.
+
+    Attributes:
+        fields: Field names the datasource offers (declared + calculated) - what a
+            reference may name.
+        source: The datasource name, for the message.
+        aggregate_calcs: The calculated fields that already aggregate; asking one of them
+            for a *second* aggregation is rejected.
+        errors: Accumulator for validation errors.
+    """
+
+    fields: set[str]
+    source: str
+    aggregate_calcs: frozenset[str]
+    errors: list[str]
+
+
+def _field_catalogs(
+    declared_fields: dict[str, set[str]],
+    calculated: dict[str, set[str]],
+    aggregate_calcs: dict[str, frozenset[str]],
+    errors: list[str],
+) -> dict[str, FieldCatalog]:
+    """Index one :class:`FieldCatalog` per declared datasource.
+
+    Args:
+        declared_fields: ``{datasource: {field}}`` from :func:`_validate_datasources`.
+        calculated: ``{datasource: {calculated field}}`` from
+            :func:`_calculated_field_names`.
+        aggregate_calcs: ``{datasource: {calculated field that already aggregates}}`` from
+            :func:`_aggregate_calculated_fields`.
+        errors: Accumulator for validation errors, shared by every catalog.
+
+    Returns:
+        ``{datasource name: FieldCatalog}``, keyed by the *declared* datasources - a
+        calculated field on an undeclared source is reported by its own validator.
+    """
+    return {
+        source: FieldCatalog(
+            fields=fields | calculated.get(source, set()),
+            source=source,
+            aggregate_calcs=aggregate_calcs.get(source, frozenset()),
+            errors=errors,
+        )
+        for source, fields in declared_fields.items()
+    }
+
+
 def _validate_reference(
-    label: str, where: str, entry: object, available: set[str], source: str,
-    errors: list[str], aggregate_calcs: frozenset[str] = frozenset(),
+    label: str, where: str, entry: object, catalog: FieldCatalog,
 ) -> None:
     """Validate one shelf/encoding entry against a datasource's fields.
 
@@ -576,12 +627,9 @@ def _validate_reference(
         where: The shelf/encoding the entry sits on.
         entry: The raw entry (a field name, or an object with ``field`` +
             optional ``aggregation`` / ``date_part``).
-        available: Field names the worksheet's datasource offers (declared + calculated).
-        source: The datasource name, for the message.
-        errors: Accumulator for validation errors.
-        aggregate_calcs: The datasource's calculated fields that already aggregate; asking
-            one of them for a *second* aggregation is rejected here.
+        catalog: The datasource's field authority, and the error accumulator.
     """
+    errors = catalog.errors
     bin_size: object = None
     table_calc = ""
     if isinstance(entry, dict):
@@ -609,17 +657,17 @@ def _validate_reference(
             f'{{"field": "revenue", "aggregation": "sum"}}'
         )
         return
-    if field_name not in available:
+    if field_name not in catalog.fields:
         errors.append(
             f"{label}: {where} references '{field_name}', which is not a field of "
-            f"datasource '{source}' nor a declared calculated field"
+            f"datasource '{catalog.source}' nor a declared calculated field"
         )
     if aggregation and aggregation not in AGGREGATIONS:
         errors.append(
             f"{label}: {where} '{field_name}' has unknown aggregation '{aggregation}' "
             f"(expected one of: {', '.join(sorted(AGGREGATIONS))})"
         )
-    elif aggregation not in ("", "none") and field_name in aggregate_calcs:
+    elif aggregation not in ("", "none") and field_name in catalog.aggregate_calcs:
         # Issue #62: SUM(SUM([profit]) / SUM([revenue])) is an error Tableau refuses at load.
         # The builder emits the un-aggregated 'usr:' instance for such a field whatever the
         # key says, so an aggregation here would be silently discarded - caught instead.
@@ -634,7 +682,7 @@ def _validate_reference(
             f"{label}: {where} '{field_name}' has unknown date_part '{date_part}' "
             f"(expected one of: {', '.join(sorted(DATE_PARTS))})"
         )
-    if field_name in aggregate_calcs:
+    if field_name in catalog.aggregate_calcs:
         # Issue #62, same rule as the aggregation check above: a date part and a bin are both
         # derived from a row-level value, which an aggregate calculated field does not have.
         # MIN([order_date]) with "date_part": "year" reached Desktop as [tyr:...] and was
@@ -795,26 +843,22 @@ def _validate_sheet_format(label: str, block: object, errors: list[str]) -> None
 
 def _validate_worksheets(
     worksheets: object,
-    declared_fields: dict[str, set[str]],
-    calculated: dict[str, set[str]],
+    catalogs: dict[str, FieldCatalog],
     layout_ids: set[str],
     container_ids: set[str],
     errors: list[str],
-    aggregate_calcs: Optional[dict[str, frozenset[str]]] = None,
     palette_names: Optional[set[str]] = None,
 ) -> set[str]:
     """Validate the worksheets against the datasources and the layout tree.
 
     Args:
         worksheets: The manifest's ``worksheets`` value.
-        declared_fields: ``{datasource: {field}}`` from :func:`_validate_datasources`.
-        calculated: ``{datasource: {calculated field}}``.
+        catalogs: ``{datasource: FieldCatalog}`` from :func:`_field_catalogs` - the
+            declared datasources, and what a reference to each may resolve to.
         layout_ids: The element ids the layout tree places.
         container_ids: Mapped-container ids (filled by their children, not a view of
             their own - CONTRACT.md §1.1).
         errors: Accumulator for validation errors.
-        aggregate_calcs: ``{datasource: {calculated field that already aggregates}}``, from
-            :func:`_aggregate_calculated_fields`.
         palette_names: The lower-cased field names DESIGN-TOKENS.md carries a series table
             for - what a worksheet's ``palette`` key may name (issue #67).
 
@@ -885,19 +929,16 @@ def _validate_worksheets(
             filled.add(element_id)
 
         source = str(worksheet.get("datasource", "")).strip()
-        if source not in declared_fields:
+        if source not in catalogs:
             errors.append(
                 f"{label}: unknown datasource '{source}' "
-                f"(declared: {', '.join(sorted(declared_fields)) or 'none'})"
+                f"(declared: {', '.join(sorted(catalogs)) or 'none'})"
             )
             continue
 
-        available = declared_fields[source] | calculated.get(source, set())
-        aggregates = (aggregate_calcs or {}).get(source, frozenset())
+        catalog = catalogs[source]
         for where, entry in _worksheet_field_references(worksheet):
-            _validate_reference(
-                label, where, entry, available, source, errors, aggregates
-            )
+            _validate_reference(label, where, entry, catalog)
         _validate_modifiers(label, worksheet, errors)
     return filled
 
@@ -1404,9 +1445,11 @@ def validate_manifest(
     calculated = _calculated_field_names(
         manifest_document, set(declared_fields), errors
     )
+    catalogs = _field_catalogs(
+        declared_fields, calculated, _aggregate_calculated_fields(manifest_document), errors
+    )
     filled = _validate_worksheets(
-        manifest_document.get("worksheets"), declared_fields, calculated, zone_ids,
-        container_ids, errors, _aggregate_calculated_fields(manifest_document),
+        manifest_document.get("worksheets"), catalogs, zone_ids, container_ids, errors,
         set(parse_design_tokens(design_tokens_text).field_palettes),
     )
 
