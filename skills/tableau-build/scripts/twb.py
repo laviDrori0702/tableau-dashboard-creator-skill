@@ -53,6 +53,14 @@ _DEFAULT_WORKBOOK_VERSION = "18.1"
 
 #: Free-text provenance string; no verified 2026.1 build string exists, so both targets
 #: carry the one we have observed.
+#: The display-name suffix each palette type gets in Desktop's colour dropdown. Keyed by the
+#: ``PaletteType-ST`` value ``worksheet._render_style`` writes.
+PALETTE_TYPE_NAMES = {
+    "regular": "",
+    "ordered-sequential": "Sequential",
+    "ordered-diverging": "Diverging",
+}
+
 SOURCE_BUILD = "2025.1.10 (20251.25.1121.1650)"
 
 #: The document-format feature flags, copied verbatim from a Tableau-saved workbook.
@@ -1178,6 +1186,58 @@ def _attach_visibility_fields(
             break
 
 
+def _lift_palettes(workbook: ET.Element) -> None:
+    """Move every inline ``<color-palette>`` into the workbook's ``<preferences>``.
+
+    Desktop defines a custom palette once, under ``<workbook><preferences>``, and every
+    encoding that uses it carries only ``palette="<name>"``. It never writes an inline
+    categorical palette - see ``skills/tableau-build/references/snippets/worksheets/
+    SHEET-FORMAT-ATTESTATION.md`` (issue #52). ``worksheet.py`` renders the palette inline
+    because that is where the colours are known; this lifts it to the shape Desktop keeps.
+
+    Palettes are deduplicated by (type, colours), so a workbook that colours several fields
+    from one brand table defines one palette, and one that colours them from per-field tables
+    defines one each. The name is the palette's *type* (``Brand``, ``Brand Sequential``,
+    ``Brand Diverging``), numbered only when one type needs a second palette - so adding a
+    chart never renames the palettes the other charts already reference. It is a display name
+    in Desktop's colour dropdown, which is why it carries no field name.
+
+    Args:
+        workbook: The assembled ``<workbook>`` element, mutated in place.
+    """
+    definitions: dict[tuple[str, tuple[str, ...]], str] = {}
+    used: set[str] = set()
+    for encoding in workbook.iter("encoding"):
+        palette = encoding.find("color-palette")
+        if palette is None:
+            continue
+        palette_type = palette.get("type", "")
+        key = (palette_type, tuple(color.text or "" for color in palette))
+        name = definitions.get(key)
+        if name is None:
+            name = f"{worksheet.BRAND_PALETTE_NAME} {PALETTE_TYPE_NAMES[palette_type]}".strip()
+            base, index = name, 1
+            while name in used:  # a second palette of the same type
+                index += 1
+                name = f"{base} {index}"
+            definitions[key] = name
+            used.add(name)
+        encoding.set("palette", name)
+        encoding.remove(palette)
+
+    if not definitions:
+        return
+    # WorkbookFile-CT puts <preferences> straight after <document-format-change-manifest>.
+    preferences = ET.Element("preferences")
+    for (palette_type, colors), name in definitions.items():
+        node = ET.SubElement(preferences, "color-palette", {
+            "custom": "true", "name": name, "type": palette_type,
+        })
+        for color in colors:
+            ET.SubElement(node, "color").text = color
+    workbook.insert(1, preferences)
+
+
 def render_workbook(
     manifest_document: dict,
     data_model_text: str,
@@ -1312,6 +1372,8 @@ def render_workbook(
             "enabled-for-viewer": "false", "extreme-values-enabled-for-all": "false",
         })
         ET.SubElement(explain_data, "explanation-types")
+
+    _lift_palettes(workbook)
 
     ET.indent(workbook, space="  ")
     return worksheet.unwrap_cdata(

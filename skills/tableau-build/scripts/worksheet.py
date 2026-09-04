@@ -122,11 +122,15 @@ class DesignTokens:
 
     **How the palette gets its colours without knowing the data's members.** A palette that
     binds hex values to concrete members (``<map to='#...'><bucket>"West"</bucket>``) is
-    unbuildable from a manifest - the builder never sees the data. It does not have to be: an
-    ``<encoding>`` may carry an inline ``<color-palette>``, which lists the colours *in order*
-    and leaves Tableau to walk the field's domain against them, exactly as it does with its own
-    default 10. So the brand's ordered series colours *are* the palette, member values are
-    never needed, and a coloured chart is on-brand instead of on Tableau-default.
+    unbuildable from a manifest - the builder never sees the data. It does not have to be: a
+    ``<color-palette>`` lists the colours *in order* and leaves Tableau to walk the field's
+    domain against them, exactly as it does with its own default 10. So the brand's ordered
+    series colours *are* the palette, member values are never needed, and a coloured chart is
+    on-brand instead of on Tableau-default.
+
+    The palette is rendered inline on the ``<encoding>`` here, because this is where the
+    colours are known, and :func:`twb._lift_palettes` then moves it to the shape Desktop
+    keeps: defined once under ``<workbook><preferences>``, referenced by ``palette='<name>'``.
 
     Attributes:
         font_family: Body font for the whole worksheet.
@@ -1654,10 +1658,12 @@ def _add_palette(add: AddRule, plan: WorksheetPlan, tokens: DesignTokens) -> Non
     colors = tokens.palette_for(palette_name)
     if quantitative:
         colors = (colors[0], colors[-1])
-    # ponytail: XSD-legal, but only Desktop can confirm it keeps the palette on save rather
-    # than rewriting it (the `custom` flag and the name<->`palette` pairing are inferred from
-    # the schema, not read out of a Desktop-saved workbook). Issue #52 carries the steps; a
-    # wrong guess costs a rewrite on open, not a broken workbook.
+    # The inline <color-palette> is a carrier, not the final shape: twb.py lifts it into the
+    # workbook's <preferences> and leaves this encoding referencing it by name. Desktop writes
+    # no inline categorical palette in 40+ attested workbooks, and does read `palette=` on a
+    # type='palette' encoding - but always beside a <map> per member, which the builder cannot
+    # write (it never sees the data). The composition is therefore still inferred; see
+    # references/snippets/worksheets/SHEET-FORMAT-ATTESTATION.md (issue #52).
     add("mark", "encoding", {
         "attr": "color",
         "field": field_reference,
@@ -1672,10 +1678,10 @@ def _add_sheet_format(add: AddRule, plan: WorksheetPlan) -> None:
     A KPI card centres itself unless the format says otherwise - its whole treatment is one big
     centred number, and an explicit ``align`` is the analyst overruling that.
 
-    ponytail: every attribute here is in the XSD's ``StyleAttribute-ST``, but which *element*
-    Desktop hangs each one off is inferred (``text-align`` / ``vertical-align`` on ``cell`` are
-    the exceptions - the KPI card has round-tripped them). Issue #52 carries the save-and-diff
-    steps; the cost of a wrong pairing is a format that does not show, not a broken workbook.
+    Every element/attribute pairing below is read off Desktop-saved workbooks - see
+    ``references/snippets/worksheets/SHEET-FORMAT-ATTESTATION.md`` (issue #52). That is a
+    claim about *these* pairings only; the palette shape in :func:`_add_palette` is partly
+    inferred, and the attestation says which step.
 
     Args:
         add: ``_render_style``'s rule accumulator.
@@ -1698,7 +1704,9 @@ def _add_sheet_format(add: AddRule, plan: WorksheetPlan) -> None:
         ("gridline", sheet_format.gridlines), ("zeroline", sheet_format.zero_lines)
     ):
         if value == NO_FORMAT:
-            add(element, "format", {"attr": "display", "value": "false"})
+            # Desktop turns a line off with line-visibility='off', never display='false':
+            # 'display' does not appear on gridline/zeroline in any attested workbook.
+            add(element, "format", {"attr": "line-visibility", "value": "off"})
         elif value:
             add(element, "format", {"attr": "stroke-color", "value": value})
 

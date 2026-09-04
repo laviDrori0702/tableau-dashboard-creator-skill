@@ -15,6 +15,15 @@
     <WindowsPersistSimpleIdentifiers />
     <ZoneFriendlyName />
   </document-format-change-manifest>
+  <preferences>
+    <color-palette custom="true" name="Brand" type="regular">
+      <color>#1b4f72</color>
+      <color>#2e86c1</color>
+      <color>#48c9b0</color>
+      <color>#f39c12</color>
+      <color>#1b4f72</color>
+    </color-palette>
+  </preferences>
   <datasources>
     <datasource caption="sales_orders" inline="true" name="federated.b2993893834e8f0306a282d0a717d7a9" version="18.1">
       <connection class="federated">
@@ -682,7 +691,7 @@
             <view>
               <breakdown value="auto" />
             </view>
-            <mark class="Automatic" />
+            <mark class="Text" />
             <encodings>
               <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
             </encodings>
@@ -749,7 +758,7 @@
             <view>
               <breakdown value="auto" />
             </view>
-            <mark class="Automatic" />
+            <mark class="Text" />
             <encodings>
               <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" />
             </encodings>
@@ -815,7 +824,7 @@
             <view>
               <breakdown value="auto" />
             </view>
-            <mark class="Automatic" />
+            <mark class="Text" />
             <encodings>
               <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[ctd:order_id:qk]" />
             </encodings>
@@ -883,7 +892,7 @@
             <view>
               <breakdown value="auto" />
             </view>
-            <mark class="Automatic" />
+            <mark class="Text" />
             <encodings>
               <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[usr:Average Order Value:qk]" />
             </encodings>
@@ -962,15 +971,7 @@
             <format attr="stroke-color" value="#eef1f4" />
           </style-rule>
           <style-rule element="mark">
-            <encoding attr="color" field="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]" palette="Brand" type="palette">
-              <color-palette custom="true" name="Brand" type="regular">
-                <color>#1b4f72</color>
-                <color>#2e86c1</color>
-                <color>#48c9b0</color>
-                <color>#f39c12</color>
-                <color>#1b4f72</color>
-              </color-palette>
-            </encoding>
+            <encoding attr="color" field="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]" palette="Brand" type="palette" />
           </style-rule>
           <style-rule element="pane">
             <format attr="background-color" value="#ffffff" />
@@ -986,7 +987,7 @@
             <view>
               <breakdown value="auto" />
             </view>
-            <mark class="Automatic" />
+            <mark class="Line" />
             <encodings>
               <color column="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]" />
             </encodings>
@@ -1045,7 +1046,7 @@
             <view>
               <breakdown value="auto" />
             </view>
-            <mark class="Automatic" />
+            <mark class="Bar" />
             <encodings>
               <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:revenue:qk]" />
             </encodings>
@@ -1110,7 +1111,7 @@
             <view>
               <breakdown value="auto" />
             </view>
-            <mark class="Automatic" />
+            <mark class="Bar" />
             <encodings>
               <text column="[federated.fd9f220bc557dfd7f751b88055fef22d].[sum:revenue_target:qk]" />
             </encodings>
@@ -1178,7 +1179,7 @@
             <view>
               <breakdown value="auto" />
             </view>
-            <mark class="Automatic" />
+            <mark class="Bar" />
             <encodings>
               <text column="[federated.b2993893834e8f0306a282d0a717d7a9].[sum:profit:qk]" />
             </encodings>
@@ -1248,7 +1249,7 @@
             <view>
               <breakdown value="auto" />
             </view>
-            <mark class="Automatic" />
+            <mark class="Text" />
             <encodings>
               <text column="[federated.ea24fc047813e26be8ea413b95586d29].[sum:lifetime_value:qk]" />
             </encodings>
@@ -1286,7 +1287,7 @@
       <zones>
         <zone friendly-name="Dashboard" h="100000" id="1" type-v2="layout-basic" w="100000" x="0" y="0">
           <zone friendly-name="V-root" h="98222" id="2" param="vert" type-v2="layout-flow" w="98828" x="586" y="889">
-            <zone friendly-name="obj-title" h="6876" id="3" type-v2="text" w="98828" x="586" y="889">
+            <zone friendly-name="obj-title" h="6876" id="3" type-v2="text" w="98828" x="586" y="889" is-fixed="true" fixed-size="62">
               <formatted-text>
                 <run fontcolor="#1c2833" fontname="Open Sans" fontsize="15">Sales Performance</run>
               </formatted-text>
@@ -1297,7 +1298,7 @@
                 <format attr="margin" value="4" />
               </zone-style>
             </zone>
-            <zone friendly-name="H-root.2" h="6875" id="4" param="horz" type-v2="layout-flow" w="98828" x="586" y="7765">
+            <zone friendly-name="H-root.2" h="6875" id="4" param="horz" type-v2="layout-flow" w="98828" x="586" y="7765" is-fixed="true" fixed-size="62">
               <zone friendly-name="flt-month" h="6875" id="5" mode="checkdropdown" name="Revenue Trend" param="[federated.b2993893834e8f0306a282d0a717d7a9].[none:Order Month:nk]" show-title="false" type-v2="filter" w="33602" x="586" y="7765">
                 <zone-style>
                   <format attr="border-color" value="#000000" />
@@ -1306,7 +1307,7 @@
                   <format attr="margin" value="4" />
                 </zone-style>
               </zone>
-              <zone friendly-name="flt-region" h="6875" id="6" mode="checkdropdown" name="Revenue Trend" param="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]" show-title="false" type-v2="filter" w="32613" x="34188" y="7765">
+              <zone friendly-name="flt-region" h="6875" id="6" mode="checkdropdown" name="Revenue Trend" param="[federated.b2993893834e8f0306a282d0a717d7a9].[none:region:nk]" show-title="false" type-v2="filter" w="32613" x="34188" y="7765" is-fixed="true" fixed-size="445">
                 <zone-style>
                   <format attr="border-color" value="#000000" />
                   <format attr="border-style" value="none" />
@@ -1314,7 +1315,7 @@
                   <format attr="margin" value="4" />
                 </zone-style>
               </zone>
-              <zone friendly-name="flt-category" h="6875" id="7" mode="checkdropdown" name="Revenue Trend" param="[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]" show-title="false" type-v2="filter" w="32613" x="66801" y="7765">
+              <zone friendly-name="flt-category" h="6875" id="7" mode="checkdropdown" name="Revenue Trend" param="[federated.b2993893834e8f0306a282d0a717d7a9].[none:product_category:nk]" show-title="false" type-v2="filter" w="32613" x="66801" y="7765" is-fixed="true" fixed-size="445">
                 <zone-style>
                   <format attr="border-color" value="#000000" />
                   <format attr="border-style" value="none" />
@@ -1329,7 +1330,7 @@
                 <format attr="margin" value="4" />
               </zone-style>
             </zone>
-            <zone friendly-name="H-root.3" h="13751" id="8" layout-strategy-id="distribute-evenly" param="horz" type-v2="layout-flow" w="98828" x="586" y="14640">
+            <zone friendly-name="H-root.3" h="13751" id="8" layout-strategy-id="distribute-evenly" param="horz" type-v2="layout-flow" w="98828" x="586" y="14640" is-fixed="true" fixed-size="124">
               <zone friendly-name="V-kpi-revenue" h="13751" id="9" param="vert" type-v2="layout-flow" w="24707" x="586" y="14640">
                 <zone fixed-size="30" friendly-name="H-kpi-revenue header" h="3333" id="10" is-fixed="true" param="horz" type-v2="layout-flow" w="24707" x="586" y="14640">
                   <zone friendly-name="kpi-revenue title" h="3333" id="11" type-v2="text" w="18530" x="586" y="14640">
@@ -1566,7 +1567,7 @@
                   <format attr="margin" value="4" />
                 </zone-style>
               </zone>
-              <zone friendly-name="V-root.4.2" h="39289" id="36" layout-strategy-id="distribute-evenly" param="vert" type-v2="layout-flow" w="39531" x="59883" y="28391">
+              <zone friendly-name="V-root.4.2" h="39289" id="36" layout-strategy-id="distribute-evenly" param="vert" type-v2="layout-flow" w="39531" x="59883" y="28391" is-fixed="true" fixed-size="540">
                 <zone friendly-name="V-chart-region-actual" h="19644" id="37" param="vert" type-v2="layout-flow" w="39531" x="59883" y="28391">
                   <zone fixed-size="30" friendly-name="H-chart-region-actual header" h="3333" id="38" is-fixed="true" param="horz" type-v2="layout-flow" w="39531" x="59883" y="28391">
                     <zone friendly-name="chart-region-actual title" h="3333" id="39" type-v2="text" w="29648" x="59883" y="28391">
@@ -1669,8 +1670,8 @@
                 <format attr="margin" value="4" />
               </zone-style>
             </zone>
-            <zone friendly-name="H-root.5" h="31431" id="47" param="horz" type-v2="layout-flow" w="98828" x="586" y="67680">
-              <zone friendly-name="V-chart-category" h="31431" id="48" param="vert" type-v2="layout-flow" w="39531" x="586" y="67680">
+            <zone friendly-name="H-root.5" h="31431" id="47" param="horz" type-v2="layout-flow" w="98828" x="586" y="67680" is-fixed="true" fixed-size="283">
+              <zone friendly-name="V-chart-category" h="31431" id="48" param="vert" type-v2="layout-flow" w="39531" x="586" y="67680" is-fixed="true" fixed-size="540">
                 <zone fixed-size="30" friendly-name="H-chart-category header" h="3333" id="49" is-fixed="true" param="horz" type-v2="layout-flow" w="39531" x="586" y="67680">
                   <zone friendly-name="chart-category title" h="3333" id="50" type-v2="text" w="29648" x="586" y="67680">
                     <formatted-text>
