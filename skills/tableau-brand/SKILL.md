@@ -37,7 +37,7 @@ two points below; do not hand-edit `STATE.md` yourself.
 1. **Precheck.** From the project directory, run:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/brand.py" precheck "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-brand/scripts/brand.py" precheck "<project-dir>"
    ```
 
    (Use `python3` if `python` is unavailable.) If it prints `[BLOCKED]`, relay the
@@ -91,9 +91,9 @@ two points below; do not hand-edit `STATE.md` yourself.
 6. **Commit** — only after the analyst approves (or chooses to skip):
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/brand.py" commit "<project-dir>" --status approved
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-brand/scripts/brand.py" commit "<project-dir>" --status approved
    # or, to skip the step (allowed only once branding/branding.md exists):
-   python "${CLAUDE_SKILL_DIR}/scripts/brand.py" commit "<project-dir>" --status skipped
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-brand/scripts/brand.py" commit "<project-dir>" --status skipped
    ```
 
    On `--status approved` the script validates `DESIGN-TOKENS.md` has the required

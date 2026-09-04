@@ -650,8 +650,8 @@ def _xsd_errors(twb_path: Path, target_tableau_version: str) -> tuple[list[str],
     if importlib.util.find_spec("lxml") is None:
         return [
             "the XSD check cannot run: lxml is not installed, and the gate refuses to run "
-            "partially. Install it with 'pip install lxml' (it is in requirements.txt) and "
-            "re-run."
+            "partially. Install it with 'pip install -r \"${CLAUDE_PLUGIN_ROOT}/"
+            "requirements.txt\"' and re-run."
         ], []
 
     import validate_twb_xsd  # imports lxml at module level - guarded above

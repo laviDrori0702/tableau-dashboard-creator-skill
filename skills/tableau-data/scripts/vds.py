@@ -37,11 +37,19 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import requests
+try:
+    import requests
+except ImportError:
+    # Guarded like lxml in tableau-build's validate_twb_xsd.py: the published-ds route is
+    # the only third-party-dependent path in the plugin, so name the install explicitly.
+    print('ERROR: requests is required by the published-ds route. Install with: '
+          'pip install -r "${CLAUDE_PLUGIN_ROOT}/requirements.txt"', file=sys.stderr)
+    sys.exit(2)
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +165,14 @@ def load_connection(project_root: Path | str) -> TableauConnection:
     Raises:
         VdsError: If no ``.env`` is found, or a required variable is missing/blank.
     """
-    from dotenv import dotenv_values  # local import: only the published-ds route needs it
+    try:
+        # Local import: only the published-ds route needs it.
+        from dotenv import dotenv_values
+    except ImportError as exc:
+        raise VdsError(
+            'python-dotenv is required to read .env for the published-ds route. '
+            'Install with: pip install -r "${CLAUDE_PLUGIN_ROOT}/requirements.txt"'
+        ) from exc
 
     env_path = find_env(project_root)
     if env_path is None:

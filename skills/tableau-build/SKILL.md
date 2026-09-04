@@ -77,7 +77,7 @@ invented zone is caught rather than silently built.
 1. **Precheck.** From the project directory, run:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/build.py" precheck "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-build/scripts/build.py" precheck "<project-dir>"
    ```
 
    (Use `python3` if `python` is unavailable.) If it prints `[BLOCKED]`, relay the reason and
@@ -99,7 +99,7 @@ invented zone is caught rather than silently built.
 4. **Validate, then present:**
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/build.py" validate "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-build/scripts/build.py" validate "<project-dir>"
    ```
 
    If it prints `[INVALID]`, fix the named entries and re-run — do not generate a workbook
@@ -117,7 +117,7 @@ invented zone is caught rather than silently built.
 5. **Build the workbook:**
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/build.py" build "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-build/scripts/build.py" build "<project-dir>"
    ```
 
    This assembles `dashboard.twb`, runs the **validation gate** over it, and packages
@@ -135,13 +135,13 @@ invented zone is caught rather than silently built.
    element became a zone, every zone names a real sheet, every declared worksheet is built,
    placed, and has a window). **The gate refuses to run partially** — if `lxml` is missing the
    `[schema]` validator cannot execute, so the gate fails rather than reporting green on two
-   of three (`pip install -r requirements.txt`). Only the third can see something *missing*:
+   of three (`pip install -r "${CLAUDE_PLUGIN_ROOT}/requirements.txt"`). Only the third can see something *missing*:
    what is absent is absent consistently, so the first two happily pass a workbook that
    dropped a chart. To re-run the gate over a `.twb` already on disk — the revalidate half of
    a fix — use:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/build.py" gate "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-build/scripts/build.py" gate "<project-dir>"
    ```
 
    It repackages the `.twbx` when the gate passes and deletes it when it does not, so
@@ -150,7 +150,7 @@ invented zone is caught rather than silently built.
 6. **Commit** — only after the analyst approves:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/build.py" commit "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-build/scripts/build.py" commit "<project-dir>"
    ```
 
    Commit re-validates the manifest, refuses unless `dashboard.twbx` is on disk (run step 5
