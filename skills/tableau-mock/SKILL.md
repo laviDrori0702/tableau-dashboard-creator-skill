@@ -48,7 +48,7 @@ markers (see `references/MOCK-SKELETON.html` for a working example):
 1. **Precheck.** From the project directory, run:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/mock.py" precheck "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-mock/scripts/mock.py" precheck "<project-dir>"
    ```
 
    (Use `python3` if `python` is unavailable.) If it prints `[BLOCKED]`, relay the reason
@@ -82,7 +82,7 @@ markers (see `references/MOCK-SKELETON.html` for a working example):
 5. **Self-check, then present.** Validate the draft before showing it:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/mock.py" validate "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-mock/scripts/mock.py" validate "<project-dir>"
    ```
 
    It prints the **coverage checklist** (one line per screen size / element / filter /
@@ -94,7 +94,7 @@ markers (see `references/MOCK-SKELETON.html` for a working example):
 6. **Commit** — only after the analyst approves:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/mock.py" commit "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-mock/scripts/mock.py" commit "<project-dir>"
    ```
 
    Commit re-runs the full coverage + guard check (mock is non-skippable, so it only ever

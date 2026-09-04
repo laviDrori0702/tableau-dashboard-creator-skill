@@ -48,7 +48,7 @@ in `DATA-MODEL.md`. Run the script at the points below; do not hand-edit `STATE.
 1. **Precheck.** From the project directory, run:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/data.py" precheck "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-data/scripts/data.py" precheck "<project-dir>"
    ```
 
    (Use `python3` if `python` is unavailable.) If it prints `[BLOCKED]`, relay the
@@ -70,7 +70,7 @@ in `DATA-MODEL.md`. Run the script at the points below; do not hand-edit `STATE.
 3a. **Pull (published-ds route only).** Sample the listed published sources via VDS:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/data.py" pull "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-data/scripts/data.py" pull "<project-dir>"
    ```
 
    This signs in with the PAT, and for each source pulls metadata + a capped row sample,
@@ -91,7 +91,7 @@ in `DATA-MODEL.md`. Run the script at the points below; do not hand-edit `STATE.
 3. **Profile (csv route only).** Generate the field tables from the resolved CSVs:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/data.py" profile "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-data/scripts/data.py" profile "<project-dir>"
    ```
 
    This infers a type per column and writes a schema-complete `DATA-MODEL.md`. It is
@@ -110,7 +110,7 @@ in `DATA-MODEL.md`. Run the script at the points below; do not hand-edit `STATE.
 5. **Commit** — only after the analyst approves:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/data.py" commit "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-data/scripts/data.py" commit "<project-dir>"
    ```
 
    The script validates every documented field name against the real CSV header

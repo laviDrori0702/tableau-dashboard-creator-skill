@@ -34,7 +34,7 @@ do not hand-edit `STATE.md`.
 1. **Precheck.** From the project directory, run:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/plan.py" precheck "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-plan/scripts/plan.py" precheck "<project-dir>"
    ```
 
    (Use `python3` if `python` is unavailable.) If it prints `[BLOCKED]`, relay the
@@ -85,7 +85,7 @@ do not hand-edit `STATE.md`.
 7. **Self-check, then present.** Validate the draft before showing it:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/plan.py" validate "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-plan/scripts/plan.py" validate "<project-dir>"
    ```
 
    If it prints `[INVALID]`, fix the named sections/ids/terms and re-run. When it prints
@@ -94,7 +94,7 @@ do not hand-edit `STATE.md`.
 8. **Commit** — only after the analyst approves:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/plan.py" commit "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-plan/scripts/plan.py" commit "<project-dir>"
    ```
 
    Commit re-validates the plan (plan is non-skippable, so it only ever sets `approved`).
