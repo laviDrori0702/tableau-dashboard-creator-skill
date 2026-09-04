@@ -27,7 +27,19 @@
     body { margin: 0; font-family: system-ui, sans-serif; background: #f4f5f7; }
     /* The canvas is the fixed design size from the plan's Screen Size section. */
     .canvas { position: relative; width: 1366px; height: 768px; margin: 16px auto; background: #fff; }
-    .filter-bar { display: flex; gap: 12px; padding: 12px; height: 56px; box-sizing: border-box; }
+    .canvas { padding-left: 212px; box-sizing: border-box; }   /* room for the sidebar */
+    .canvas.nofilters { padding-left: 48px; }                    /* charts reclaim the width when it hides */
+    /* Collapsible filter sidebar (toggle panel): a slim rail with a Show button when hidden. */
+    .side { position: absolute; left: 12px; top: 12px; width: 200px; display: flex; flex-direction: column; gap: 12px;
+            border: 1px solid #e1e4e8; border-radius: 6px; padding: 12px; box-sizing: border-box; }
+    .rail { display: none; position: absolute; left: 12px; top: 12px; }
+    .canvas.nofilters .side { display: none; }
+    .canvas.nofilters .rail { display: block; }
+    /* Multi-select = summary button + checkbox list + Apply. Never a native multi-select list box. */
+    .multi { position: relative; }
+    .multi .pop { display: none; position: absolute; z-index: 2; background: #fff; border: 1px solid #e1e4e8; padding: 8px; }
+    .multi.open .pop { display: block; }
+    .multi label { display: block; font-size: 12px; }
     .kpi-row { display: flex; gap: 12px; padding: 0 12px; }
     .kpi { flex: 1; min-height: 120px; border: 1px solid #e1e4e8; border-radius: 6px; padding: 12px; }
     .chart { border: 1px solid #e1e4e8; border-radius: 6px; margin: 12px; min-height: 360px; }
@@ -36,11 +48,26 @@
 <body>
   <div class="canvas">
 
-    <!-- Filters: one control per plan Filters-row id. -->
-    <div class="filter-bar">
-      <select data-plan-id="flt-region"><option>All regions</option></select>
-      <input  data-plan-id="flt-date" type="month">
+    <!-- Filters: one control per plan Filters-row id, rendered per SKILL.md "Filter control types".
+         The sidebar is a collapsible panel (toggle panel interaction: int-filter-toggle). -->
+    <div class="side" id="side">
+      <button data-plan-id="int-filter-toggle" onclick="toggleFilters()">Hide filters</button>
+
+      <!-- dropdown (multi): summary button -> checkbox list with (All) + Apply. Applies on Apply only. -->
+      <div class="multi" id="flt-region" data-plan-id="flt-region">
+        <button onclick="this.parentNode.classList.toggle('open')">Region: All</button>
+        <div class="pop">
+          <label><input type="checkbox" checked data-all onchange="toggleAll(this)"> (All)</label>
+          <label><input type="checkbox" checked value="East"> East</label>
+          <label><input type="checkbox" checked value="West"> West</label>
+          <button onclick="applyMulti('flt-region')">Apply</button>
+        </div>
+      </div>
+
+      <!-- date range: from / to month pickers -->
+      <input data-plan-id="flt-date" type="month" value="2025-01"> <input type="month" value="2025-04">
     </div>
+    <div class="rail" id="rail"><button onclick="toggleFilters()">Show filters</button></div>
 
     <!-- Elements: KPIs and charts, each tagged with its plan Elements-row id. -->
     <div class="kpi-row">
@@ -65,12 +92,24 @@
   {
     "canvas": { "width": 1366, "height": 768 },
     "elements": [
-      { "id": "kpi-revenue",  "x": 12,  "y": 68,  "width": 665, "height": 120 },
-      { "id": "kpi-orders",   "x": 689, "y": 68,  "width": 665, "height": 120 },
-      { "id": "chart-region", "x": 12,  "y": 200, "width": 665, "height": 360 },
-      { "id": "chart-trend",  "x": 689, "y": 200, "width": 665, "height": 360 }
+      { "id": "kpi-revenue",  "x": 224, "y": 68,  "width": 559, "height": 120 },
+      { "id": "kpi-orders",   "x": 795, "y": 68,  "width": 559, "height": 120 },
+      { "id": "chart-region", "x": 224, "y": 200, "width": 559, "height": 360 },
+      { "id": "chart-trend",  "x": 795, "y": 200, "width": 559, "height": 360 }
     ]
   }
+  </script>
+  <script>
+    function toggleFilters() { document.querySelector('.canvas').classList.toggle('nofilters'); /* then re-render charts at the new width */ }
+    function toggleAll(all) { all.closest('.pop').querySelectorAll('input[value]').forEach(function (c) { c.checked = all.checked; }); }
+    function applyMulti(id) {
+      var box = document.getElementById(id);
+      var picked = Array.prototype.filter.call(box.querySelectorAll('input[value]'), function (c) { return c.checked; }).map(function (c) { return c.value; });
+      var total = box.querySelectorAll('input[value]').length;
+      box.querySelector('button').textContent = 'Region: ' + (picked.length === total ? 'All' : picked.length + ' of ' + total);
+      box.classList.remove('open');
+      /* apply `picked` to the dashboard state here, then re-render */
+    }
   </script>
 </body>
 </html>

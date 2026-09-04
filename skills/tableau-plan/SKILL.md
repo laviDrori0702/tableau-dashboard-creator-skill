@@ -67,7 +67,7 @@ do not hand-edit `STATE.md`.
    | `## Screen Size` | Mode + design dimensions + rationale. |
    | `## Layout Grid` | Named slots with position + size (the `slot` ids elements reference). |
    | `## Elements` | Per-element table `id \| type \| columns \| slot \| size` — every KPI and chart. |
-   | `## Filters` | `id \| field \| control type \| scope \| default` — every filter (a single `none` row if there are none). |
+   | `## Filters` | `id \| field \| control type \| scope \| default` — every filter (a single `none` row if there are none). `control type` is one of `dropdown (multi)`, `dropdown (single)`, `date range`, `slider`. |
    | `## Interactions` | `id \| interaction \| source \| target \| detail` — the `interaction` term **must** come from the shared vocabulary below. |
 
    Plus the recommended `## Summary` and `## Suggestions` (and optional `## Data Gaps`).
