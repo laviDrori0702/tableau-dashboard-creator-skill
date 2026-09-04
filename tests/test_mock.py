@@ -453,3 +453,26 @@ def test_first_run_marks_nothing_stale(tmp_path):
     result = mock.commit(tmp_path)
 
     assert result.ok is True and result.staled_steps == []
+
+
+# --- Filter control types (issue #92) -----------------------------------------
+# The skill must tell the agent how to render each plan control type, and the skeleton
+# must model a multi-select as a checkbox list + Apply, never a native <select multiple>.
+
+MOCK_SKILL_DIR = Path(__file__).resolve().parent.parent / "skills" / "tableau-mock"
+
+
+def test_skill_documents_filter_control_types() -> None:
+    skill_text = (MOCK_SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    assert "## Filter control types" in skill_text
+    for control_type in ("dropdown (multi)", "dropdown (single)", "date range"):
+        assert control_type in skill_text
+    assert "Apply" in skill_text
+
+
+def test_skeleton_multi_select_has_apply_and_no_native_listbox() -> None:
+    skeleton = (MOCK_SKILL_DIR / "references" / "MOCK-SKELETON.html").read_text(encoding="utf-8")
+    assert "<select multiple" not in skeleton
+    assert 'type="checkbox"' in skeleton
+    assert ">Apply<" in skeleton
+    assert 'data-plan-id="int-filter-toggle"' in skeleton

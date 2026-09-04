@@ -104,6 +104,22 @@ markers (see `references/MOCK-SKELETON.html` for a working example):
    to open a fresh conversation and run the next step (`tableau-spec`, or `tableau-route`
    to confirm).
 
+## Filter control types
+
+The plan's Filters table names a `control type` per filter. Render each as the Tableau
+control it stands for, not as a bare browser widget. Never use a native `<select multiple>`
+list box: it needs Ctrl+click and applies on every change.
+
+| control type | render in the mock as |
+|--------------|------------------------|
+| `dropdown (multi)` / `multi-select` | a button showing the selection summary ("All", "2 of 5") that opens a checkbox list with an **(All)** row and an **Apply** button; the filter applies on Apply, not on each tick. |
+| `dropdown (single)` / `single-select` | a native `<select>` (one value, applies on change). |
+| `date range` | two `<input type="month">` (or `date`) pickers, from and to. |
+| `slider` | a native `<input type="range">` with the current value shown. |
+
+When the plan puts filters in a sidebar slot, render it as a **collapsible** panel with a
+Show/Hide control (see `references/MOCK-SKELETON.html`), unless the plan says otherwise.
+
 ## Shared interactions vocabulary (CONTRACT.md §6)
 
 The plan's interactions use these intent-level terms; render each so its intent is

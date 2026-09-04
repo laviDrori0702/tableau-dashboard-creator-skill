@@ -50,6 +50,8 @@ one of the Layout Grid slots above; `size` is the footprint within that slot.
 
 Every filter. `scope` lists which elements (by id) it affects. If the dashboard has no
 filters, keep this section and write a single row with `id` = `none`.
+`control type` is one of `dropdown (multi)` (checkbox list + Apply button), `dropdown (single)`,
+`date range`, `slider`. Default to `dropdown (multi)` for dimensions and `date range` for dates.
 
 | id         | field      | control type     | scope                      | default    |
 |------------|------------|------------------|----------------------------|------------|
