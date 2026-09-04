@@ -12,6 +12,8 @@ logs/
 *.log
 .DS_Store
 Thumbs.db
+ignore todos dir
+todos/
 
 # Allow top-level files
 !.gitignore
@@ -51,6 +53,9 @@ skill/tableau-dashboard-creator/scripts/__pycache__/
 
 # Allow the inter-skill contract
 !CONTRACT.md
+
+# Allow the end-to-end test handoff
+!HANDOFF-e2e-test.md
 
 # Allow skills/ tree (the 8 v2 skills + tableau-route router)
 !skills/

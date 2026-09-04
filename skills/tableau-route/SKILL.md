@@ -24,7 +24,7 @@ analyst's project and tells them **which one skill to run next** — nothing mor
 2. Run the router script and capture its output:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/route.py" "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-route/scripts/route.py" "<project-dir>"
    ```
 
    (Use `python3` if `python` is unavailable.) The script reads `STATE.md`,

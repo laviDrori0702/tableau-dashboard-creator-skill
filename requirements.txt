@@ -1,5 +1,4 @@
-# Core — data handling and .env credential loading (shared across skills)
-pandas>=2.0,<3.0
+# .env credential loading for the tableau-data published-ds route
 python-dotenv>=1.0,<2.0
 
 # Step 3 (tableau-data) — published-ds route: REST sign-in + VizQL Data Service calls

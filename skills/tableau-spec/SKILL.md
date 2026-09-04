@@ -79,7 +79,7 @@ panel` / `parameter swap` → these legitimately need DZV / parameter — justif
 1. **Precheck.** From the project directory, run:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/spec.py" precheck "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" precheck "<project-dir>"
    ```
 
    (Use `python3` if `python` is unavailable.) If it prints `[BLOCKED]`, relay the reason
@@ -106,7 +106,7 @@ panel` / `parameter swap` → these legitimately need DZV / parameter — justif
 4. **Self-check, then present.** Validate the draft before showing it:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/spec.py" validate "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" validate "<project-dir>"
    ```
 
    It prints the **reconciliation checklist** (one line per mock element, each `[x]` mapped
@@ -120,7 +120,7 @@ panel` / `parameter swap` → these legitimately need DZV / parameter — justif
 5. **Commit** — only after the analyst approves:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/spec.py" commit "<project-dir>"
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" commit "<project-dir>"
    ```
 
    Commit re-runs the full reconciliation + guard (spec is non-skippable, so it only ever

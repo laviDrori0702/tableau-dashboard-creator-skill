@@ -1530,7 +1530,7 @@ def test_the_gate_refuses_to_run_without_lxml(tmp_path, monkeypatch):
 
     assert result.ok is False
     assert any("lxml" in error for error in result.errors)
-    assert any("pip install lxml" in error for error in result.errors)
+    assert any("pip install -r" in error for error in result.errors)
     # The absence is never a mere warning, and nothing is packaged for commit to approve.
     assert not any("lxml" in warning for warning in result.warnings)
     assert "[BUILT]" not in build.format_build(result)

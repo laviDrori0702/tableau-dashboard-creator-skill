@@ -15,8 +15,8 @@ This plugin breaks that monolith into **8 independent skills**, each running in 
 | Requirement | Details |
 |-------------|---------|
 | **Claude Code** | The plugin targets [Claude Code](https://docs.anthropic.com/en/docs/claude-code)'s plugin system (`/plugin install`, namespaced skills). |
-| **Python 3.9+** | The helper scripts use `pandas` 2.x (which requires 3.9+). |
-| **Python dependencies** | `pip install -r requirements.txt` — `pandas`, `python-dotenv`, `requests` (published-datasource route), `lxml` (workbook XSD validation). |
+| **Python 3.9+** | The helper scripts use builtin generic annotations (`dict[str, ...]`), which require 3.9+. |
+| **Python dependencies** | `pip install -r "${CLAUDE_PLUGIN_ROOT}/requirements.txt"` (after a `/plugin install` there is no clone, so the plugin-root path is the only one that resolves) — `python-dotenv` and `requests` (published-datasource route only), `lxml` (workbook XSD validation). Seven of the nine skills are standard-library only and need none of these. |
 | **Tableau Desktop** | Only needed to open the generated `.twbx` workbook. |
 
 ---
