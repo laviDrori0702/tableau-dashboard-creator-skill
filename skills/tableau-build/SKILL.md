@@ -234,6 +234,87 @@ When one arrives:
   `"legend": false`, and its header from a `text` object in the layout.
 - **Field labels are off on every sheet.** They repeat what the zone's header already says
   and cost the chart a whole band of the sheet.
+- **There is no `^[field]` prefix for hiding one pill's header on `<rows>`/`<cols>`.** That
+  syntax was guessed (by analogy with hierarchy-collapse markers elsewhere) and applied to a
+  live workbook without a Desktop-verified example; Desktop refused the file on open with
+  *"Qualified Name Parse Error --- Invalid input: expected '[' --- Input: ^[federated...]..."*.
+  The XSD validator did not catch it — `<rows>`/`<cols>` content is a "Qualified Name" string
+  Tableau parses with its own grammar, not XML, so schema validation is blind to it. This is
+  the general case the "report-back repair" section above already covers for generated output:
+  when a construct has no verified example in a real, Desktop-saved `.twb` (this workbook or a
+  reference snippet), do not guess it and apply it wholesale — have the construct built by hand
+  in Desktop once, saved, then diff the `.twb` before/after to learn the real syntax before
+  applying it anywhere else. **The real mechanism**, found by diffing an analyst's own
+  Desktop edit: a `<style-rule element='label'><format attr='display'
+  field='[datasource].[none:FIELD:nk]' value='false' /></style-rule>` in the worksheet's
+  `<style>` block — untouched `<rows>`/`<cols>`.
+- **A "domain-complete" dimension needs its own logical table, related (not joined) to the
+  fact table.** Filtering/pivoting a dimension that lives on the fact table itself (e.g.
+  `brand_market` on a per-response table) silently drops any member with zero matching rows
+  once a boolean flag filter narrows the view — a market with no `true` responses for a given
+  reason just vanishes as a column instead of showing 0%/blank. Fix: add a second logical
+  table to the data model that is just `SELECT DISTINCT <dimension>` from the same source (a
+  Custom SQL Query relation is enough), related to the fact table on that column (a plain
+  Tableau **Relationship**, not a join), and put *that* copy of the field on the shelf instead
+  of the fact table's own. Relationships preserve each side's own domain independent of
+  filters on the other side, so every market always renders as a column. Paired with `(dim *
+  measure)` on `<cols>` (`total='true' onLeft='true'` puts the Grand Total column first) and,
+  to hide `false` rows without collapsing the now-domain-complete columns, a table calc
+  `LOOKUP(MAX([flag]), 0)` used as a filter (not a plain categorical filter on the raw flag,
+  which removes rows before the pivot can render empty-but-present columns).
+- **Floating dashboard objects are not marked `floating='true'` in this schema version** —
+  don't grep for that attribute and conclude a workbook has none. A floating zone (and its
+  descendants) is simply an *additional top-level sibling* of the dashboard's main tile-tree
+  root inside the same `<zones>` element — `<zones><zone type-v2='layout-basic'>...(the tiled
+  dashboard)...</zone><zone type-v2='layout-flow' ...>...(a floating cluster)...</zone></zones>`.
+  A show/hide toggle button is a further sibling: `<zone type-v2='dashboard-object'><button
+  ...><toggle-action>tabdoc:toggle-button-click-action window-id="{guid}"
+  zone-id="&lt;the button's own zone id&gt;" zone-ids=[&lt;target zone id(s), comma-separated&gt;]
+  </toggle-action>...</button></zone>` (note: this text is the button's own embedded
+  mini-language, written with literal `&quot;`-escaped double quotes — see the quote-style
+  warning below). Cloning one of these to another dashboard means renumbering the button's own
+  zone id *and* rewriting both the `zone-id=` and `zone-ids=[...]` references inside its
+  `toggle-action` text to match; whether the `window-id` also needs to be unique per dashboard
+  was not established (left the same GUID across clones — flag this as unverified if you do
+  the same, and have someone confirm the button actually toggles on each cloned dashboard).
+- **Zone ids are scoped per dashboard, not workbook-global.** Every dashboard's own `<zones>`
+  tree starts renumbering from its own small ids (often literally `100`, `2`, `301`...) — the
+  same id appearing in five different dashboards is normal, not a collision. Only check for
+  duplicates *within* one dashboard's own zone tree when cloning/renumbering.
+- **Fully removing a dashboard action-filter touches four places, not one.** A generated
+  "Filter N (generated)" action leaves traces in: (1) the workbook-level `<actions>` block —
+  the action's own declaration; (2) every worksheet it filters, as a `<filter
+  class='categorical' column='[ds].[Action (fields...)]'>` whose *inner* `<groupfilter>` (not
+  the outer `<filter>` tag) carries `user:ui-action-filter='[ActionNN_hash]'` — for a
+  multi-field action this groupfilter is `function='crossjoin'` and has nested
+  `<groupfilter function='level-members' .../>` children instead of being self-closing, so a
+  removal script must find the filter's *true* closing `</filter>` positionally (the first one
+  after its open tag — a `<filter>` never nests another `<filter>`) rather than assuming a
+  fixed shape; (3) each such worksheet's `<slices>` list, as a `<column>[ds].[Action
+  (fields...)]</column>` entry; and (4) the synthetic field's own definition at the
+  *datasource* level, a `<group caption='Action (fields...)' hidden='true' name='[Action
+  (fields...)]' ... user:auto-column='sheet_link'>` (attribute order on the `<group>` tag
+  varies — some have `auto-hidden='true'` before `caption`, so match on `caption='Action ('`
+  appearing anywhere in the tag, not as the first attribute). Missing any one of the four
+  leaves orphaned cruft or a dangling reference.
+- **A field's display name can itself contain parentheses** (e.g. an action synthesized over
+  a calculated field named `Avg q sat hotel (bins)` becomes `Action (Avg q sat hotel
+  (bins))`). A naive `\(...[^)]*\)` regex to strip one such name stops at the *first* `)`,
+  well before the real end. Match on the surrounding quote or bracket boundary instead
+  (`column='[^']*'`, `\[[^\]]*\]`) and let it swallow the nested parens whole, rather than
+  trying to hand-balance them.
+- **A blanket cudzysłów/quote-style normalization after re-serializing a fragment (e.g. via
+  `ElementTree`, which always emits double quotes) can corrupt text content that merely
+  *contains* `key="value"`-looking substrings but isn't XML attributes at all** — a
+  `toggle-action`'s embedded mini-language (`window-id="..."` written as plain element text,
+  originally `&quot;`-escaped) is exactly this shape. Blindly converting `="..."` to `='...'`
+  across a whole re-serialized block turned a working button into "Command parse error:
+  missing value after =" in Desktop, because that parser wants literal `"`. Before a global
+  quote-swap, check the block for `<toggle-action>`, calculation `formula='...'` strings (which
+  can contain a real apostrophe, `&apos;`-escaped, that must **not** be moved to a
+  single-quoted delimiter), and any other custom text mini-language; skip those spans, or grep
+  the result afterwards and compare against an untouched, working example of the same
+  construct.
 - **The dashboard is interactive** (CONTRACT.md §6). An `actions` entry of type `filter`
   cross-filters its target zones from the marks clicked in its source view, `highlight` brushes
   related marks, and `parameter` writes a clicked mark's `field` into a declared parameter;
