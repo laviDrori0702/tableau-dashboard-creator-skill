@@ -318,7 +318,9 @@ def test_first_run_marks_nothing_stale(tmp_path):
 
 # --- Optional `view` column (issue #97) --------------------------------------
 
-def _with_views(plan_text: str, *, grid_view: str = "Overview", element_view: str = "Overview") -> str:
+def _with_views(
+    plan_text: str, *, grid_view: str = "Overview", element_view: str = "Overview"
+) -> str:
     """Return FULL_PLAN with a ``view`` column on the Layout Grid and Elements tables.
 
     Args:
@@ -329,21 +331,20 @@ def _with_views(plan_text: str, *, grid_view: str = "Overview", element_view: st
     Returns:
         The plan text with ``view`` columns appended (``kpi-row`` rows stay blank).
     """
-    return (
-        plan_text
-        .replace("| slot     | position | size         |", "| slot     | position | size         | view |")
-        .replace("|----------|----------|--------------|", "|----------|----------|--------------|------|")
-        .replace("| kpi-row  | top      | 100% x 120px |", "| kpi-row  | top      | 100% x 120px |      |")
-        .replace("| chart-a  | middle   | 100% x 360px |", f"| chart-a  | middle   | 100% x 360px | {grid_view} |")
-        .replace("| id          | type       | columns      | slot    | size       |",
-                 "| id          | type       | columns      | slot    | size       | view |")
-        .replace("|-------------|------------|--------------|---------|------------|",
-                 "|-------------|------------|--------------|---------|------------|------|")
-        .replace("| kpi-revenue | kpi        | revenue      | kpi-row | 1/4 of row |",
-                 "| kpi-revenue | kpi        | revenue      | kpi-row | 1/4 of row |      |")
-        .replace("| chart-trend | chart:line | order_date   | chart-a | fills slot |",
-                 f"| chart-trend | chart:line | order_date   | chart-a | fills slot | {element_view} |")
-    )
+    # (old row -> appended view cell) for the Layout Grid and Elements tables.
+    appended_cells = {
+        "| slot     | position | size         |": " view |",
+        "|----------|----------|--------------|": "------|",
+        "| kpi-row  | top      | 100% x 120px |": "      |",
+        "| chart-a  | middle   | 100% x 360px |": f" {grid_view} |",
+        "| id          | type       | columns      | slot    | size       |": " view |",
+        "|-------------|------------|--------------|---------|------------|": "------|",
+        "| kpi-revenue | kpi        | revenue      | kpi-row | 1/4 of row |": "      |",
+        "| chart-trend | chart:line | order_date   | chart-a | fills slot |": f" {element_view} |",
+    }
+    for row, cell in appended_cells.items():
+        plan_text = plan_text.replace(row, row + cell)
+    return plan_text
 
 
 def test_plan_without_view_column_is_single_default_view():
@@ -362,24 +363,46 @@ def test_view_column_is_accepted_and_declared_views_reported():
 
 def test_element_view_must_match_its_slot_view():
     """An Elements row placed in a slot that lives on a different view is a problem."""
-    validation = plan.validate_plan(_with_views(FULL_PLAN, grid_view="Overview", element_view="Detail"))
+    validation = plan.validate_plan(_with_views(FULL_PLAN, element_view="Detail"))
     assert validation.ok is False
-    assert any("chart-trend" in p and "Detail" in p and "Overview" in p for p in validation.problems), (
-        validation.problems
-    )
+    assert any(
+        "chart-trend" in problem and "Detail" in problem and "Overview" in problem
+        for problem in validation.problems
+    ), validation.problems
 
 
 def test_blank_element_view_in_named_slot_is_a_problem():
     """Blank means the default view, so it also mismatches a slot on a named view."""
-    validation = plan.validate_plan(_with_views(FULL_PLAN, grid_view="Overview", element_view=""))
+    validation = plan.validate_plan(_with_views(FULL_PLAN, element_view=""))
     assert validation.ok is False
-    assert any("chart-trend" in p for p in validation.problems), validation.problems
+    assert any("chart-trend" in problem for problem in validation.problems), validation.problems
 
 
 def test_validation_output_names_declared_views():
-    text = plan.format_validation(plan.validate_plan(_with_views(FULL_PLAN)))
-    assert text.startswith("[OK]")
-    assert "Overview" in text
+    """The CLI lists the declared views on both the ``[OK]`` and ``[INVALID]`` paths."""
+    ok_text = plan.format_validation(plan.validate_plan(_with_views(FULL_PLAN)))
+    assert ok_text.startswith("[OK]")
+    assert "views: default, Overview" in ok_text
+
+    bad_text = plan.format_validation(
+        plan.validate_plan(_with_views(FULL_PLAN, element_view="Detail"))
+    )
+    assert bad_text.startswith("[INVALID]")
+    assert "views: default, Detail, Overview" in bad_text
+
+
+def test_interactions_table_view_column_is_not_a_view_source():
+    """Only the Layout Grid, Elements, and Filters tables declare views."""
+    with_interaction_view = FULL_PLAN.replace(
+        "| int-region-filter | cross-filter | chart-trend | kpi-revenue | click filters |",
+        "| int-region-filter | cross-filter | chart-trend | kpi-revenue | click filters | Ghost |",
+    ).replace(
+        "| id                | interaction  | source      | target      | detail        |",
+        "| id                | interaction  | source      | target      | detail        | view |",
+    )
+    validation = plan.validate_plan(with_interaction_view)
+    assert validation.ok is True, validation
+    assert validation.views == [plan.DEFAULT_VIEW]
 
 
 def test_demo_plan_is_single_view():

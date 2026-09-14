@@ -213,7 +213,20 @@ def _is_separator_row(cells: list[str]) -> bool:
     return bool(non_empty) and all(_SEPARATOR_CELL.match(cell) for cell in non_empty)
 
 
-def _cell(row: list[str], index: Optional[int]) -> str:
+def _column_index(header: list[str], name: str) -> Optional[int]:
+    """Return the index of column ``name`` in a lower-cased header, or ``None``.
+
+    Args:
+        header: The table's lower-cased header cells.
+        name: The column name to look for.
+
+    Returns:
+        The column's index, or ``None`` when the table has no such column.
+    """
+    return header.index(name) if name in header else None
+
+
+def _cell_text(row: list[str], index: Optional[int]) -> str:
     """Return the stripped cell at ``index``, or ``""`` when the column is absent/short.
 
     Args:
@@ -250,20 +263,21 @@ def _validate_id_tables(text: str) -> tuple[list[str], list[str]]:
     views: set[str] = set()
     slot_views: dict[str, str] = {}
 
+    # Keep only tables with a header plus at least one data row.
     tables = [
         rows for table in _markdown_tables(text)
         if len(rows := [row for row in table if not _is_separator_row(row)]) >= 2
-    ]  # header plus at least one data row
+    ]
 
     # Pass 1: the Layout Grid (first header ``slot``) decides which view each slot is on.
     for rows in tables:
         header = [cell.lower() for cell in rows[0]]
         if header[0] != "slot":
             continue
-        view_index = header.index("view") if "view" in header else None
+        view_index = _column_index(header, "view")
         for row in rows[1:]:
             if row and row[0].strip():
-                view = _cell(row, view_index) or DEFAULT_VIEW
+                view = _cell_text(row, view_index) or DEFAULT_VIEW
                 slot_views[row[0].strip()] = view
                 views.add(view)
 
@@ -273,23 +287,26 @@ def _validate_id_tables(text: str) -> tuple[list[str], list[str]]:
         if header[0] != "id":
             continue  # not an id-bearing table (e.g. the Layout Grid's slot table)
 
-        term_index = header.index("interaction") if "interaction" in header else None
-        slot_index = header.index("slot") if "slot" in header else None
-        view_index = header.index("view") if "view" in header else None
+        term_index = _column_index(header, "interaction")
+        slot_index = _column_index(header, "slot")
+        view_index = _column_index(header, "view")
         for row in rows[1:]:
             row_id = row[0].strip() if row else ""
             if not row_id:
                 problems.append("an id-table row has an empty 'id' cell")
                 continue
             all_ids.append(row_id)
-            if view_index is not None or slot_index is not None:
-                view = _cell(row, view_index) or DEFAULT_VIEW
+            # Views live on Elements (has ``slot``) and Filters (has ``view``); the
+            # Interactions table is never a view source.
+            if term_index is None and (view_index is not None or slot_index is not None):
+                view = _cell_text(row, view_index) or DEFAULT_VIEW
                 views.add(view)
-                slot_view = slot_views.get(_cell(row, slot_index))
+                slot = _cell_text(row, slot_index)
+                slot_view = slot_views.get(slot)
                 if slot_view is not None and slot_view != view:
                     problems.append(
                         f"element '{row_id}' is on view '{view}' but its slot "
-                        f"'{_cell(row, slot_index)}' is on view '{slot_view}'"
+                        f"'{slot}' is on view '{slot_view}'"
                     )
             if term_index is not None and len(row) > term_index:
                 term = row[term_index].strip()
@@ -719,9 +736,12 @@ def format_validation(validation: PlanValidation) -> str:
         A multi-line, plain-ASCII string suitable for printing to the analyst.
     """
     # Plain ASCII only (see format_precheck).
+    views_line = f"  views: {', '.join(validation.views)}"
     if validation.ok:
-        lines = ["[OK] DASHBOARD-PLAN.md is complete (all required sections, unique ids)."]
-        lines.append(f"  views: {', '.join(validation.views)}")
+        lines = [
+            "[OK] DASHBOARD-PLAN.md is complete (all required sections, unique ids).",
+            views_line,
+        ]
         if validation.missing_recommended:
             lines.append(
                 f"  note: no {', '.join(validation.missing_recommended)} section(s) - "
@@ -729,7 +749,7 @@ def format_validation(validation: PlanValidation) -> str:
             )
         return "\n".join(lines)
 
-    lines = ["[INVALID] DASHBOARD-PLAN.md is incomplete."]
+    lines = ["[INVALID] DASHBOARD-PLAN.md is incomplete.", views_line]
     if validation.missing_required:
         lines.append(f"  missing required section(s): {', '.join(validation.missing_required)}")
     for problem in validation.problems:

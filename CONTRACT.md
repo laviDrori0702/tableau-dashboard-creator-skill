@@ -376,11 +376,11 @@ A workbook may have several dashboards (tabs), called **views**. The plan declar
 - **A blank `view` cell — or no `view` column at all — means the single default view.** Every
   plan written before this column existed is therefore a valid one-view plan, unchanged.
 - An Elements row must be on the same view as the slot it is placed in; `tableau-plan`'s
-  `validate` reports a mismatch as a problem and lists the set of declared views.
+  `validate` reports a mismatch as a problem and always lists the set of declared views. View
+  names are compared exactly (case and spacing) after trimming.
 - Today views are **declarable only**: `tableau-mock` and `tableau-build` still produce one
   dashboard. Rendering the declared views (tabs in the mock, one page per view in the spec,
-  several dashboards in the workbook) is separate, later work; a downstream skill that cannot
-  honour a multi-view plan must block and name this as the reason rather than flatten it.
+  several dashboards in the workbook) is separate, later work.
 
 ---
 
