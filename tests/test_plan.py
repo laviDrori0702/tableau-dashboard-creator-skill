@@ -314,3 +314,77 @@ def test_first_run_marks_nothing_stale(tmp_path):
     result = plan.commit(tmp_path)
 
     assert result.ok is True and result.staled_steps == []
+
+
+# --- Optional `view` column (issue #97) --------------------------------------
+
+def _with_views(plan_text: str, *, grid_view: str = "Overview", element_view: str = "Overview") -> str:
+    """Return FULL_PLAN with a ``view`` column on the Layout Grid and Elements tables.
+
+    Args:
+        plan_text: A plan without a ``view`` column (``FULL_PLAN``).
+        grid_view: The view assigned to slot ``chart-a`` in the Layout Grid.
+        element_view: The view assigned to element ``chart-trend`` (slot ``chart-a``).
+
+    Returns:
+        The plan text with ``view`` columns appended (``kpi-row`` rows stay blank).
+    """
+    return (
+        plan_text
+        .replace("| slot     | position | size         |", "| slot     | position | size         | view |")
+        .replace("|----------|----------|--------------|", "|----------|----------|--------------|------|")
+        .replace("| kpi-row  | top      | 100% x 120px |", "| kpi-row  | top      | 100% x 120px |      |")
+        .replace("| chart-a  | middle   | 100% x 360px |", f"| chart-a  | middle   | 100% x 360px | {grid_view} |")
+        .replace("| id          | type       | columns      | slot    | size       |",
+                 "| id          | type       | columns      | slot    | size       | view |")
+        .replace("|-------------|------------|--------------|---------|------------|",
+                 "|-------------|------------|--------------|---------|------------|------|")
+        .replace("| kpi-revenue | kpi        | revenue      | kpi-row | 1/4 of row |",
+                 "| kpi-revenue | kpi        | revenue      | kpi-row | 1/4 of row |      |")
+        .replace("| chart-trend | chart:line | order_date   | chart-a | fills slot |",
+                 f"| chart-trend | chart:line | order_date   | chart-a | fills slot | {element_view} |")
+    )
+
+
+def test_plan_without_view_column_is_single_default_view():
+    """No ``view`` column means one view: the default (blank) one."""
+    validation = plan.validate_plan(FULL_PLAN)
+    assert validation.ok is True
+    assert validation.views == [plan.DEFAULT_VIEW]
+
+
+def test_view_column_is_accepted_and_declared_views_reported():
+    """Blank cells map to the default view; named cells are reported alongside it."""
+    validation = plan.validate_plan(_with_views(FULL_PLAN))
+    assert validation.ok is True, validation
+    assert validation.views == [plan.DEFAULT_VIEW, "Overview"]
+
+
+def test_element_view_must_match_its_slot_view():
+    """An Elements row placed in a slot that lives on a different view is a problem."""
+    validation = plan.validate_plan(_with_views(FULL_PLAN, grid_view="Overview", element_view="Detail"))
+    assert validation.ok is False
+    assert any("chart-trend" in p and "Detail" in p and "Overview" in p for p in validation.problems), (
+        validation.problems
+    )
+
+
+def test_blank_element_view_in_named_slot_is_a_problem():
+    """Blank means the default view, so it also mismatches a slot on a named view."""
+    validation = plan.validate_plan(_with_views(FULL_PLAN, grid_view="Overview", element_view=""))
+    assert validation.ok is False
+    assert any("chart-trend" in p for p in validation.problems), validation.problems
+
+
+def test_validation_output_names_declared_views():
+    text = plan.format_validation(plan.validate_plan(_with_views(FULL_PLAN)))
+    assert text.startswith("[OK]")
+    assert "Overview" in text
+
+
+def test_demo_plan_is_single_view():
+    """The shipped demo carries no ``view`` column and must keep validating unchanged."""
+    demo_plan = Path(__file__).resolve().parent.parent / "demo" / "DASHBOARD-PLAN.md"
+    validation = plan.validate_plan(demo_plan.read_text(encoding="utf-8-sig"))
+    assert validation.ok is True, validation
+    assert validation.views == [plan.DEFAULT_VIEW]

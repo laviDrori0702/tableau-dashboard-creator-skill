@@ -88,6 +88,10 @@ INTERACTION_VOCABULARY: tuple[str, ...] = (
 )
 _INTERACTION_TERMS = frozenset(INTERACTION_VOCABULARY)
 
+#: Name reported for the single default view - the one a blank (or absent) ``view``
+#: cell in the Layout Grid / Elements / Filters tables belongs to (issue #97).
+DEFAULT_VIEW = "default"
+
 
 # --- STATE.md reading (shared shape with intake.py / route.py) ---------------
 
@@ -209,38 +213,84 @@ def _is_separator_row(cells: list[str]) -> bool:
     return bool(non_empty) and all(_SEPARATOR_CELL.match(cell) for cell in non_empty)
 
 
-def _validate_id_tables(text: str) -> list[str]:
-    """Check stable-id and interaction-vocabulary rules across the plan's tables.
+def _cell(row: list[str], index: Optional[int]) -> str:
+    """Return the stripped cell at ``index``, or ``""`` when the column is absent/short.
+
+    Args:
+        row: A table row's cells.
+        index: The column index, or ``None`` when the table has no such column.
+
+    Returns:
+        The cell text, blank when the column does not exist for this row.
+    """
+    return row[index].strip() if index is not None and len(row) > index else ""
+
+
+def _validate_id_tables(text: str) -> tuple[list[str], list[str]]:
+    """Check stable-id, interaction-vocabulary, and view rules across the plan's tables.
 
     Every table whose first column header is ``id`` (the Elements, Filters, and
     Interactions tables) is checked: each data row must carry a non-empty id, ids must
     be unique across the whole plan (later steps reference them), and any table with an
     ``interaction`` column must use only the shared vocabulary (CONTRACT.md §6).
 
+    The optional ``view`` column (Layout Grid, Elements, Filters) names the workbook tab
+    a row belongs to; a blank cell - or no column at all - means :data:`DEFAULT_VIEW`.
+    An Elements row must sit on the same view as the slot it is placed in.
+
     Args:
         text: The contents of a ``DASHBOARD-PLAN.md`` file.
 
     Returns:
-        A list of human-readable problem strings (empty when all id-tables are clean).
+        ``(problems, views)`` - human-readable problem strings (empty when clean) and
+        the declared views, :data:`DEFAULT_VIEW` first when used, then named views sorted.
     """
     problems: list[str] = []
     all_ids: list[str] = []
+    views: set[str] = set()
+    slot_views: dict[str, str] = {}
 
-    for table in _markdown_tables(text):
-        rows = [row for row in table if not _is_separator_row(row)]
-        if len(rows) < 2:  # need a header plus at least one data row to matter
-            continue
+    tables = [
+        rows for table in _markdown_tables(text)
+        if len(rows := [row for row in table if not _is_separator_row(row)]) >= 2
+    ]  # header plus at least one data row
+
+    # Pass 1: the Layout Grid (first header ``slot``) decides which view each slot is on.
+    for rows in tables:
         header = [cell.lower() for cell in rows[0]]
-        if not header or header[0] != "id":
+        if header[0] != "slot":
+            continue
+        view_index = header.index("view") if "view" in header else None
+        for row in rows[1:]:
+            if row and row[0].strip():
+                view = _cell(row, view_index) or DEFAULT_VIEW
+                slot_views[row[0].strip()] = view
+                views.add(view)
+
+    # Pass 2: the id tables.
+    for rows in tables:
+        header = [cell.lower() for cell in rows[0]]
+        if header[0] != "id":
             continue  # not an id-bearing table (e.g. the Layout Grid's slot table)
 
         term_index = header.index("interaction") if "interaction" in header else None
+        slot_index = header.index("slot") if "slot" in header else None
+        view_index = header.index("view") if "view" in header else None
         for row in rows[1:]:
             row_id = row[0].strip() if row else ""
             if not row_id:
                 problems.append("an id-table row has an empty 'id' cell")
                 continue
             all_ids.append(row_id)
+            if view_index is not None or slot_index is not None:
+                view = _cell(row, view_index) or DEFAULT_VIEW
+                views.add(view)
+                slot_view = slot_views.get(_cell(row, slot_index))
+                if slot_view is not None and slot_view != view:
+                    problems.append(
+                        f"element '{row_id}' is on view '{view}' but its slot "
+                        f"'{_cell(row, slot_index)}' is on view '{slot_view}'"
+                    )
             if term_index is not None and len(row) > term_index:
                 term = row[term_index].strip()
                 if term and term.lower() not in _INTERACTION_TERMS:
@@ -253,7 +303,8 @@ def _validate_id_tables(text: str) -> list[str]:
     problems.extend(
         f"duplicate id '{dup}' - ids must be unique across the plan" for dup in duplicates
     )
-    return problems
+    default_first = [DEFAULT_VIEW] if DEFAULT_VIEW in views or not views else []
+    return problems, default_first + sorted(views - {DEFAULT_VIEW})
 
 
 @dataclass(frozen=True)
@@ -265,14 +316,17 @@ class PlanValidation:
             id/vocabulary problem was found.
         missing_required: Required sections absent from the plan (CONTRACT.md schema).
         missing_recommended: Recommended sections absent (reported, never blocking).
-        problems: Stable-id / interaction-vocabulary problems (see
+        problems: Stable-id / interaction-vocabulary / view problems (see
             :func:`_validate_id_tables`).
+        views: The declared views (workbook tabs), :data:`DEFAULT_VIEW` first when any
+            row belongs to it. A plan with no ``view`` column is ``[DEFAULT_VIEW]``.
     """
 
     ok: bool
     missing_required: list[str]
     missing_recommended: list[str]
     problems: list[str]
+    views: list[str] = field(default_factory=lambda: [DEFAULT_VIEW])
 
 
 def validate_plan(text: str) -> PlanValidation:
@@ -298,9 +352,9 @@ def validate_plan(text: str) -> PlanValidation:
         section for section in PLAN_RECOMMENDED_SECTIONS
         if section.lower() not in headings_blob
     ]
-    problems = _validate_id_tables(text)
+    problems, views = _validate_id_tables(text)
     ok = not missing_required and not problems
-    return PlanValidation(ok, missing_required, missing_recommended, problems)
+    return PlanValidation(ok, missing_required, missing_recommended, problems, views)
 
 
 def render_plan_template() -> str:
@@ -667,6 +721,7 @@ def format_validation(validation: PlanValidation) -> str:
     # Plain ASCII only (see format_precheck).
     if validation.ok:
         lines = ["[OK] DASHBOARD-PLAN.md is complete (all required sections, unique ids)."]
+        lines.append(f"  views: {', '.join(validation.views)}")
         if validation.missing_recommended:
             lines.append(
                 f"  note: no {', '.join(validation.missing_recommended)} section(s) - "

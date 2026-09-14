@@ -26,25 +26,32 @@ downstream.
 The named slots that elements are placed into, with position and size (relative to the
 canvas above). Element rows reference these slot names.
 
-| slot        | position             | size           |
-|-------------|----------------------|----------------|
-| filter-bar  | top, full width      | 100% x 56px    |
-| kpi-row     | below filter-bar     | 100% x 120px   |
-| chart-main  | middle-left          | 60% x 360px    |
-| chart-side  | middle-right         | 40% x 360px    |
+The optional `view` column (here, in Elements, and in Filters) names the workbook tab a
+row belongs to. **A blank cell means the single default view**, so a one-tab dashboard
+leaves the column blank or drops it entirely. An element must be on the same view as its
+slot. Views are declarable only for now: `tableau-mock` and `tableau-build` still produce
+one dashboard.
+
+| slot        | position             | size           | view |
+|-------------|----------------------|----------------|------|
+| filter-bar  | top, full width      | 100% x 56px    |      |
+| kpi-row     | below filter-bar     | 100% x 120px   |      |
+| chart-main  | middle-left          | 60% x 360px    |      |
+| chart-side  | middle-right         | 40% x 360px    |      |
 
 ## Elements
 
 Every KPI and chart. `id` is stable and unique; `type` is `kpi` or `chart` (or a chart
 kind, e.g. `chart:line`); `columns` are the DATA-MODEL.md field(s) used; `slot` must be
-one of the Layout Grid slots above; `size` is the footprint within that slot.
+one of the Layout Grid slots above; `size` is the footprint within that slot; `view`
+(optional) must match the slot's view - blank is the default view.
 
-| id           | type        | columns                       | slot       | size       |
-|--------------|-------------|-------------------------------|------------|------------|
-| kpi-revenue  | kpi         | revenue                       | kpi-row    | 1/4 of row |
-| kpi-orders   | kpi         | order_id (distinct count)     | kpi-row    | 1/4 of row |
-| chart-trend  | chart:line  | order_date, revenue, region   | chart-main | fills slot |
-| chart-region | chart:bar   | region, revenue               | chart-side | fills slot |
+| id           | type        | columns                       | slot       | size       | view |
+|--------------|-------------|-------------------------------|------------|------------|------|
+| kpi-revenue  | kpi         | revenue                       | kpi-row    | 1/4 of row |      |
+| kpi-orders   | kpi         | order_id (distinct count)     | kpi-row    | 1/4 of row |      |
+| chart-trend  | chart:line  | order_date, revenue, region   | chart-main | fills slot |      |
+| chart-region | chart:bar   | region, revenue               | chart-side | fills slot |      |
 
 ## Filters
 
@@ -52,11 +59,12 @@ Every filter. `scope` lists which elements (by id) it affects. If the dashboard 
 filters, keep this section and write a single row with `id` = `none`.
 `control type` is one of `dropdown (multi)` (checkbox list + Apply button), `dropdown (single)`,
 `date range`, `slider`. Default to `dropdown (multi)` for dimensions and `date range` for dates.
+`view` (optional) names the tab the filter card sits on - blank is the default view.
 
-| id         | field      | control type     | scope                      | default    |
-|------------|------------|------------------|----------------------------|------------|
-| flt-date   | order_date | date range       | all                        | last 12 mo |
-| flt-region | region     | dropdown (multi) | chart-trend, chart-region  | All        |
+| id         | field      | control type     | scope                      | default    | view |
+|------------|------------|------------------|----------------------------|------------|------|
+| flt-date   | order_date | date range       | all                        | last 12 mo |      |
+| flt-region | region     | dropdown (multi) | chart-trend, chart-region  | All        |      |
 
 ## Interactions
 
