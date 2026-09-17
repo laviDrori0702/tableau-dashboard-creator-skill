@@ -569,3 +569,85 @@ def test_first_run_marks_nothing_stale(tmp_path):
     result = spec.commit(tmp_path)
 
     assert result.ok is True and result.staled_steps == []
+
+
+# --- spec_mode gate (issue #98) ----------------------------------------------
+
+def test_read_spec_mode_absent_means_unset():
+    """Projects that predate spec_mode have no line; read returns None."""
+    text = init.render_state_md(TARGET_VERSION)
+    assert spec.read_spec_mode(text) is None
+    assert spec.effective_spec_mode(text) == spec.SPEC_MODE_AGENT
+
+
+def test_set_spec_mode_inserts_beside_data_mode_preserving_comments():
+    """set-mode writes the bullet after data_mode and keeps inline comments."""
+    text = init.render_state_md(TARGET_VERSION)
+    updated = spec.set_spec_mode(text, "human")
+
+    assert spec.read_spec_mode(updated) == "human"
+    assert "- spec_mode: human" in updated
+    assert "# agent | human" in updated
+    # data_mode line and its comment survive byte-for-byte beside the new bullet.
+    assert "- data_mode: csv" in updated
+    assert updated.count("spec_mode:") == 1
+
+
+def test_set_spec_mode_rewrites_existing_value_only():
+    """A second set-mode call rewrites the value without duplicating the bullet."""
+    text = spec.set_spec_mode(init.render_state_md(TARGET_VERSION), "human")
+    again = spec.set_spec_mode(text, "agent")
+
+    assert spec.read_spec_mode(again) == "agent"
+    assert again.count("spec_mode:") == 1
+
+
+def test_precheck_reports_unset_spec_mode(tmp_path):
+    """precheck reports that spec_mode is unset and must be chosen; agent route still runs."""
+    _ready_project(tmp_path)
+
+    result = spec.precheck(tmp_path)
+    rendered = spec.format_precheck(result)
+
+    assert result.can_run is True
+    assert result.spec_mode is None
+    assert result.effective_spec_mode == "agent"
+    assert "unset" in rendered.lower() and "must be chosen" in rendered.lower()
+
+
+def test_precheck_reports_recorded_spec_mode(tmp_path):
+    """Once recorded, precheck surfaces the stored mode."""
+    _ready_project(tmp_path)
+    state_path = tmp_path / "STATE.md"
+    state_path.write_text(
+        spec.set_spec_mode(state_path.read_text(encoding="utf-8"), "human"),
+        encoding="utf-8",
+    )
+
+    result = spec.precheck(tmp_path)
+    rendered = spec.format_precheck(result)
+
+    assert result.spec_mode == "human"
+    assert result.effective_spec_mode == "human"
+    assert "spec_mode      : human" in rendered
+
+
+def test_unset_spec_mode_keeps_agent_route_commit(tmp_path):
+    """A STATE.md with no spec_mode still commits the agent-route spec exactly as before."""
+    _ready_project(tmp_path)
+    _write_spec(tmp_path, "v_1", _spec_md())
+
+    result = spec.commit(tmp_path)
+
+    assert result.ok is True
+    assert "spec_mode" not in (tmp_path / "STATE.md").read_text(encoding="utf-8")
+
+
+def test_cli_set_mode_writes_state(tmp_path):
+    """The set-mode subcommand records spec_mode in STATE.md."""
+    _ready_project(tmp_path)
+
+    code = spec.main(["set-mode", str(tmp_path), "--mode", "agent"])
+
+    assert code == 0
+    assert spec.read_spec_mode((tmp_path / "STATE.md").read_text(encoding="utf-8")) == "agent"
