@@ -44,8 +44,10 @@ JUSTIFICATION_HINTS = re.compile(
 OPTIONAL_SUPPORT_PAGES = frozenset(
     {"calculations.md", "parameters.md", "fields.md", "patterns.md"}
 )
+OPTIONAL_DASHBOARD_PAGES = frozenset({"shared-sidebar.md"})
 ROOT_GUIDE_NAME = "IMPLEMENTATION-SPEC.md"
 SPEC_DIR_NAME = "spec"
+DASHBOARDS_SUBDIR = "dashboards"
 
 
 # --- Plan id extraction -------------------------------------------------------
@@ -95,9 +97,14 @@ def plan_ids(plan_text: str) -> list[str]:
 
 
 def view_page_filename(view: str) -> str:
-    """Map a declared view name to its ``spec/<file>.md`` page name."""
+    """Map a declared view name to its ``spec/dashboards/<file>.md`` basename."""
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", view.strip()).strip("-").lower()
     return f"{slug or 'default'}.md"
+
+
+def view_page_relpath(view: str) -> str:
+    """Return ``spec/dashboards/<slug>.md`` for a declared view."""
+    return f"{SPEC_DIR_NAME}/{DASHBOARDS_SUBDIR}/{view_page_filename(view)}"
 
 
 # --- Coverage -----------------------------------------------------------------
@@ -197,7 +204,12 @@ def check_page_set(
     relative_paths: Iterable[str],
     page_texts_by_path: dict[str, str],
 ) -> list[str]:
-    """Validate the human-route page set under IMPLEMENTATION-SPEC.md + spec/."""
+    """Validate the human-route page set under IMPLEMENTATION-SPEC.md + spec/.
+
+    View pages live under ``spec/dashboards/<view>.md`` (Polaris layout). Support
+    pages stay as siblings of ``dashboards/``. ``shared-sidebar.md`` under
+    dashboards/ is optional shared chrome.
+    """
     problems: list[str] = []
     norm = {p.replace("\\", "/") for p in relative_paths}
     texts = {k.replace("\\", "/"): v for k, v in page_texts_by_path.items()}
@@ -205,26 +217,38 @@ def check_page_set(
     if ROOT_GUIDE_NAME not in norm:
         problems.append(f"missing root guide '{ROOT_GUIDE_NAME}'")
 
-    expected_views = {f"{SPEC_DIR_NAME}/{view_page_filename(v)}" for v in views}
+    expected_views = {view_page_relpath(v) for v in views}
     for path in sorted(expected_views):
         if path not in norm:
             problems.append(f"missing view page '{path}'")
         elif not texts.get(path, "").strip():
-            problems.append(f"view page '{path}' is empty - omit empty pages or fill them")
+            problems.append(
+                f"view page '{path}' is empty - omit empty pages or fill them"
+            )
+
+    dash_prefix = f"{SPEC_DIR_NAME}/{DASHBOARDS_SUBDIR}/"
+    under_dashboards = {
+        p for p in norm if p.startswith(dash_prefix) and p.count("/") == 2
+    }
+    allowed_dashboard_extras = {
+        f"{dash_prefix}{n}" for n in OPTIONAL_DASHBOARD_PAGES
+    }
+    for path in sorted(under_dashboards - expected_views - allowed_dashboard_extras):
+        problems.append(f"unexpected page '{path}' under {dash_prefix}")
 
     under_spec = {
         p for p in norm if p.startswith(f"{SPEC_DIR_NAME}/") and p.count("/") == 1
     }
-    support_present = under_spec - expected_views
+    support_present = under_spec
     allowed_support = {f"{SPEC_DIR_NAME}/{n}" for n in OPTIONAL_SUPPORT_PAGES}
     for path in sorted(support_present - allowed_support):
         problems.append(f"unexpected page '{path}' under {SPEC_DIR_NAME}/")
 
-    scanned_for_patterns = [
-        texts[p]
-        for p in sorted(expected_views | (support_present - {f"{SPEC_DIR_NAME}/patterns.md"}))
-        if p in texts
-    ]
+    scanned_paths = expected_views | (
+        support_present - {f"{SPEC_DIR_NAME}/patterns.md"}
+    )
+    scanned_paths |= under_dashboards & allowed_dashboard_extras
+    scanned_for_patterns = [texts[p] for p in sorted(scanned_paths) if p in texts]
     shared = shared_patterns(scanned_for_patterns)
     patterns_path = f"{SPEC_DIR_NAME}/patterns.md"
     if shared and patterns_path not in norm:
@@ -244,5 +268,12 @@ def check_page_set(
             problems.append(
                 f"'{path}' is empty - omit empty pages rather than stubbing them"
             )
+    for name in OPTIONAL_DASHBOARD_PAGES:
+        path = f"{dash_prefix}{name}"
+        if path in norm and not texts.get(path, "").strip():
+            problems.append(
+                f"'{path}' is empty - omit empty pages rather than stubbing them"
+            )
 
     return problems
+

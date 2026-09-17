@@ -36,7 +36,7 @@
 
 ---
 
-# spec/<view>.md — one page per declared view
+# spec/dashboards/<view>.md — one page per declared view
 
 ## View: <view-name>
 
@@ -77,6 +77,8 @@ Justification (only when using Dynamic Zone Visibility, LOD, table calc, or para
 because <why the simpler primitive is not enough>.
 
 ---
+
+# spec/dashboards/shared-sidebar.md - optional shared chrome (header/sidebar/nav)
 
 # spec/calculations.md
 

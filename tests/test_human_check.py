@@ -64,8 +64,8 @@ def test_page_set_requires_one_page_per_view_and_patterns_rules():
     views = ["Overview", "Detail"]
     texts = {
         "IMPLEMENTATION-SPEC.md": "# guide\n",
-        "spec/overview.md": "Element: kpi-a\nPattern: kpi-card\n",
-        "spec/detail.md": "Element: chart-b\nPattern: kpi-card\n",
+        "spec/dashboards/overview.md": "Element: kpi-a\nPattern: kpi-card\n",
+        "spec/dashboards/detail.md": "Element: chart-b\nPattern: kpi-card\n",
     }
     # Shared pattern without patterns.md -> problem
     problems = human_check.check_page_set(views, texts.keys(), texts)
@@ -75,8 +75,8 @@ def test_page_set_requires_one_page_per_view_and_patterns_rules():
     assert human_check.check_page_set(views, texts.keys(), texts) == []
 
     # patterns.md without shared pattern -> problem
-    texts["spec/overview.md"] = "Element: kpi-a\n"
-    texts["spec/detail.md"] = "Element: chart-b\n"
+    texts["spec/dashboards/overview.md"] = "Element: kpi-a\n"
+    texts["spec/dashboards/detail.md"] = "Element: chart-b\n"
     problems = human_check.check_page_set(views, texts.keys(), texts)
     assert any("omit" in p.lower() or "omitted" in p.lower() or "no sheet" in p.lower() for p in problems)
 
@@ -84,3 +84,4 @@ def test_page_set_requires_one_page_per_view_and_patterns_rules():
 def test_view_page_filename_slug():
     assert human_check.view_page_filename("Overview") == "overview.md"
     assert human_check.view_page_filename("Q1 Review!") == "q1-review.md"
+    assert human_check.view_page_relpath("Overview") == "spec/dashboards/overview.md"
