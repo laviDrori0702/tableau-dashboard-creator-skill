@@ -22,6 +22,8 @@ field, or element id named.
 | **Entry gate** | Refuses to run until `spec` is resolved **and** `IMPLEMENTATION-SPEC.md` exists at `current_version`, **and** `data` is resolved **and** `DATA-MODEL.md` plus at least one CSV exist (CONTRACT.md §4.1). |
 | **Next step** | None — the pipeline is complete (`tableau-route` confirms). |
 
+On `spec_mode: human`, precheck returns `[BLOCKED]` before looking for the versioned machine spec — that project's guide is for Tableau Desktop; re-run `tableau-spec` on the agent route to get one.
+
 The mechanical guarantees live in Python: the entry gate, the manifest schema validation and
 the STATE.md transition in `build.py` / `manifest.py`, the workbook shell in `twb.py`, and
 every chart template in `worksheet.py` — the element order, the generated ids, the four

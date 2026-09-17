@@ -1668,3 +1668,49 @@ def test_a_boolean_legend_key_is_accepted():
         document["worksheets"][0]["legend"] = value
 
         assert _errors(document) == []
+
+# --- Human-route refusal (issue #102) ----------------------------------------
+
+def test_precheck_blocks_human_spec_mode_before_versioned_spec(tmp_path):
+    """spec_mode: human blocks build with a Desktop-guide reason before the versioned spec check."""
+    # Spec resolved but NO versioned IMPLEMENTATION-SPEC.md — human path must win.
+    _state_with(tmp_path, spec="approved", data="approved")
+    (tmp_path / "DATA-MODEL.md").write_text("# Data\n", encoding="utf-8")
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "sample.csv").write_text("a,b\n1,2\n", encoding="utf-8")
+    state_path = tmp_path / "STATE.md"
+    text = state_path.read_text(encoding="utf-8")
+    if "- spec_mode:" not in text:
+        text = text.replace(
+            "- data_mode:",
+            "- spec_mode: human\n- data_mode:",
+            1,
+        )
+    else:
+        import re
+        text = re.sub(r"(-\s*spec_mode\s*:\s*)\S+", r"\1human", text, count=1)
+    state_path.write_text(text, encoding="utf-8")
+
+    result = build.precheck(tmp_path)
+    rendered = build.format_precheck(result)
+
+    assert result.can_run is False
+    assert result.blocker is not None
+    assert "Desktop" in result.blocker or "desktop" in result.blocker.lower()
+    assert "agent" in result.blocker.lower()
+    assert "missing" not in result.blocker.lower()  # not the versioned-file error
+    assert rendered.startswith("[BLOCKED]")
+
+
+def test_precheck_agent_or_unset_spec_mode_unchanged(tmp_path):
+    """Agent / unset spec_mode still open the gate when the versioned spec is present."""
+    _ready_project(tmp_path)
+    assert "spec_mode" not in (tmp_path / "STATE.md").read_text(encoding="utf-8")
+    assert build.precheck(tmp_path).can_run is True
+
+    # Explicit agent mode also runs.
+    state_path = tmp_path / "STATE.md"
+    text = state_path.read_text(encoding="utf-8")
+    text = text.replace("- data_mode:", "- spec_mode: agent\n- data_mode:", 1)
+    state_path.write_text(text, encoding="utf-8")
+    assert build.precheck(tmp_path).can_run is True
