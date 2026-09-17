@@ -72,6 +72,12 @@ do not hand-edit `STATE.md`.
 
    Plus the recommended `## Summary` and `## Suggestions` (and optional `## Data Gaps`).
 
+   **Views (optional).** The Layout Grid, Elements, and Filters tables may carry a `view`
+   column naming the workbook tab a row belongs to. A blank cell (or no column) is the
+   single default view, so one-tab plans need nothing. An element's `view` must equal its
+   slot's `view`; `validate` reports a mismatch and lists the declared views. Declaring
+   views does not yet change what `tableau-mock` / `tableau-build` render.
+
    **Stable ids are the contract.** Give every KPI, chart, filter, and interaction a
    short, stable, unique id (e.g. `kpi-revenue`, `chart-trend`, `flt-region`,
    `int-region-filter`). Later steps reference these — don't renumber them on a refine.

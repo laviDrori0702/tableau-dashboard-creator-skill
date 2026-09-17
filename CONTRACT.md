@@ -368,6 +368,20 @@ the mock's behavior, and the spec's Tableau mapping.
 When a requested interaction does not fit one of these terms, add the term **here first** (with its
 intent and Tableau construct) before using it in any skill — that keeps plan, mock, and spec aligned.
 
+### 6.1 Views in `DASHBOARD-PLAN.md`
+
+A workbook may have several dashboards (tabs), called **views**. The plan declares them through an
+**optional `view` column** on its Layout Grid, Elements, and Filters tables:
+
+- **A blank `view` cell — or no `view` column at all — means the single default view.** Every
+  plan written before this column existed is therefore a valid one-view plan, unchanged.
+- An Elements row must be on the same view as the slot it is placed in; `tableau-plan`'s
+  `validate` reports a mismatch as a problem and always lists the set of declared views. View
+  names are compared exactly (case and spacing) after trimming.
+- Today views are **declarable only**: `tableau-mock` and `tableau-build` still produce one
+  dashboard. Rendering the declared views (tabs in the mock, one page per view in the spec,
+  several dashboards in the workbook) is separate, later work.
+
 ---
 
 ## 7. Self-containment
