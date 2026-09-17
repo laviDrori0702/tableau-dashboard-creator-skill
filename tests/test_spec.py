@@ -743,7 +743,7 @@ def test_agent_single_view_plan_is_unaffected(tmp_path):
 
 
 def test_human_route_not_blocked_by_view_count(tmp_path):
-    """Human route precheck/commit are not gated by the number of declared views."""
+    """Human route precheck is not gated by the number of declared views."""
     _ready_project(tmp_path)
     _write_plan(tmp_path, _MULTI_VIEW_PLAN)
     state_path = tmp_path / "STATE.md"
@@ -751,12 +751,106 @@ def test_human_route_not_blocked_by_view_count(tmp_path):
         spec.set_spec_mode(state_path.read_text(encoding="utf-8"), "human"),
         encoding="utf-8",
     )
-    _write_spec(tmp_path, "v_1", _spec_md())
 
     pre = spec.precheck(tmp_path)
     assert pre.can_run is True
     assert pre.effective_spec_mode == "human"
 
-    committed = spec.commit(tmp_path)
-    assert committed.ok is True
-    assert committed.blocked is False
+
+def _write_human_guide(
+    project_dir: Path, element_ids: list[str], views: list[str] | None = None
+) -> None:
+    """Write a minimal human-route guide covering ``element_ids``."""
+    import human_check
+
+    views = views or ["default"]
+    (project_dir / "IMPLEMENTATION-SPEC.md").write_text(
+        "# Implementation Spec\n\n## Decisions\n\n- none\n",
+        encoding="utf-8",
+    )
+    spec_dir = project_dir / "spec"
+    spec_dir.mkdir(exist_ok=True)
+    per_view = {v: [] for v in views}
+    for i, eid in enumerate(element_ids):
+        per_view[views[i % len(views)]].append(eid)
+    for view in views:
+        body = [f"# View: {view}", ""]
+        for eid in per_view[view]:
+            body += [
+                f"## {eid}",
+                f"Element: {eid}",
+                "",
+                "| slot | value |",
+                "|------|-------|",
+                "| Text | x |",
+                "",
+            ]
+        if not per_view[view]:
+            body += ["(no elements on this view)", ""]
+        fname = human_check.view_page_filename(view)
+        (spec_dir / fname).write_text("\n".join(body), encoding="utf-8")
+
+
+def test_human_commit_approves_and_skips_build(tmp_path):
+    """Human commit approves spec and sets build=skipped when the guide covers the plan."""
+    _ready_project(tmp_path)
+    plan = """# Dashboard Plan
+
+## Elements
+| id | type | view |
+|----|------|------|
+| kpi-revenue | kpi | Overview |
+
+## Filters
+| id | field | view |
+|----|-------|------|
+| flt-region | region | Overview |
+
+## Interactions
+| id | interaction |
+|----|-------------|
+| int-region-filter | filter |
+"""
+    _write_plan(tmp_path, plan)
+    state_path = tmp_path / "STATE.md"
+    state_path.write_text(
+        spec.set_spec_mode(state_path.read_text(encoding="utf-8"), "human"),
+        encoding="utf-8",
+    )
+    _write_human_guide(
+        tmp_path,
+        ["kpi-revenue", "flt-region", "int-region-filter"],
+        views=["Overview"],
+    )
+
+    result = spec.commit(tmp_path)
+    assert result.ok is True, result.message
+    statuses = spec.parse_statuses((tmp_path / "STATE.md").read_text(encoding="utf-8"))
+    assert statuses["spec"] == "approved"
+    assert statuses["build"] == "skipped"
+
+
+def test_human_commit_refuses_missing_element_lines(tmp_path):
+    """Human commit refuses when a plan id has no Element: carrier."""
+    _ready_project(tmp_path)
+    plan = """# Dashboard Plan
+
+## Elements
+| id | type | view |
+|----|------|------|
+| kpi-revenue | kpi | Overview |
+| chart-trend | chart | Overview |
+"""
+    _write_plan(tmp_path, plan)
+    state_path = tmp_path / "STATE.md"
+    state_path.write_text(
+        spec.set_spec_mode(state_path.read_text(encoding="utf-8"), "human"),
+        encoding="utf-8",
+    )
+    _write_human_guide(tmp_path, ["kpi-revenue"], views=["Overview"])
+
+    result = spec.commit(tmp_path)
+    assert result.ok is False
+    assert "chart-trend" in result.message
+    statuses = spec.parse_statuses((tmp_path / "STATE.md").read_text(encoding="utf-8"))
+    assert statuses.get("spec") != "approved"

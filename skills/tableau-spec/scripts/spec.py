@@ -49,6 +49,8 @@ if str(_PLAN_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_PLAN_SCRIPTS))
 import plan as _plan  # noqa: E402  (path bootstrap above)
 
+import human_check  # human-route checks (issue #101)
+
 logger = logging.getLogger(__name__)
 
 # --- Canonical constants (mirror of CONTRACT.md §1 / §3 / §4.3) --------------
@@ -69,6 +71,11 @@ SPEC_STEP = "spec"
 #: Allowed ``spec_mode`` metadata values (CONTRACT.md §2). Unset means agent route.
 SPEC_MODE_AGENT = "agent"
 SPEC_MODE_HUMAN = "human"
+HUMAN_ROOT_GUIDE = human_check.ROOT_GUIDE_NAME
+HUMAN_SPEC_DIR = human_check.SPEC_DIR_NAME
+BUILD_STEP = "build"
+STATUS_APPROVED = "approved"
+STATUS_SKIPPED = "skipped"
 SPEC_MODES = frozenset({SPEC_MODE_AGENT, SPEC_MODE_HUMAN})
 
 #: The 8 step names in canonical order (mirror of CONTRACT.md §1). Used to decide which
@@ -525,6 +532,62 @@ class CommitResult:
     blocked: bool = False
 
 
+
+def _human_guide_paths(project_root: Path) -> list[Path]:
+    """Return existing human-guide files: root IMPLEMENTATION-SPEC.md + spec/**/*.md."""
+    paths: list[Path] = []
+    root_guide = project_root / HUMAN_ROOT_GUIDE
+    if root_guide.is_file():
+        paths.append(root_guide)
+    spec_dir = project_root / HUMAN_SPEC_DIR
+    if spec_dir.is_dir():
+        paths.extend(sorted(p for p in spec_dir.rglob("*.md") if p.is_file()))
+    return paths
+
+
+def _human_guide_texts(project_root: Path) -> dict[str, str]:
+    """Map relative POSIX path -> file text for every human-guide page on disk."""
+    out: dict[str, str] = {}
+    for path in _human_guide_paths(project_root):
+        rel = path.relative_to(project_root).as_posix()
+        out[rel] = path.read_text(encoding="utf-8-sig")
+    return out
+
+
+def validate_human_guide(project_root: Path) -> tuple[bool, str]:
+    """Run human-route coverage, page-set, and primitive-guard checks.
+
+    Returns:
+        ``(ok, message)``. On failure ``message`` is a plain-ASCII refusal that
+        includes the per-id coverage checklist; on success it is a short note
+        with the same checklist.
+    """
+    plan_text = (project_root / PLAN_FILENAME).read_text(encoding="utf-8-sig")
+    views = list(_plan.validate_plan(plan_text).views)
+    ids = human_check.plan_ids(plan_text)
+    texts_by_path = _human_guide_texts(project_root)
+    rels = list(texts_by_path.keys())
+    page_texts = list(texts_by_path.values())
+
+    page_problems = human_check.check_page_set(views, rels, texts_by_path)
+    coverage = human_check.check_coverage(ids, page_texts)
+    primitive_problems = human_check.check_primitive_guard(page_texts)
+
+    problems: list[str] = []
+    problems.extend(page_problems)
+    if coverage.missing:
+        problems.append(
+            "missing Element: line(s) for: " + ", ".join(coverage.missing)
+        )
+    problems.extend(primitive_problems)
+
+    checklist_block = human_check.format_coverage_checklist(coverage)
+    if problems:
+        return False, "human guide refused - " + "; ".join(problems) + "\n" + checklist_block
+    return True, "human guide ok\n" + checklist_block
+
+
+
 def commit(project_dir: Path | str) -> CommitResult:
     """Reconcile the IMPLEMENTATION-SPEC.md and approve the spec step.
 
@@ -559,6 +622,23 @@ def commit(project_dir: Path | str) -> CommitResult:
     if multiview_blocker is not None:
         return CommitResult(
             False, multiview_blocker, version=version, blocked=True,
+        )
+
+    # Human route: validate the Desktop guide and skip build (issue #101).
+    if effective_mode == SPEC_MODE_HUMAN:
+        ok, message = validate_human_guide(project_root)
+        if not ok:
+            return CommitResult(False, message, version=version)
+        updated = apply_status_updates(
+            text,
+            {SPEC_STEP: STATUS_APPROVED, BUILD_STEP: STATUS_SKIPPED},
+        )
+        (project_root / STATE_FILENAME).write_text(updated, encoding="utf-8")
+        return CommitResult(
+            ok=True,
+            message=f"spec -> approved (human); build -> skipped ({version})",
+            version=version,
+            staled_steps=[],
         )
 
     mock_path = project_root / VERSION_DIR / version / MOCK_FILENAME
