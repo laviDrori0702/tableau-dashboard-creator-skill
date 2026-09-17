@@ -854,3 +854,117 @@ def test_human_commit_refuses_missing_element_lines(tmp_path):
     assert "chart-trend" in result.message
     statuses = spec.parse_statuses((tmp_path / "STATE.md").read_text(encoding="utf-8"))
     assert statuses.get("spec") != "approved"
+
+
+# --- Mode flip (issue #104) ---------------------------------------------------
+
+def test_precheck_reports_pending_mode_flip_and_abandoned_files(tmp_path):
+    """precheck with --request-mode differing from recorded lists abandoned paths."""
+    _ready_project(tmp_path)
+    state_path = tmp_path / "STATE.md"
+    state_path.write_text(
+        spec.set_spec_mode(state_path.read_text(encoding="utf-8"), "agent"),
+        encoding="utf-8",
+    )
+    _write_spec(tmp_path, "v_1", _spec_md())
+
+    result = spec.precheck(tmp_path, requested_mode="human")
+    rendered = spec.format_precheck(result)
+
+    assert result.can_run is True
+    assert result.mode_flip_pending is True
+    assert result.spec_mode == "agent"
+    assert result.requested_mode == "human"
+    assert any("IMPLEMENTATION-SPEC.md" in p for p in result.abandoned_files)
+    assert "mode flip" in rendered.lower()
+    assert "abandoned" in rendered.lower()
+
+
+def test_mode_flip_commit_requires_confirmation(tmp_path):
+    """Without confirm_mode_flip, commit refuses a pending mode change."""
+    _ready_project(tmp_path)
+    state_path = tmp_path / "STATE.md"
+    state_path.write_text(
+        spec.set_spec_mode(state_path.read_text(encoding="utf-8"), "agent"),
+        encoding="utf-8",
+    )
+    _write_spec(tmp_path, "v_1", _spec_md())
+    before = state_path.read_text(encoding="utf-8")
+
+    result = spec.commit(tmp_path, requested_mode="human", confirm_mode_flip=False)
+
+    assert result.ok is False
+    assert "confirm" in result.message.lower()
+    assert state_path.read_text(encoding="utf-8") == before
+
+
+def test_mode_flip_commit_with_confirmation_keeps_abandoned_files(tmp_path):
+    """Confirmed flip records the new mode, adjusts build, and deletes nothing."""
+    _ready_project(tmp_path)
+    state_path = tmp_path / "STATE.md"
+    # Start on human with build skipped, then flip to agent.
+    state_path.write_text(
+        spec.set_spec_mode(state_path.read_text(encoding="utf-8"), "human"),
+        encoding="utf-8",
+    )
+    state_path.write_text(
+        spec.apply_status_updates(
+            state_path.read_text(encoding="utf-8"),
+            {"spec": "approved", "build": "skipped"},
+        ),
+        encoding="utf-8",
+    )
+    _write_human_guide(
+        tmp_path,
+        ["kpi-revenue"],
+        views=["Overview"],
+    )
+    # Minimal plan matching the guide
+    _write_plan(
+        tmp_path,
+        """# Dashboard Plan
+
+## Elements
+| id | type | view |
+|----|------|------|
+| kpi-revenue | kpi | Overview |
+""",
+    )
+
+    human_guide = tmp_path / "IMPLEMENTATION-SPEC.md"
+    human_spec_page = tmp_path / "spec" / "overview.md"
+    assert human_guide.is_file() and human_spec_page.is_file()
+
+    # Flip human -> agent with confirmation (does not author the agent spec here)
+    result = spec.commit(
+        tmp_path, requested_mode="agent", confirm_mode_flip=True
+    )
+    # Commit after flip still needs an agent-route spec; may refuse for missing
+    # versioned spec — but the flip itself must have been applied and files kept.
+    after = state_path.read_text(encoding="utf-8")
+    assert spec.read_spec_mode(after) == "agent"
+    statuses = spec.parse_statuses(after)
+    assert statuses.get("build") == "pending"  # was skipped on human
+    assert human_guide.is_file()
+    assert human_spec_page.is_file()
+
+
+def test_set_mode_flip_requires_confirm_flag(tmp_path):
+    """set-mode refuses a flip without --confirm; with --confirm it applies."""
+    _ready_project(tmp_path)
+    state_path = tmp_path / "STATE.md"
+    state_path.write_text(
+        spec.set_spec_mode(state_path.read_text(encoding="utf-8"), "agent"),
+        encoding="utf-8",
+    )
+    _write_spec(tmp_path, "v_1", _spec_md())
+
+    code = spec.main(["set-mode", str(tmp_path), "--mode", "human"])
+    assert code == 2
+    assert spec.read_spec_mode(state_path.read_text(encoding="utf-8")) == "agent"
+
+    code = spec.main(["set-mode", str(tmp_path), "--mode", "human", "--confirm"])
+    assert code == 0
+    assert spec.read_spec_mode(state_path.read_text(encoding="utf-8")) == "human"
+    # Abandoned agent file still present
+    assert (tmp_path / "mock-version" / "v_1" / "IMPLEMENTATION-SPEC.md").is_file()

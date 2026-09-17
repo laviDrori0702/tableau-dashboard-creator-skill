@@ -325,6 +325,87 @@ def _downstream_stale_updates(statuses: dict[str, str]) -> dict[str, str]:
 
 # --- Entry gate (CONTRACT.md §4.1) -------------------------------------------
 
+
+def abandoned_route_files(project_root: Path, from_mode: str) -> list[str]:
+    """Return on-disk paths that belong to the route being abandoned.
+
+    Agent-route leftovers: versioned ``mock-version/*/IMPLEMENTATION-SPEC.md``.
+    Human-route leftovers: root ``IMPLEMENTATION-SPEC.md`` and everything under ``spec/``.
+    Nothing is deleted — callers only list paths so the analyst can see what remains.
+
+    Args:
+        project_root: The analyst's project directory.
+        from_mode: The route being left (``agent`` or ``human``).
+
+    Returns:
+        Relative POSIX paths that currently exist on disk, sorted.
+    """
+    found: list[str] = []
+    if from_mode == SPEC_MODE_AGENT:
+        version_root = project_root / VERSION_DIR
+        if version_root.is_dir():
+            for path in sorted(version_root.glob(f"*/{SPEC_FILENAME}")):
+                if path.is_file():
+                    found.append(path.relative_to(project_root).as_posix())
+    elif from_mode == SPEC_MODE_HUMAN:
+        root_guide = project_root / HUMAN_ROOT_GUIDE
+        if root_guide.is_file():
+            found.append(HUMAN_ROOT_GUIDE)
+        spec_dir = project_root / HUMAN_SPEC_DIR
+        if spec_dir.is_dir():
+            for path in sorted(spec_dir.rglob("*")):
+                if path.is_file():
+                    found.append(path.relative_to(project_root).as_posix())
+    return found
+
+
+def mode_flip_status(
+    recorded: str | None, requested: str | None
+) -> tuple[bool, str | None, str | None]:
+    """Detect a pending mode flip.
+
+    Returns:
+        ``(pending, from_mode, to_mode)``. ``pending`` is True only when both sides
+        are known and differ. Unset recorded + any request is a first-time set, not a flip.
+    """
+    if requested is None or recorded is None:
+        return False, None, None
+    if requested == recorded:
+        return False, None, None
+    return True, recorded, requested
+
+
+def apply_mode_flip(
+    text: str, new_mode: str, *, statuses: dict[str, str]
+) -> tuple[str, dict[str, str]]:
+    """Record ``new_mode`` and compute build-status updates for a confirmed flip.
+
+    - If ``build`` was ``approved``, flip it to ``stale``.
+    - If flipping **to agent** and ``build`` was ``skipped`` (human completion), reset
+      ``build`` to ``pending`` so a machine build can run later.
+    - Other build statuses are left alone.
+
+    Args:
+        text: Full STATE.md contents.
+        new_mode: ``agent`` or ``human``.
+        statuses: Current step statuses.
+
+    Returns:
+        ``(updated_state_text, status_updates_applied)``.
+    """
+    updated = set_spec_mode(text, new_mode)
+    updates: dict[str, str] = {}
+    build_status = statuses.get(BUILD_STEP, "pending")
+    if build_status == STATUS_APPROVED:
+        updates[BUILD_STEP] = "stale"
+    elif new_mode == SPEC_MODE_AGENT and build_status == STATUS_SKIPPED:
+        updates[BUILD_STEP] = "pending"
+    if updates:
+        updated = apply_status_updates(updated, updates)
+    return updated, updates
+
+
+
 def entry_gate_blocker(project_root: Path) -> Optional[str]:
     """Return why spec may not run yet, or ``None`` if it may.
 
@@ -452,9 +533,15 @@ class PrecheckResult:
     element_ids: list[str]
     spec_mode: Optional[str] = None
     effective_spec_mode: str = SPEC_MODE_AGENT
+    requested_mode: Optional[str] = None
+    mode_flip_pending: bool = False
+    abandoned_files: list[str] = field(default_factory=list)
 
 
-def precheck(project_dir: Path | str) -> PrecheckResult:
+def precheck(
+    project_dir: Path | str,
+    requested_mode: Optional[str] = None,
+) -> PrecheckResult:
     """Report whether spec may run, where to write it, and what it must map.
 
     Args:
@@ -481,7 +568,23 @@ def precheck(project_dir: Path | str) -> PrecheckResult:
         (project_root / mock_rel).read_text(encoding="utf-8-sig")
     )
     recorded_mode = read_spec_mode(text)
-    effective_mode = recorded_mode or SPEC_MODE_AGENT
+    if requested_mode is not None:
+        requested_mode = requested_mode.lower().strip()
+        if requested_mode not in SPEC_MODES:
+            raise ValueError(
+                f"requested_mode must be one of {sorted(SPEC_MODES)}, got {requested_mode!r}"
+            )
+    effective_mode = (
+        requested_mode
+        if requested_mode is not None
+        else (recorded_mode or SPEC_MODE_AGENT)
+    )
+    flip_pending, from_mode, _to = mode_flip_status(recorded_mode, requested_mode)
+    abandoned = (
+        abandoned_route_files(project_root, from_mode)
+        if flip_pending and from_mode is not None
+        else []
+    )
     multiview_blocker = agent_multiview_blocker(project_root, effective_mode)
     if multiview_blocker is not None:
         return PrecheckResult(
@@ -494,6 +597,9 @@ def precheck(project_dir: Path | str) -> PrecheckResult:
             element_ids=element_ids,
             spec_mode=recorded_mode,
             effective_spec_mode=effective_mode,
+            requested_mode=requested_mode,
+            mode_flip_pending=flip_pending,
+            abandoned_files=abandoned,
         )
     return PrecheckResult(
         can_run=True,
@@ -505,6 +611,9 @@ def precheck(project_dir: Path | str) -> PrecheckResult:
         element_ids=element_ids,
         spec_mode=recorded_mode,
         effective_spec_mode=effective_mode,
+        requested_mode=requested_mode,
+        mode_flip_pending=flip_pending,
+        abandoned_files=abandoned,
     )
 
 
@@ -588,7 +697,11 @@ def validate_human_guide(project_root: Path) -> tuple[bool, str]:
 
 
 
-def commit(project_dir: Path | str) -> CommitResult:
+def commit(
+    project_dir: Path | str,
+    requested_mode: Optional[str] = None,
+    confirm_mode_flip: bool = False,
+) -> CommitResult:
     """Reconcile the IMPLEMENTATION-SPEC.md and approve the spec step.
 
     The spec is non-skippable, so commit only ever sets ``approved``. The
@@ -617,6 +730,40 @@ def commit(project_dir: Path | str) -> CommitResult:
     statuses = parse_statuses(text)
     version = read_current_version(text)
     effective_mode = effective_spec_mode(text)
+
+    # Mode flip (issue #104): require confirmation; never delete abandoned files.
+    if requested_mode is not None:
+        requested_mode = requested_mode.lower().strip()
+        if requested_mode not in SPEC_MODES:
+            raise ValueError(
+                f"requested_mode must be one of {sorted(SPEC_MODES)}, got {requested_mode!r}"
+            )
+    recorded_mode = read_spec_mode(text)
+    flip_pending, from_mode, to_mode = mode_flip_status(recorded_mode, requested_mode)
+    if flip_pending:
+        abandoned = abandoned_route_files(project_root, from_mode or "")
+        if not confirm_mode_flip:
+            abandoned_txt = (
+                ", ".join(abandoned) if abandoned else "(none on disk yet)"
+            )
+            return CommitResult(
+                False,
+                f"Mode flip {from_mode} -> {to_mode} requires confirmation "
+                f"(--confirm-mode-flip). This re-authors the spec from scratch and "
+                f"will stale/reset build; abandoned-route files remain on disk: "
+                f"{abandoned_txt}.",
+                version=version,
+            )
+        text, _updates = apply_mode_flip(
+            text, to_mode or requested_mode, statuses=statuses
+        )
+        (project_root / STATE_FILENAME).write_text(text, encoding="utf-8")
+        statuses = parse_statuses(text)
+        effective_mode = to_mode or requested_mode
+    elif requested_mode is not None and recorded_mode is None:
+        text = set_spec_mode(text, requested_mode)
+        (project_root / STATE_FILENAME).write_text(text, encoding="utf-8")
+        effective_mode = requested_mode
 
     multiview_blocker = agent_multiview_blocker(project_root, effective_mode)
     if multiview_blocker is not None:
@@ -733,6 +880,15 @@ def format_precheck(result: PrecheckResult) -> str:
         "  the spec must also carry a '## Layout' fenced-JSON container tree derived from "
         "the mock's geometry (canvas + nested vert/horz + % sizes; see the template)."
     )
+    if result.mode_flip_pending:
+        lines.append(
+            f"  mode flip     : pending ({result.spec_mode} -> {result.requested_mode}); "
+            "re-author from scratch; confirm on commit/set-mode"
+        )
+        if result.abandoned_files:
+            lines.append("  abandoned     : " + ", ".join(result.abandoned_files))
+        else:
+            lines.append("  abandoned     : (none on disk yet)")
     return "\n".join(lines)
 
 
@@ -840,6 +996,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         sub.add_argument(
             "project_dir", nargs="?", default=".", help="Project directory (default: cwd)."
         )
+        if name in ("precheck", "commit"):
+            sub.add_argument(
+                "--request-mode",
+                choices=sorted(SPEC_MODES),
+                default=None,
+                help="Requested spec_mode; reports/refuses a flip vs the recorded value.",
+            )
+        if name == "commit":
+            sub.add_argument(
+                "--confirm-mode-flip",
+                action="store_true",
+                help="Confirm a spec_mode change (re-author; does not delete abandoned files).",
+            )
 
     set_mode = subparsers.add_parser(
         "set-mode",
@@ -854,6 +1023,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         choices=sorted(SPEC_MODES),
         help="Spec route to record: agent (machine spec) or human (Desktop build guide).",
     )
+    set_mode.add_argument(
+        "--confirm",
+        action="store_true",
+        help="Required when changing an already-recorded spec_mode (mode flip).",
+    )
 
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     project_dir = Path(args.project_dir)
@@ -867,13 +1041,38 @@ def main(argv: Optional[list[str]] = None) -> int:
             )
             return 2
         original = state_path.read_text(encoding="utf-8-sig")
+        recorded = read_spec_mode(original)
+        pending, from_mode, to_mode = mode_flip_status(recorded, args.mode)
+        if pending and not getattr(args, "confirm", False):
+            abandoned = abandoned_route_files(project_dir, from_mode or "")
+            abandoned_txt = ", ".join(abandoned) if abandoned else "(none on disk yet)"
+            print(
+                f"[REFUSED] Mode flip {from_mode} -> {to_mode} re-authors the spec "
+                f"from scratch and will stale/reset build. Abandoned files remain: "
+                f"{abandoned_txt}. Re-run with --confirm to proceed."
+            )
+            return 2
+        if pending:
+            statuses = parse_statuses(original)
+            updated, updates = apply_mode_flip(
+                original, args.mode, statuses=statuses
+            )
+            state_path.write_text(updated, encoding="utf-8")
+            print(
+                f"[SPEC] mode flip confirmed: {from_mode} -> {to_mode}; "
+                f"build updates: {updates or 'none'}; "
+                f"abandoned files left on disk."
+            )
+            return 0
         updated = set_spec_mode(original, args.mode)
         state_path.write_text(updated, encoding="utf-8")
         print(f"[SPEC] recorded spec_mode: {args.mode}")
         return 0
 
     if args.command == "precheck":
-        precheck_result = precheck(project_dir)
+        precheck_result = precheck(
+            project_dir, requested_mode=getattr(args, "request_mode", None)
+        )
         print(format_precheck(precheck_result))
         return 0 if precheck_result.can_run else 2
 
@@ -890,7 +1089,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(format_validation(validation))
         return 0 if validation.ok else 2
 
-    commit_result = commit(project_dir)
+    commit_result = commit(
+            project_dir,
+            requested_mode=getattr(args, "request_mode", None),
+            confirm_mode_flip=getattr(args, "confirm_mode_flip", False),
+        )
     print(format_commit(commit_result))
     return 0 if commit_result.ok else 2
 
