@@ -787,8 +787,32 @@ def _write_human_guide(
             ]
         if not per_view[view]:
             body += ["(no elements on this view)", ""]
+        dash_dir = spec_dir / human_check.DASHBOARDS_SUBDIR
+        dash_dir.mkdir(exist_ok=True)
         fname = human_check.view_page_filename(view)
-        (spec_dir / fname).write_text("\n".join(body), encoding="utf-8")
+        (dash_dir / fname).write_text("\n".join(body), encoding="utf-8")
+
+
+
+def test_page_set_requires_dashboards_subdir():
+    """View pages must live under spec/dashboards/, not flat under spec/."""
+    import human_check
+
+    views = ["Overview"]
+    flat = {
+        "IMPLEMENTATION-SPEC.md": "# root\n",
+        "spec/overview.md": "# View: Overview\n\nElement: e1\n",
+    }
+    problems = human_check.check_page_set(views, flat.keys(), flat)
+    assert any("spec/dashboards/overview.md" in p for p in problems)
+    assert any("unexpected page 'spec/overview.md'" in p for p in problems)
+
+    good = {
+        "IMPLEMENTATION-SPEC.md": "# root\n",
+        "spec/dashboards/overview.md": "# View: Overview\n\nElement: e1\n",
+        "spec/dashboards/shared-sidebar.md": "# Shared chrome\n",
+    }
+    assert human_check.check_page_set(views, good.keys(), good) == []
 
 
 def test_human_commit_approves_and_skips_build(tmp_path):
@@ -932,7 +956,7 @@ def test_mode_flip_commit_with_confirmation_keeps_abandoned_files(tmp_path):
     )
 
     human_guide = tmp_path / "IMPLEMENTATION-SPEC.md"
-    human_spec_page = tmp_path / "spec" / "overview.md"
+    human_spec_page = tmp_path / "spec" / "dashboards" / "overview.md"
     assert human_guide.is_file() and human_spec_page.is_file()
 
     # Flip human -> agent with confirmation (does not author the agent spec here)

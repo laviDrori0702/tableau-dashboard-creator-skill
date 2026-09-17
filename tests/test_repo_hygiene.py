@@ -109,8 +109,9 @@ def test_demo_human_route_passes_human_checks():
     texts["IMPLEMENTATION-SPEC.md"] = root_guide.read_text(encoding="utf-8")
     spec_dir = root / "spec"
     assert spec_dir.is_dir(), "missing demo/human-route/spec/"
-    for path in sorted(spec_dir.glob("*.md")):
-        texts[f"spec/{path.name}"] = path.read_text(encoding="utf-8")
+    for path in sorted(spec_dir.rglob("*.md")):
+        rel = path.relative_to(root).as_posix()
+        texts[rel] = path.read_text(encoding="utf-8")
 
     coverage = human_check.check_coverage(ids, texts.values())
     page_problems = human_check.check_page_set(views, texts.keys(), texts)

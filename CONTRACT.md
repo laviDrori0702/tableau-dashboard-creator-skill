@@ -108,7 +108,7 @@ Step 7 has **two routes**, selected by `spec_mode` in `STATE.md` Metadata (`agen
 
 **Human route (`spec_mode: human`).** `tableau-spec` writes a **Desktop build guide** instead of a
 machine spec: a root `IMPLEMENTATION-SPEC.md` (decision register, seams, build order, verification
-checklist, open items) plus a lowercase `spec/` tree (one page per declared view, plus
+checklist, open items) plus a lowercase `spec/` tree (`spec/dashboards/` one page per declared view, plus
 `calculations.md` / `parameters.md` / `fields.md` as needed, and `patterns.md` only when a sheet
 shape repeats). Geometry is prose (tile tables, sidebar blocks, sizing) — no Layout JSON. Coverage
 is checked via `Element: <id>` lines against the plan's Elements / Filters / Interactions ids;
@@ -189,7 +189,7 @@ The case of a filename encodes its role, so a skill can tell handoff artifacts f
   `PRD.md`, `DATA-MODEL.md`, `DESIGN-TOKENS.md`, `DASHBOARD-PLAN.md`, `IMPLEMENTATION-SPEC.md`.
   (`STATE.md` is the manifest and also uses this casing.)
 - **lowercase ⇒ input, config, or a non-handoff tree owned by a skill** — with the
-  build-internal files described below, plus the human-route `spec/` directory (one Desktop guide
+  build-internal files described below, plus the human-route `spec/` directory (`spec/dashboards/` one Desktop guide
   page per view; not a handoff to another skill):
   `.env`, `branding/`, `data/`, `spec/` (human route only), `datasources.json`, `DASHBOARD-REQUEST.md`.
   Their demo counterparts live under `scaffold/` (see §3.1).
@@ -324,7 +324,7 @@ Two kinds of outputs, two storage strategies:
   `DASHBOARD-PLAN.md` live at the project root and are overwritten in place. There is exactly one
   current copy. Re-running one of these skills updates the root file and triggers staleness (§4.2);
   it does **not** create a new version directory. **Human-route exception:** when `spec_mode` is
-  `human`, `IMPLEMENTATION-SPEC.md` also lives at the project root (with the `spec/` page tree beside
+  `human`, `IMPLEMENTATION-SPEC.md` also lives at the project root (with the `spec/` page tree (`spec/dashboards/<view>.md`) beside
   it) and is overwritten in place on re-run — it is a living Desktop guide, not a versioned machine
   handoff under `mock-version/v_N/`.
 > **`mock.html` and views.** When `DASHBOARD-PLAN.md` declares more than one `view`, `mock.html` may hold several canvases (one per view) behind a tab strip in a single file; `tableau-mock` coverage is checked per view. A plan with no `view` column still produces one canvas.

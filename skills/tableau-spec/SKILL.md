@@ -69,7 +69,7 @@ Author a Desktop guide from `references/HUMAN-IMPLEMENTATION-SPEC-TEMPLATE.md`:
 2. **Root `IMPLEMENTATION-SPEC.md`:** decision register with rationale, seams, numbered
    **build order** (parameters before calculated fields that read them; patterns before the
    sheets that instantiate them), verification checklist, open-items register.
-3. **`spec/<view>.md` per declared view:** prose tile table, sidebar blocks, sizing rules
+3. **`spec/dashboards/<view>.md` per declared view:** prose tile table, sidebar blocks, sizing rules
    (range sizing with a minimum; tiled percentage containers; **never floating**), and
    per-sheet slot tables (Text / Colour / Rows / Columns / Filter / Tooltip).
 4. **Coverage carrier:** every plan id (Elements, Filters, Interactions) must appear on an
@@ -77,7 +77,8 @@ Author a Desktop guide from `references/HUMAN-IMPLEMENTATION-SPEC-TEMPLATE.md`:
    **before** asking for approval.
 5. **Simplest-primitive:** any DZV / LOD / table calc / parameter action needs a written
    justification nearby.
-6. **`spec/patterns.md`** only when two or more sheets share a `Pattern: <name>`; omit
+6. **`spec/dashboards/shared-sidebar.md`** (optional) when header/sidebar/nav is shared across views.
+7. **`spec/patterns.md`** only when two or more sheets share a `Pattern: <name>`; omit
    empty support pages rather than stubbing them.
 7. Supporting pages as needed: `calculations.md`, `parameters.md`, `fields.md`.
 
