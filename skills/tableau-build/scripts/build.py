@@ -169,6 +169,56 @@ def read_target_tableau_version(text: str) -> str:
     return match.group(1).strip() if match else ""
 
 
+_SPEC_MODE_LINE = re.compile(
+    r"^\s*-\s*spec_mode\s*:\s*(\S+)", re.MULTILINE
+)
+SPEC_MODE_AGENT = "agent"
+SPEC_MODE_HUMAN = "human"
+SPEC_MODES = frozenset({SPEC_MODE_AGENT, SPEC_MODE_HUMAN})
+
+
+def read_spec_mode(text: str) -> str | None:
+    """Read the ``spec_mode`` metadata value from STATE.md, if present.
+
+    Args:
+        text: The full contents of a ``STATE.md`` file.
+
+    Returns:
+        ``"agent"`` or ``"human"`` when recorded; ``None`` when the line is absent
+        (projects that predate ``spec_mode`` run the agent route).
+    """
+    match = _SPEC_MODE_LINE.search(text)
+    if match is None:
+        return None
+    value = match.group(1).lower()
+    return value if value in SPEC_MODES else None
+
+
+def human_route_blocker(text: str) -> str | None:
+    """Block build when the project is on the human (Desktop guide) spec route.
+
+    Must run before the versioned ``IMPLEMENTATION-SPEC.md`` existence check so an
+    analyst who chose the human route gets a plain statement instead of a missing-file
+    parser error (issue #102).
+
+    Args:
+        text: Full ``STATE.md`` contents.
+
+    Returns:
+        A plain-ASCII blocker naming the Desktop-guide reason and how to get a
+        machine spec, or ``None`` when build may continue (agent / unset).
+    """
+    if read_spec_mode(text) != SPEC_MODE_HUMAN:
+        return None
+    return (
+        "This project's spec is a Desktop build guide (spec_mode: human), not a "
+        "machine spec for tableau-build. Re-run tableau-spec on the agent route "
+        "(record spec_mode: agent) to produce a machine-readable IMPLEMENTATION-SPEC.md."
+    )
+
+
+
+
 # --- STATE.md rewriting (shared shape with spec.py / state.py) ---------------
 
 def _format_step_row(cells: list[str]) -> str:
@@ -260,6 +310,10 @@ def entry_gate_blocker(project_root: Path) -> Optional[str]:
         )
 
     text = state_path.read_text(encoding="utf-8-sig")
+    human_blocker = human_route_blocker(text)
+    if human_blocker is not None:
+        return human_blocker
+
     statuses = parse_statuses(text)
     version = read_current_version(text)
 

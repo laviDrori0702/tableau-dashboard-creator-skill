@@ -166,3 +166,33 @@ def test_steps_definition_mirrors_the_eight_workflow_steps():
     ]
     actual = [(step.order, step.name, step.skill) for step in route.STEPS]
     assert actual == expected
+
+
+def test_human_route_skipped_build_reports_done(tmp_path):
+    """spec=approved and build=skipped (human route) reports the pipeline done."""
+    state = (
+        "# Project State\n\n"
+        "## Metadata\n"
+        "- target_tableau_version: 2024.2-2025.x\n"
+        "- data_mode: csv\n"
+        "- spec_mode: human\n"
+        "- current_version: v_1\n\n"
+        "## Steps\n"
+        "| order | step   | skill          | status   |\n"
+        "|-------|--------|----------------|----------|\n"
+        "| 1     | init   | tableau-init   | approved |\n"
+        "| 2     | intake | tableau-intake | skipped  |\n"
+        "| 3     | data   | tableau-data   | approved |\n"
+        "| 4     | brand  | tableau-brand  | skipped  |\n"
+        "| 5     | plan   | tableau-plan   | approved |\n"
+        "| 6     | mock   | tableau-mock   | approved |\n"
+        "| 7     | spec   | tableau-spec   | approved |\n"
+        "| 8     | build  | tableau-build  | skipped  |\n"
+    )
+    (tmp_path / "STATE.md").write_text(state, encoding="utf-8")
+
+    result = route.compute_next_step(tmp_path)
+
+    assert result.kind == "done"
+    assert result.is_done is True
+    assert result.next_skill is None
