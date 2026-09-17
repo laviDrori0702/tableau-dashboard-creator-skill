@@ -18,6 +18,8 @@
   replace it with your plan's actual dimensions everywhere it appears.
 
   Populate every chart from the REAL sample CSVs (read them; do not invent numbers).
+
+  Multi-view: see the comment block near </body> for the tab strip + data-view convention.
 -->
 <html lang="en">
 <head>
@@ -43,6 +45,14 @@
     .kpi-row { display: flex; gap: 12px; padding: 0 12px; }
     .kpi { flex: 1; min-height: 120px; border: 1px solid #e1e4e8; border-radius: 6px; padding: 12px; }
     .chart { border: 1px solid #e1e4e8; border-radius: 6px; margin: 12px; min-height: 360px; }
+
+    /* Multi-view (issue #99): a tab strip + one .view-canvas per declared plan view.
+       Single-view plans omit the strip and keep a single .canvas as above. */
+    .view-tabs { display: flex; gap: 4px; max-width: 1366px; margin: 16px auto 0; padding: 0 8px; }
+    .view-tabs button { border: 1px solid #e1e4e8; background: #f4f5f7; padding: 8px 14px; border-radius: 6px 6px 0 0; cursor: pointer; }
+    .view-tabs button[aria-selected="true"] { background: #fff; border-bottom-color: #fff; font-weight: 600; }
+    .view-canvas { display: none; }
+    .view-canvas.is-active { display: block; }
   </style>
 </head>
 <body>
@@ -111,5 +121,31 @@
       /* apply `picked` to the dashboard state here, then re-render */
     }
   </script>
+
+  <!--
+    Multi-view plans (issue #99): replace the single .canvas with a tab strip + one
+    .view-canvas per plan view. Every element keeps data-plan-id; each canvas carries
+    data-view="<view name>" matching the plan's view column (blank = default).
+
+    <nav class="view-tabs" role="tablist">
+      <button role="tab" aria-selected="true" onclick="showView('Overview')">Overview</button>
+      <button role="tab" aria-selected="false" onclick="showView('Detail')">Detail</button>
+    </nav>
+    <div class="canvas view-canvas is-active" data-view="Overview"> ... elements for Overview ... </div>
+    <div class="canvas view-canvas" data-view="Detail"> ... elements for Detail ... </div>
+    <script>
+      function showView(name) {
+        document.querySelectorAll('.view-canvas').forEach(function (el) {
+          el.classList.toggle('is-active', el.getAttribute('data-view') === name);
+        });
+        document.querySelectorAll('.view-tabs button').forEach(function (btn) {
+          btn.setAttribute('aria-selected', btn.textContent === name ? 'true' : 'false');
+        });
+      }
+    </script>
+
+    Layout manifest for multi-view: use { "views": [ { "name": "Overview", "canvas": {...}, "elements": [...] }, ... ] }
+    instead of a single top-level elements list. Single-view mocks keep the original shape.
+  -->
 </body>
 </html>

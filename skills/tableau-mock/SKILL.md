@@ -134,6 +134,16 @@ demonstrable in the demo (the Tableau construct is chosen later, in `spec`):
 | `highlight` | clicking/hovering marks highlights related marks elsewhere (no filtering). |
 | `parameter swap` | a control that changes a measure/dimension/threshold across views. |
 
+
+## Multi-view tabs
+
+When `DASHBOARD-PLAN.md` declares more than one `view`, author **one** `mock.html` with a
+tab strip and one `.view-canvas` per view (see `references/MOCK-SKELETON.html`). Each canvas
+carries `data-view="<name>"` matching the plan; every element keeps its `data-plan-id`.
+`mock.validate` checks coverage **per view** ? an id planned for view B missing from B's
+canvas is a gap that names the view. A single-view plan (no `view` column) omits the strip
+and renders exactly as today.
+
 ## Notes
 
 - **Non-skippable.** The workflow has no demo without the mock; `commit` only ever sets

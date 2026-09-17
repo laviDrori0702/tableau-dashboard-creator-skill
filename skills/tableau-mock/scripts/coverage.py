@@ -30,6 +30,9 @@ from typing import Optional
 #: (DASHBOARD-PLAN-TEMPLATE.md). It is not a real element, so coverage skips it.
 NONE_ID = "none"
 
+#: Name for the single default view — a blank / absent ``view`` cell (issue #97/#99).
+DEFAULT_VIEW = "default"
+
 #: The <script type="application/json" id="..."> block the mock embeds for the guard.
 LAYOUT_MANIFEST_ID = "mock-layout"
 
@@ -120,17 +123,42 @@ class PlanCoverage:
             need a geometry box in the layout manifest.
         filter_ids: Filter ids (excludes the ``none`` sentinel).
         interaction_ids: Interaction ids (excludes the ``none`` sentinel).
+        views: Declared workbook tabs (``DEFAULT_VIEW`` first when used). A plan with no
+            ``view`` column is ``[DEFAULT_VIEW]``.
+        id_views: ``{plan_id: view_name}`` for every element/filter/interaction id.
     """
 
     canvas: Optional[tuple[int, int]]
     element_ids: list[str]
     filter_ids: list[str]
     interaction_ids: list[str]
+    views: list[str] = field(default_factory=lambda: [DEFAULT_VIEW])
+    id_views: dict[str, str] = field(default_factory=dict)
 
     @property
     def all_ids(self) -> list[str]:
         """list[str]: Every plan id that must appear as a ``data-plan-id`` in the mock."""
         return [*self.element_ids, *self.filter_ids, *self.interaction_ids]
+
+    @property
+    def is_multi_view(self) -> bool:
+        """True when the plan declares more than one workbook tab."""
+        return len(self.views) > 1
+
+
+def _header_index(header: list[str], name: str) -> Optional[int]:
+    """Return the index of ``name`` in a lower-cased header row, or ``None``."""
+    try:
+        return header.index(name)
+    except ValueError:
+        return None
+
+
+def _cell(row: list[str], index: Optional[int]) -> str:
+    """Return a trimmed cell, or ``""`` when the column is absent / short row."""
+    if index is None or index >= len(row):
+        return ""
+    return row[index].strip()
 
 
 def parse_plan_coverage(text: str) -> PlanCoverage:
@@ -139,7 +167,8 @@ def parse_plan_coverage(text: str) -> PlanCoverage:
     The plan's id-tables (first column header ``id``) are categorised by their other
     headers: a ``slot`` column marks the Elements table, an ``interaction`` column the
     Interactions table, everything else (a ``field``/``control`` table) the Filters
-    table. The ``none`` sentinel row is dropped.
+    table. The ``none`` sentinel row is dropped. An optional ``view`` column (issue #97)
+    assigns each id to a workbook tab; blank / absent means :data:`DEFAULT_VIEW`.
 
     Args:
         text: The contents of a ``DASHBOARD-PLAN.md`` file.
@@ -155,6 +184,25 @@ def parse_plan_coverage(text: str) -> PlanCoverage:
     element_ids: list[str] = []
     filter_ids: list[str] = []
     interaction_ids: list[str] = []
+    id_views: dict[str, str] = {}
+    views_seen: set[str] = set()
+
+    # Layout Grid (header starts with ``slot``) maps slot -> view for Elements rows.
+    slot_views: dict[str, str] = {}
+    for table in _markdown_tables(text):
+        rows = [row for row in table if not _is_separator_row(row)]
+        if len(rows) < 2:
+            continue
+        header = [cell.lower() for cell in rows[0]]
+        if not header or header[0] != "slot":
+            continue
+        view_i = _header_index(header, "view")
+        for row in rows[1:]:
+            if not row or not row[0].strip():
+                continue
+            view = _cell(row, view_i) or DEFAULT_VIEW
+            slot_views[row[0].strip()] = view
+            views_seen.add(view)
 
     for table in _markdown_tables(text):
         rows = [row for row in table if not _is_separator_row(row)]
@@ -164,19 +212,35 @@ def parse_plan_coverage(text: str) -> PlanCoverage:
         if not header or header[0] != "id":
             continue
 
-        ids = [
-            row[0].strip()
-            for row in rows[1:]
-            if row and row[0].strip() and row[0].strip().lower() != NONE_ID
-        ]
-        if "slot" in header:
-            element_ids.extend(ids)
-        elif "interaction" in header:
-            interaction_ids.extend(ids)
-        else:
-            filter_ids.extend(ids)
+        view_i = _header_index(header, "view")
+        slot_i = _header_index(header, "slot")
+        for row in rows[1:]:
+            if not row or not row[0].strip():
+                continue
+            row_id = row[0].strip()
+            if row_id.lower() == NONE_ID:
+                continue
+            # Prefer the explicit view cell; else inherit the slot's view; else default.
+            view = _cell(row, view_i)
+            if not view and slot_i is not None:
+                view = slot_views.get(_cell(row, slot_i), "")
+            view = view or DEFAULT_VIEW
+            id_views[row_id] = view
+            views_seen.add(view)
+            if "slot" in header:
+                element_ids.append(row_id)
+            elif "interaction" in header:
+                interaction_ids.append(row_id)
+            else:
+                filter_ids.append(row_id)
 
-    return PlanCoverage(canvas, element_ids, filter_ids, interaction_ids)
+    if not views_seen:
+        views_seen.add(DEFAULT_VIEW)
+    default_first = [DEFAULT_VIEW] if DEFAULT_VIEW in views_seen else []
+    views = default_first + sorted(views_seen - {DEFAULT_VIEW})
+    return PlanCoverage(
+        canvas, element_ids, filter_ids, interaction_ids, views, id_views,
+    )
 
 
 # --- Mock parsing: what the HTML actually rendered ---------------------------
@@ -225,6 +289,79 @@ def parse_layout_manifest(html: str) -> Optional[dict]:
     return parsed if isinstance(parsed, dict) else None
 
 
+
+
+def _view_canvas_html(html: str, view: str) -> Optional[str]:
+    """Return the HTML of the canvas tagged data-view="<view>", if any.
+
+    Looks for an element carrying data-view="<view>" (typically .view-canvas)
+    and returns the slice from that opening tag through its matching close. Nested
+    same-tag depth is tracked so a view canvas may contain child divs.
+
+    Args:
+        html: Full mock.html contents.
+        view: The view name to find.
+
+    Returns:
+        The matching element HTML (inclusive), or None when absent.
+    """
+    attr = re.escape(view)
+    open_re = re.compile(
+        r"<([a-zA-Z0-9]+)([^>]*\bdata-view\s*=\s*[\"']" + attr + r"[\"'][^>]*)>",
+        re.IGNORECASE,
+    )
+    match = open_re.search(html)
+    if not match:
+        return None
+    tag = match.group(1)
+    start = match.start()
+    if match.group(0).rstrip().endswith("/>") or tag.lower() in {
+        "img", "input", "br", "hr", "meta", "link",
+    }:
+        return match.group(0)
+
+    open_tag = re.compile(rf"<{re.escape(tag)}\b[^>]*>", re.IGNORECASE)
+    close_tag = re.compile(rf"</{re.escape(tag)}\s*>", re.IGNORECASE)
+    pos = match.end()
+    depth = 1
+    while depth > 0:
+        next_open = open_tag.search(html, pos)
+        next_close = close_tag.search(html, pos)
+        if next_close is None:
+            return html[start:]
+        if next_open is not None and next_open.start() < next_close.start():
+            depth += 1
+            pos = next_open.end()
+        else:
+            depth -= 1
+            pos = next_close.end()
+    return html[start:pos]
+
+
+def rendered_plan_ids_for_view(html: str, view: str, *, multi_view: bool) -> set[str]:
+    """Return data-plan-id values visible for a given view.
+
+    On a single-view plan/mock, the whole document is searched (today's behaviour).
+    On a multi-view mock, only ids inside the data-view="<view>" canvas count;
+    if that canvas is missing the set is empty (every planned id is a gap).
+
+    Args:
+        html: mock.html contents.
+        view: View name.
+        multi_view: Whether the plan declared more than one view.
+
+    Returns:
+        The set of rendered plan ids for that view.
+    """
+    if not multi_view:
+        return rendered_plan_ids(html)
+    canvas_html = _view_canvas_html(html, view)
+    if canvas_html is None:
+        return set()
+    return rendered_plan_ids(canvas_html)
+
+
+
 # --- Coverage checklist + slot-sizing guard ----------------------------------
 
 @dataclass(frozen=True)
@@ -235,11 +372,14 @@ class CoverageItem:
         kind: ``"screen size"``, ``"element"``, ``"filter"``, or ``"interaction"``.
         label: The id (or canvas size) being checked.
         rendered: Whether the mock renders it.
+        view: Workbook tab the id belongs to (multi-view plans); ``None`` for screen size
+            or a single-view plan.
     """
 
     kind: str
     label: str
     rendered: bool
+    view: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -348,9 +488,12 @@ def validate_mock(plan_text: str, html: str) -> MockValidation:
 
     Coverage: every plan element/filter/interaction id must appear as a
     ``data-plan-id`` in the HTML, and the planned canvas size must be declared in the
-    layout manifest. Guard: every element box must be in-bounds, readable, and the
-    layout must not be empty-space-heavy. The mock is valid iff there are no coverage
-    gaps, no missing boxes, and no guard violations.
+    layout manifest. On a multi-view plan (issue #99), each id is checked against the
+    canvas tagged ``data-view="<view>"`` for its declared view — a miss is a gap that
+    names the view. A single-view plan checks the whole document exactly as before.
+    Guard: every element box must be in-bounds, readable, and the layout must not be
+    empty-space-heavy. The mock is valid iff there are no coverage gaps, no missing
+    boxes, and no guard violations.
 
     Args:
         plan_text: The contents of ``DASHBOARD-PLAN.md``.
@@ -360,7 +503,7 @@ def validate_mock(plan_text: str, html: str) -> MockValidation:
         A :class:`MockValidation`.
     """
     spec = parse_plan_coverage(plan_text)
-    rendered = rendered_plan_ids(html)
+    multi = spec.is_multi_view
     manifest = parse_layout_manifest(html)
     notes: list[str] = []
     items: list[CoverageItem] = []
@@ -372,20 +515,92 @@ def validate_mock(plan_text: str, html: str) -> MockValidation:
         )
     else:
         plan_w, plan_h = spec.canvas
-        canvas = (manifest or {}).get("canvas") or {}
-        rendered_size = (canvas.get("width"), canvas.get("height"))
-        items.append(CoverageItem(
-            "screen size", f"{plan_w}x{plan_h}px", rendered_size == (plan_w, plan_h),
-        ))
+        if multi and isinstance((manifest or {}).get("views"), list):
+            # Each view entry may carry its own canvas; all must match the plan size.
+            view_ok = True
+            for entry in manifest["views"]:
+                if not isinstance(entry, dict):
+                    view_ok = False
+                    break
+                canvas = entry.get("canvas") or {}
+                if (canvas.get("width"), canvas.get("height")) != (plan_w, plan_h):
+                    view_ok = False
+                    break
+            if not manifest["views"]:
+                view_ok = False
+            items.append(CoverageItem(
+                "screen size", f"{plan_w}x{plan_h}px", view_ok,
+            ))
+        else:
+            canvas = (manifest or {}).get("canvas") or {}
+            rendered_size = (canvas.get("width"), canvas.get("height"))
+            items.append(CoverageItem(
+                "screen size", f"{plan_w}x{plan_h}px", rendered_size == (plan_w, plan_h),
+            ))
+
+    # Per-view rendered sets (single-view uses the whole document).
+    rendered_by_view = {
+        view: rendered_plan_ids_for_view(html, view, multi_view=multi)
+        for view in spec.views
+    }
+    # Fallback for ids somehow missing from id_views.
+    whole_rendered = rendered_plan_ids(html)
+
+    def _item(kind: str, plan_id: str) -> CoverageItem:
+        view = spec.id_views.get(plan_id, DEFAULT_VIEW)
+        rendered_set = rendered_by_view.get(view, set()) if multi else whole_rendered
+        return CoverageItem(
+            kind,
+            plan_id,
+            plan_id in rendered_set,
+            view if multi else None,
+        )
 
     for element_id in spec.element_ids:
-        items.append(CoverageItem("element", element_id, element_id in rendered))
+        items.append(_item("element", element_id))
     for filter_id in spec.filter_ids:
-        items.append(CoverageItem("filter", filter_id, filter_id in rendered))
+        items.append(_item("filter", filter_id))
     for interaction_id in spec.interaction_ids:
-        items.append(CoverageItem("interaction", interaction_id, interaction_id in rendered))
+        items.append(_item("interaction", interaction_id))
 
-    guard_violations, missing_boxes = slot_sizing_violations(manifest, spec.element_ids)
+    # Slot-sizing: single manifest (today) or per-view manifests under ``views``.
+    guard_violations: list[str] = []
+    missing_boxes: list[str] = []
+    if multi and isinstance((manifest or {}).get("views"), list):
+        elements_by_view: dict[str, list[str]] = {v: [] for v in spec.views}
+        for eid in spec.element_ids:
+            elements_by_view.setdefault(
+                spec.id_views.get(eid, DEFAULT_VIEW), []
+            ).append(eid)
+        by_name = {
+            str(entry.get("name")): entry
+            for entry in manifest["views"]
+            if isinstance(entry, dict) and entry.get("name") is not None
+        }
+        for view, eids in elements_by_view.items():
+            if not eids:
+                continue
+            entry = by_name.get(view)
+            if entry is None:
+                missing_boxes.extend(eids)
+                guard_violations.append(
+                    f"view '{view}': no layout manifest entry (need views[].name)"
+                )
+                continue
+            # Reuse the single-canvas guard against a synthetic manifest for this view.
+            view_manifest = {
+                "canvas": entry.get("canvas") or (manifest or {}).get("canvas"),
+                "elements": entry.get("elements") or [],
+            }
+            v_violations, v_missing = slot_sizing_violations(view_manifest, eids)
+            guard_violations.extend(
+                f"view '{view}': {msg}" for msg in v_violations
+            )
+            missing_boxes.extend(v_missing)
+    else:
+        guard_violations, missing_boxes = slot_sizing_violations(
+            manifest, spec.element_ids
+        )
 
     has_gap = any(not item.rendered for item in items)
     ok = not has_gap and not guard_violations and not missing_boxes
