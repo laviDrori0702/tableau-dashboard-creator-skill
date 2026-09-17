@@ -651,3 +651,112 @@ def test_cli_set_mode_writes_state(tmp_path):
 
     assert code == 0
     assert spec.read_spec_mode((tmp_path / "STATE.md").read_text(encoding="utf-8")) == "agent"
+
+
+# --- Agent-route multi-view block (issue #100) --------------------------------
+
+_MULTI_VIEW_PLAN = """# Dashboard Plan: Multi
+
+## Layout Grid
+| slot | position | size | view |
+|------|----------|------|------|
+| a | top | 100% | Overview |
+| b | bottom | 100% | Detail |
+
+## Elements
+| id | type | columns | slot | size | view |
+|----|------|---------|------|------|------|
+| e1 | kpi | x | a | 1 | Overview |
+| e2 | kpi | y | b | 1 | Detail |
+"""
+
+_SINGLE_NAMED_VIEW_PLAN = """# Dashboard Plan: Single Named
+
+## Layout Grid
+| slot | position | size | view |
+|------|----------|------|------|
+| a | top | 100% | Overview |
+
+## Elements
+| id | type | columns | slot | size | view |
+|----|------|---------|------|------|------|
+| e1 | kpi | x | a | 1 | Overview |
+"""
+
+
+def _write_plan(project_dir: Path, plan_text: str) -> None:
+    """Overwrite DASHBOARD-PLAN.md with ``plan_text``."""
+    (project_dir / spec.PLAN_FILENAME).write_text(plan_text, encoding="utf-8")
+
+
+def test_agent_precheck_blocks_multi_view_plan(tmp_path):
+    """Agent-route precheck returns [BLOCKED] when the plan declares 2+ views."""
+    _ready_project(tmp_path)
+    _write_plan(tmp_path, _MULTI_VIEW_PLAN)
+    # Unset spec_mode => agent route (effective).
+    assert spec.read_spec_mode((tmp_path / "STATE.md").read_text(encoding="utf-8")) is None
+
+    result = spec.precheck(tmp_path)
+    rendered = spec.format_precheck(result)
+
+    assert result.can_run is False
+    assert result.blocker is not None
+    assert "single dashboard" in result.blocker.lower() or "emits a single dashboard" in result.blocker
+    assert "human" in result.blocker.lower()
+    assert "multi-dashboard" in result.blocker.lower()
+    assert rendered.startswith("[BLOCKED]")
+    assert "human" in rendered.lower()
+    assert "multi-dashboard" in rendered.lower()
+
+
+def test_agent_commit_blocks_multi_view_plan(tmp_path):
+    """Agent-route commit returns [BLOCKED] on a multi-view plan; STATE.md untouched."""
+    _ready_project(tmp_path)
+    _write_plan(tmp_path, _MULTI_VIEW_PLAN)
+    _write_spec(tmp_path, "v_1", _spec_md())
+    before = (tmp_path / "STATE.md").read_text(encoding="utf-8")
+
+    result = spec.commit(tmp_path)
+    rendered = spec.format_commit(result)
+
+    assert result.ok is False
+    assert result.blocked is True
+    assert "human" in result.message.lower()
+    assert "multi-dashboard" in result.message.lower()
+    assert rendered.startswith("[BLOCKED]")
+    assert (tmp_path / "STATE.md").read_text(encoding="utf-8") == before
+
+
+def test_agent_single_view_plan_is_unaffected(tmp_path):
+    """A single-view plan (named or default) still prechecks and commits on the agent route."""
+    _ready_project(tmp_path)
+    _write_plan(tmp_path, _SINGLE_NAMED_VIEW_PLAN)
+    _write_spec(tmp_path, "v_1", _spec_md())
+
+    pre = spec.precheck(tmp_path)
+    assert pre.can_run is True
+    assert pre.effective_spec_mode == spec.SPEC_MODE_AGENT
+
+    committed = spec.commit(tmp_path)
+    assert committed.ok is True
+    assert committed.blocked is False
+
+
+def test_human_route_not_blocked_by_view_count(tmp_path):
+    """Human route precheck/commit are not gated by the number of declared views."""
+    _ready_project(tmp_path)
+    _write_plan(tmp_path, _MULTI_VIEW_PLAN)
+    state_path = tmp_path / "STATE.md"
+    state_path.write_text(
+        spec.set_spec_mode(state_path.read_text(encoding="utf-8"), "human"),
+        encoding="utf-8",
+    )
+    _write_spec(tmp_path, "v_1", _spec_md())
+
+    pre = spec.precheck(tmp_path)
+    assert pre.can_run is True
+    assert pre.effective_spec_mode == "human"
+
+    committed = spec.commit(tmp_path)
+    assert committed.ok is True
+    assert committed.blocked is False

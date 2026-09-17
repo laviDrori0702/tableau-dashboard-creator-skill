@@ -382,9 +382,14 @@ A workbook may have several dashboards (tabs), called **views**. The plan declar
 - An Elements row must be on the same view as the slot it is placed in; `tableau-plan`'s
   `validate` reports a mismatch as a problem and always lists the set of declared views. View
   names are compared exactly (case and spacing) after trimming.
-- Today views are **declarable only**: `tableau-mock` and `tableau-build` still produce one
-  dashboard. Rendering the declared views (tabs in the mock, one page per view in the spec,
-  several dashboards in the workbook) is separate, later work.
+- **`tableau-build` emits one dashboard.** Multi-dashboard generation (one workbook tab per
+  declared view) is a separate, later change. `tableau-mock` may already render declared views
+  as tabs in a single `mock.html` (§4.3); that does not mean the builder can emit several
+  dashboards yet.
+- **Agent route (`spec_mode: agent`) refuses a multi-view plan.** `tableau-spec` `precheck` and
+  `commit` return `[BLOCKED]` when the plan declares two or more views, naming the one-dashboard
+  limit and the two ways forward: choose the human route (`spec_mode: human`), or wait for
+  multi-dashboard support. The human route is not blocked by view count.
 
 ---
 
