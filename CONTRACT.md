@@ -119,6 +119,7 @@ analyst is in the workflow.
 ## Metadata
 - target_tableau_version: 2024.2-2025.x   # 2024.2-2025.x | 2026.1+
 - data_mode: csv                          # csv | published-ds
+- spec_mode: agent                        # agent | human
 - current_version: v_1                    # v_1, v_2, ...
 
 ## Steps
@@ -140,6 +141,7 @@ analyst is in the workflow.
 |-------------------------|--------------------|-------------------------------------------------|---------|
 | `target_tableau_version`| Metadata           | `2024.2-2025.x` \| `2026.1+`                     | Captured at `init`; drives `tableau-build`'s workbook `version` attribute and version-specific XML (e.g. `<explain-data>`). Never re-asked downstream. |
 | `data_mode`             | Metadata           | `csv` \| `published-ds`                          | How `tableau-data` acquires rows (§3.2). `csv` is the default, zero-credential path (analyst-provided CSVs); `published-ds` queries a published source via the VizQL Data Service. There is **no** direct-database mode. |
+| `spec_mode`             | Metadata           | `agent` | `human`                               | How `tableau-spec` authors its deliverable. `agent` (default when unset) is today's machine `IMPLEMENTATION-SPEC.md` for `tableau-build`. `human` is a Desktop build guide (human-route authoring is a later ticket). Recorded by `tableau-spec` on first run; `tableau-init` does not set it. |
 | `current_version`       | Metadata           | `v_1`, `v_2`, …                                 | The active deliverable version directory under `mock-version/`. Bumped when a deliverable skill re-runs after approval (§4.3). |
 | `status` (per step)     | Steps table, 1/row | `pending` \| `approved` \| `skipped` \| `stale` | Lifecycle of each step. |
 

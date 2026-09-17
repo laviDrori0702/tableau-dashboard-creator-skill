@@ -10,24 +10,43 @@ allowed-tools: Read, Write, Edit, AskUserQuestion, Bash(python *), Bash(python3 
 Step 7 of 8, and **non-skippable**. It turns the approved `mock.html` into an
 `IMPLEMENTATION-SPEC.md` that maps **every** mock element to a concrete Tableau construct,
 so `tableau-build` builds from an explicit spec instead of guessing. It ends with a
-**coverage reconciliation** — the mirror of the mock's checklist — proving every mock
+**coverage reconciliation** â€” the mirror of the mock's checklist â€” proving every mock
 element is mapped, and applies a **simplest-primitive guard** so the workbook uses the
 simplest construct that does the job.
 
 | | |
 |---|---|
-| **Reads** | **Required:** `mock-version/<v_N>/mock.html` (from `mock`) — the elements to map, tagged with `data-plan-id`; and `DASHBOARD-PLAN.md` (from `plan`) — the shared element/filter/interaction ids and the interaction intents (CONTRACT.md §6). |
-| **Writes** | `mock-version/<v_N>/IMPLEMENTATION-SPEC.md` — a standalone deliverable copy (CONTRACT.md §4.3). |
-| **STATE.md update** | Sets `spec` = `approved`; flips a downstream `approved` `build` step to `stale` on a re-run (CONTRACT.md §4.2). Does **not** touch `current_version` — only `tableau-mock` bumps it (§4.3). |
-| **Entry gate** | Refuses to run until `plan` is resolved **and** `DASHBOARD-PLAN.md` exists, **and** `mock` is resolved **and** `mock.html` exists at `current_version` (CONTRACT.md §4.1). |
+| **Reads** | **Required:** `mock-version/<v_N>/mock.html` (from `mock`) â€” the elements to map, tagged with `data-plan-id`; and `DASHBOARD-PLAN.md` (from `plan`) â€” the shared element/filter/interaction ids and the interaction intents (CONTRACT.md Â§6). |
+| **Writes** | `mock-version/<v_N>/IMPLEMENTATION-SPEC.md` â€” a standalone deliverable copy (CONTRACT.md Â§4.3). |
+| **STATE.md update** | Records `spec_mode` (`agent` | `human`) on first run via `set-mode`; sets `spec` = `approved`; flips a downstream `approved` `build` step to `stale` on a re-run (CONTRACT.md Â§4.2). Does **not** touch `current_version` â€” only `tableau-mock` bumps it (Â§4.3). |
+| **Entry gate** | Refuses to run until `plan` is resolved **and** `DASHBOARD-PLAN.md` exists, **and** `mock` is resolved **and** `mock.html` exists at `current_version` (CONTRACT.md Â§4.1). |
 | **Next step** | `tableau-build` (or `tableau-route` to confirm). |
 
-The mechanical guarantees — the entry gate, the **coverage reconciliation** (every mock
+The mechanical guarantees â€” the entry gate, the **coverage reconciliation** (every mock
 element mapped, nothing unmapped), the **simplest-primitive guard** (any advanced feature
-carries a justification), the version bump, and the STATE.md transition — live in
+carries a justification), the version bump, and the STATE.md transition â€” live in
 `spec.py` (CLI) and `reconcile.py` (the reconciliation + guard core). Your job is the
 judgment part: choosing the right, simplest Tableau construct for each element and
 justifying any escalation. Run the script at the points below; do not hand-edit `STATE.md`.
+
+
+## Spec mode gate (`spec_mode`)
+
+Before authoring, choose the route **once per project** and record it:
+
+| mode | Meaning |
+|------|---------|
+| `agent` | Today's machine `IMPLEMENTATION-SPEC.md` (Element Mapping + `## Layout`) for `tableau-build`. **Default when unset** ? projects that predate `spec_mode` keep this behaviour. |
+| `human` | A Desktop build guide for analysts who will build in Tableau Desktop (human-route authoring is a later ticket; this skill still records the choice). |
+
+1. Run precheck ? it reports the recorded `spec_mode`, or that it is unset and must be chosen.
+2. If unset, ask the analyst once (`agent` or `human`), then record it:
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" set-mode "<project-dir>" --mode agent
+   ```
+
+   (or `--mode human`). Do **not** hand-edit `STATE.md`. Later runs read the recorded value and do not ask again.
 
 ## The two conventions the reconciliation depends on
 
@@ -38,7 +57,7 @@ single **Element Mapping table** and a **Layout section** (see
 - The table's first column header is **`id`** and it has a column whose header contains
   **`construct`** and one whose header contains **`justif`**.
 - **One row per mock element**, with the `id` matching a `data-plan-id` from `mock.html`
-  **exactly**. A mock id with no row is an **unmapped element** that blocks approval — this
+  **exactly**. A mock id with no row is an **unmapped element** that blocks approval â€” this
   is what makes "nothing unmapped" a guarantee.
 - The **construct** cell names the Tableau construct; the **justification** cell explains
   any escalation (leave it blank / `-` for a simple primitive).
@@ -46,18 +65,18 @@ single **Element Mapping table** and a **Layout section** (see
   derived from the approved mock: the mock's `canvas` dimensions, nested `vert`/`horz`
   containers, and element-id leaves with percentage `size`s (siblings sum to ~100). Every
   mapped **zone** id appears **exactly once**; interaction ids (`int-*`) are actions, not
-  zones, and never appear. This is how the mock's geometry reaches `tableau-build` — a
+  zones, and never appear. This is how the mock's geometry reaches `tableau-build` â€” a
   missing or inconsistent Layout blocks approval exactly like an unmapped element.
 - **Siblings meant to stay equal must be a container's only children.** Tableau holds a row
   of equal cards equal by distributing the *container* evenly, so an equal group stranded
-  beside a smaller sibling (three chart cards above a 3% legend strip) cannot be held — the
+  beside a smaller sibling (three chart cards above a 3% legend strip) cannot be held â€” the
   build pins every child but the biggest, and the group drifts apart on any dashboard taller
   than its minimum. Wrap the group in its own container; the validator flags this.
 
 ## The simplest-primitive guard
 
 Default every element to the **simplest sufficient** Tableau primitive. Only escalate to an
-advanced feature when the simpler option genuinely cannot do the job — and when you do,
+advanced feature when the simpler option genuinely cannot do the job â€” and when you do,
 **write why in the justification cell** (what simpler alternative you rejected and the
 concrete reason). The guard flags these advanced features when their justification is blank:
 
@@ -70,9 +89,9 @@ concrete reason). The guard flags these advanced features when their justificati
 
 The concrete "what's simplest for this interaction" knowledge lives in the validated
 snippet library. Map the shared interaction terms to their **simplest** construct first
-(CONTRACT.md §6): `cross-filter` → a **Filter action** (`Use as Filter`); `highlight` → a
-**Highlight action**; `drill` → a **hierarchy** expand/collapse; `swap view` / `toggle
-panel` / `parameter swap` → these legitimately need DZV / parameter — justify them.
+(CONTRACT.md Â§6): `cross-filter` â†’ a **Filter action** (`Use as Filter`); `highlight` â†’ a
+**Highlight action**; `drill` â†’ a **hierarchy** expand/collapse; `swap view` / `toggle
+panel` / `parameter swap` â†’ these legitimately need DZV / parameter â€” justify them.
 
 ## How to run
 
@@ -83,13 +102,13 @@ panel` / `parameter swap` → these legitimately need DZV / parameter — justif
    ```
 
    (Use `python3` if `python` is unavailable.) If it prints `[BLOCKED]`, relay the reason
-   and **stop** — the analyst must resolve the named upstream step (`tableau-mock` for the
+   and **stop** â€” the analyst must resolve the named upstream step (`tableau-mock` for the
    approved mock, `tableau-plan` for the blueprint) first. Otherwise note its signals: the
    **mock path** to map from, the **list of element ids** every one of which needs a
    mapping row, and the **target path** to write `IMPLEMENTATION-SPEC.md` into (the mock's
-   `current_version` — spec writes beside the `mock.html` it maps and never bumps the version).
+   `current_version` â€” spec writes beside the `mock.html` it maps and never bumps the version).
 
-2. **Read the inputs.** Read `mock.html` at the reported mock path — its `data-plan-id`
+2. **Read the inputs.** Read `mock.html` at the reported mock path â€” its `data-plan-id`
    attributes are your exact mapping list. Read `DASHBOARD-PLAN.md` for what each id *is*
    (KPI / chart kind / filter / interaction) and the interaction intents, so you map to the
    right construct.
@@ -97,7 +116,7 @@ panel` / `parameter swap` → these legitimately need DZV / parameter — justif
 3. **Author `IMPLEMENTATION-SPEC.md`** at the precheck's **target path**. Fill the Element
    Mapping table with one row per mock element, defaulting to the simplest primitive and
    justifying every escalation. Write the **`## Layout` section** by reading the mock's
-   actual geometry (its rows, columns, and nesting) into the JSON container tree — sizes
+   actual geometry (its rows, columns, and nesting) into the JSON container tree â€” sizes
    as percentages of the parent, canvas from the plan's Screen Size. Add the supporting
    detail the build needs (calculated fields, data source / joins, actions, parameters)
    following the template. When **refining** an existing spec at this version, `Edit` it
@@ -117,7 +136,7 @@ panel` / `parameter swap` → these legitimately need DZV / parameter — justif
    When it prints `[OK]`, **show the checklist to the analyst** (it's the proof nothing was
    dropped and nothing is over-engineered) and present the spec for approval.
 
-5. **Commit** — only after the analyst approves:
+5. **Commit** â€” only after the analyst approves:
 
    ```bash
    python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" commit "<project-dir>"
@@ -134,7 +153,7 @@ panel` / `parameter swap` → these legitimately need DZV / parameter — justif
 
 - **Non-skippable.** The build needs an explicit spec; `commit` only ever sets `approved`.
 - **Versioned deliverable.** `IMPLEMENTATION-SPEC.md` lives under `mock-version/<v_N>/`
-  beside its `mock.html` (CONTRACT.md §4.3). Spec writes into the mock's `current_version`
+  beside its `mock.html` (CONTRACT.md Â§4.3). Spec writes into the mock's `current_version`
   and **overwrites in place** on a re-run; it never bumps `current_version`. A new spec
   version is created by re-running `tableau-mock` (which bumps and stales spec). The target
   path is reported by `precheck`.

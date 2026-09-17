@@ -58,6 +58,11 @@ MOCK_STEP = "mock"
 #: This step.
 SPEC_STEP = "spec"
 
+#: Allowed ``spec_mode`` metadata values (CONTRACT.md §2). Unset means agent route.
+SPEC_MODE_AGENT = "agent"
+SPEC_MODE_HUMAN = "human"
+SPEC_MODES = frozenset({SPEC_MODE_AGENT, SPEC_MODE_HUMAN})
+
 #: The 8 step names in canonical order (mirror of CONTRACT.md §1). Used to decide which
 #: steps are "downstream of spec" for staleness propagation (§4.2).
 STEP_ORDER: tuple[str, ...] = (
@@ -127,6 +132,112 @@ def read_current_version(text: str) -> str:
     """
     match = _CURRENT_VERSION_LINE.search(text)
     return match.group(1) if match else "v_1"
+
+
+
+# Matches ``- spec_mode: agent`` (optional metadata; absent => agent route).
+_SPEC_MODE_LINE = re.compile(
+    r"^\s*-\s*spec_mode\s*:\s*(\S+)", re.MULTILINE
+)
+
+# Canonical metadata bullet inserted beside data_mode when first recording a mode.
+_SPEC_MODE_BULLET = (
+    "- spec_mode: {mode}                       # agent | human"
+)
+
+
+def read_spec_mode(text: str) -> Optional[str]:
+    """Read the ``spec_mode`` metadata value from STATE.md, if present.
+
+    Args:
+        text: The full contents of a ``STATE.md`` file.
+
+    Returns:
+        ``"agent"`` or ``"human"`` when recorded; ``None`` when the line is absent
+        (projects that predate ``spec_mode`` — they run the agent route).
+    """
+    match = _SPEC_MODE_LINE.search(text)
+    if match is None:
+        return None
+    value = match.group(1).lower()
+    return value if value in SPEC_MODES else None
+
+
+def effective_spec_mode(text: str) -> str:
+    """Return the route to run: recorded ``spec_mode``, or ``agent`` when unset."""
+    return read_spec_mode(text) or SPEC_MODE_AGENT
+
+
+def set_spec_mode(text: str, mode: str) -> str:
+    """Write ``- spec_mode: agent|human`` into STATE.md Metadata.
+
+    When the line already exists, only the value is rewritten and any trailing inline
+    comment is preserved (same shape as ``data_mode``). When absent, a new bullet is
+    inserted immediately after the ``data_mode`` line when present, otherwise after the
+    ``## Metadata`` heading. Every other line is preserved byte-for-byte.
+
+    Args:
+        text: The full ``STATE.md`` contents.
+        mode: ``agent`` or ``human``.
+
+    Returns:
+        The updated ``STATE.md`` contents (trailing newline preserved).
+
+    Raises:
+        ValueError: If ``mode`` is not an allowed value.
+    """
+    mode = mode.lower().strip()
+    if mode not in SPEC_MODES:
+        raise ValueError(
+            f"spec_mode must be one of {sorted(SPEC_MODES)}, got {mode!r}"
+        )
+
+    # Prefer rewrite-in-place when the bullet already exists (do not also insert).
+    if _SPEC_MODE_LINE.search(text) is not None:
+        out_lines: list[str] = []
+        for raw_line in text.splitlines():
+            match = re.match(r"^(\s*-\s*spec_mode\s*:\s*)(\S+)(.*)$", raw_line)
+            if match:
+                out_lines.append(f"{match.group(1)}{mode}{match.group(3)}")
+            else:
+                out_lines.append(raw_line)
+        result = "\n".join(out_lines)
+        if text.endswith("\n"):
+            result += "\n"
+        return result
+
+    out_lines: list[str] = []
+    inserted = False
+    for raw_line in text.splitlines():
+        out_lines.append(raw_line)
+        if not inserted and re.match(r"^\s*-\s*data_mode\s*:", raw_line):
+            out_lines.append(_SPEC_MODE_BULLET.format(mode=mode))
+            inserted = True
+
+    if not inserted:
+        rebuilt: list[str] = []
+        for raw_line in out_lines:
+            rebuilt.append(raw_line)
+            if raw_line.strip().lower().startswith("## metadata"):
+                rebuilt.append(_SPEC_MODE_BULLET.format(mode=mode))
+                inserted = True
+        out_lines = rebuilt
+
+    if not inserted:
+        if out_lines and out_lines[-1].strip():
+            out_lines.append("")
+        out_lines.extend(
+            [
+                "## Metadata",
+                _SPEC_MODE_BULLET.format(mode=mode),
+            ]
+        )
+
+    result = "\n".join(out_lines)
+    if text.endswith("\n"):
+        result += "\n"
+    return result
+
 
 
 # --- STATE.md rewriting (shared shape with mock.py / state.py) ---------------
@@ -264,6 +375,8 @@ class PrecheckResult:
         target_path: ``mock-version/<version>/IMPLEMENTATION-SPEC.md`` (where to author).
         spec_exists: Whether the IMPLEMENTATION-SPEC.md already exists (refine vs author fresh).
         element_ids: The mock element ids that must each be mapped to a construct.
+        spec_mode: Recorded ``spec_mode`` (``agent`` / ``human``), or ``None`` when unset.
+        effective_spec_mode: Route to run — recorded mode, or ``agent`` when unset.
     """
 
     can_run: bool
@@ -273,6 +386,8 @@ class PrecheckResult:
     target_path: str
     spec_exists: bool
     element_ids: list[str]
+    spec_mode: Optional[str] = None
+    effective_spec_mode: str = SPEC_MODE_AGENT
 
 
 def precheck(project_dir: Path | str) -> PrecheckResult:
@@ -288,7 +403,10 @@ def precheck(project_dir: Path | str) -> PrecheckResult:
     project_root = Path(project_dir)
     blocker = entry_gate_blocker(project_root)
     if blocker is not None:
-        return PrecheckResult(False, blocker, "v_1", "", "", False, [])
+        return PrecheckResult(
+            False, blocker, "v_1", "", "", False, [],
+            spec_mode=None, effective_spec_mode=SPEC_MODE_AGENT,
+        )
 
     text = (project_root / STATE_FILENAME).read_text(encoding="utf-8-sig")
     version = read_current_version(text)
@@ -298,6 +416,7 @@ def precheck(project_dir: Path | str) -> PrecheckResult:
     element_ids = mock_element_ids(
         (project_root / mock_rel).read_text(encoding="utf-8-sig")
     )
+    recorded_mode = read_spec_mode(text)
     return PrecheckResult(
         can_run=True,
         blocker=None,
@@ -306,6 +425,8 @@ def precheck(project_dir: Path | str) -> PrecheckResult:
         target_path=target_rel,
         spec_exists=(project_root / target_rel).exists(),
         element_ids=element_ids,
+        spec_mode=recorded_mode,
+        effective_spec_mode=recorded_mode or SPEC_MODE_AGENT,
     )
 
 
@@ -422,8 +543,17 @@ def format_precheck(result: PrecheckResult) -> str:
     if not result.can_run:
         return f"[BLOCKED] tableau-spec cannot run.\n{result.blocker}"
 
+    if result.spec_mode is None:
+        mode_line = (
+            "  spec_mode      : unset - must be chosen (agent | human); "
+            "until recorded, the agent route runs."
+        )
+    else:
+        mode_line = f"  spec_mode      : {result.spec_mode}"
+
     lines = [
         "[SPEC] precheck OK - tableau-spec can run.",
+        mode_line,
         f"  map from       : {result.mock_path}",
         f"  must map       : {len(result.element_ids)} mock element(s) -> "
         f"a Tableau construct each, nothing unmapped.",
@@ -548,8 +678,36 @@ def main(argv: Optional[list[str]] = None) -> int:
             "project_dir", nargs="?", default=".", help="Project directory (default: cwd)."
         )
 
+    set_mode = subparsers.add_parser(
+        "set-mode",
+        help="Record spec_mode (agent|human) in STATE.md Metadata; ask once per project.",
+    )
+    set_mode.add_argument(
+        "project_dir", nargs="?", default=".", help="Project directory (default: cwd)."
+    )
+    set_mode.add_argument(
+        "--mode",
+        required=True,
+        choices=sorted(SPEC_MODES),
+        help="Spec route to record: agent (machine spec) or human (Desktop build guide).",
+    )
+
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     project_dir = Path(args.project_dir)
+
+    if args.command == "set-mode":
+        state_path = project_dir / STATE_FILENAME
+        if not state_path.exists():
+            print(
+                "[REFUSED] No STATE.md found. Run 'tableau-init' first before "
+                "recording spec_mode."
+            )
+            return 2
+        original = state_path.read_text(encoding="utf-8-sig")
+        updated = set_spec_mode(original, args.mode)
+        state_path.write_text(updated, encoding="utf-8")
+        print(f"[SPEC] recorded spec_mode: {args.mode}")
+        return 0
 
     if args.command == "precheck":
         precheck_result = precheck(project_dir)
