@@ -85,3 +85,37 @@ def test_the_check_would_catch_an_unmasked_path():
     assert _HOME_PATH.search("/home/someone/data.csv")
     # The masked form and a bare 'Users/' are the accepted shapes.
     assert not _HOME_PATH.search("filename='C:/Users/%USERNAME%/Documents/data.hyper'")
+
+
+def test_demo_human_route_passes_human_checks():
+    """demo/human-route must stay a valid human-route guide (issue #103)."""
+    import sys
+
+    scripts = _REPO_ROOT / "skills" / "tableau-spec" / "scripts"
+    plan_scripts = _REPO_ROOT / "skills" / "tableau-plan" / "scripts"
+    sys.path.insert(0, str(scripts))
+    sys.path.insert(0, str(plan_scripts))
+    import human_check
+    import plan
+
+    root = _REPO_ROOT / "demo" / "human-route"
+    plan_text = (root / "DASHBOARD-PLAN.md").read_text(encoding="utf-8")
+    ids = human_check.plan_ids(plan_text)
+    views = list(plan.validate_plan(plan_text).views)
+
+    texts: dict[str, str] = {}
+    root_guide = root / "IMPLEMENTATION-SPEC.md"
+    assert root_guide.is_file(), "missing demo/human-route/IMPLEMENTATION-SPEC.md"
+    texts["IMPLEMENTATION-SPEC.md"] = root_guide.read_text(encoding="utf-8")
+    spec_dir = root / "spec"
+    assert spec_dir.is_dir(), "missing demo/human-route/spec/"
+    for path in sorted(spec_dir.glob("*.md")):
+        texts[f"spec/{path.name}"] = path.read_text(encoding="utf-8")
+
+    coverage = human_check.check_coverage(ids, texts.values())
+    page_problems = human_check.check_page_set(views, texts.keys(), texts)
+    primitive = human_check.check_primitive_guard(texts.values())
+
+    assert coverage.ok, f"coverage gaps: {coverage.missing}"
+    assert page_problems == [], page_problems
+    assert primitive == [], primitive
