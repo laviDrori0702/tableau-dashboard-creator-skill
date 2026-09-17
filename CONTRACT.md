@@ -81,9 +81,12 @@ Both headings are in `brand.DESIGN_TOKENS_REQUIRED_SECTIONS`; keep them there. A
 
 ### 1.1 The `IMPLEMENTATION-SPEC.md` handoff (step 7 → step 8)
 
-`IMPLEMENTATION-SPEC.md` carries two machine-checked sections that `tableau-build` consumes; spec
-approval is blocked until both are present and consistent (enforced by `tableau-spec`'s
-`reconcile.py`):
+Step 7 has **two routes**, selected by `spec_mode` in `STATE.md` Metadata (`agent` | `human`).
+
+**Agent route (`spec_mode: agent`, default).** `IMPLEMENTATION-SPEC.md` is written under
+`mock-version/v_N/` beside the mock it describes. It carries two machine-checked sections that
+`tableau-build` consumes; spec approval is blocked until both are present and consistent
+(enforced by `tableau-spec`'s `reconcile.py`):
 
 1. **The Element Mapping table** — one row per mock element (`data-plan-id`), mapping each to a
    Tableau construct, with a justification for any advanced-feature escalation.
@@ -102,6 +105,17 @@ approval is blocked until both are present and consistent (enforced by `tableau-
    Every Element Mapping **zone** id appears in the tree **exactly once**; ids in the tree must have
    a mapping row. Interaction ids (`int-*`, per the plan's id convention) are dashboard *actions*,
    not zones — they are never placed in the tree.
+
+**Human route (`spec_mode: human`).** `tableau-spec` writes a **Desktop build guide** instead of a
+machine spec: a root `IMPLEMENTATION-SPEC.md` (decision register, seams, build order, verification
+checklist, open items) plus a lowercase `spec/` tree (one page per declared view, plus
+`calculations.md` / `parameters.md` / `fields.md` as needed, and `patterns.md` only when a sheet
+shape repeats). Geometry is prose (tile tables, sidebar blocks, sizing) — no Layout JSON. Coverage
+is checked via `Element: <id>` lines against the plan's Elements / Filters / Interactions ids;
+advanced constructs still need a written justification nearby. On successful commit, `spec` becomes
+`approved` and `build` becomes `skipped` (the guide is for Tableau Desktop, so `tableau-build` does
+not run). Re-running `tableau-mock` still stales `spec` on this route; re-running spec overwrites the
+root guide in place.
 
 ---
 
@@ -151,7 +165,7 @@ analyst is in the workflow.
 |------------|-----------------------------------------|---------|
 | `pending`  | `init` (initial state of steps 2–8)     | Not yet run, or run but not approved. |
 | `approved` | the owning skill, on explicit user OK   | The step's artifact exists and the analyst signed off on it. Satisfies the ordering gate for downstream steps. |
-| `skipped`  | the owning skill (only steps 2 & 4)     | The analyst chose to skip an optional step. Satisfies the ordering gate **without** producing the artifact (downstream uses fallbacks). |
+| `skipped`  | the owning skill (steps 2 & 4; also step 8 when `spec_mode: human`) | The analyst chose to skip an optional step, **or** `tableau-spec` on the human route marked `build` skipped because the deliverable is a Desktop guide. Satisfies the ordering gate **without** producing the artifact (downstream uses fallbacks). |
 | `stale`    | an **upstream** skill, via §4.2         | The step was `approved`, but an upstream artifact changed afterward; its output may now disagree with the new upstream truth and must be re-run. |
 
 > A step is **resolved** when its status is `approved` or `skipped`. Resolved is the condition the
@@ -174,10 +188,11 @@ The case of a filename encodes its role, so a skill can tell handoff artifacts f
 - **`UPPER-KEBAB.md` ⇒ handoff artifact** produced by a step and consumed by later steps:
   `PRD.md`, `DATA-MODEL.md`, `DESIGN-TOKENS.md`, `DASHBOARD-PLAN.md`, `IMPLEMENTATION-SPEC.md`.
   (`STATE.md` is the manifest and also uses this casing.)
-- **lowercase ⇒ input or config, owned by the analyst, never produced as a handoff** — with
-  one narrow exception, the build-internal file described below:
-  `.env`, `branding/`, `data/`, `datasources.json`, `DASHBOARD-REQUEST.md`. Their demo counterparts live
-  under `scaffold/` (see §3.1).
+- **lowercase ⇒ input, config, or a non-handoff tree owned by a skill** — with the
+  build-internal files described below, plus the human-route `spec/` directory (one Desktop guide
+  page per view; not a handoff to another skill):
+  `.env`, `branding/`, `data/`, `spec/` (human route only), `datasources.json`, `DASHBOARD-REQUEST.md`.
+  Their demo counterparts live under `scaffold/` (see §3.1).
 
 **Build-internal files** are the third, narrow category: lowercase files a skill writes for
 its *own* next stage, never read by another skill. Today there are two, both `tableau-build`'s:
@@ -308,7 +323,10 @@ Two kinds of outputs, two storage strategies:
 - **Root files = latest approved truth.** `PRD.md`, `DATA-MODEL.md`, `DESIGN-TOKENS.md`,
   `DASHBOARD-PLAN.md` live at the project root and are overwritten in place. There is exactly one
   current copy. Re-running one of these skills updates the root file and triggers staleness (§4.2);
-  it does **not** create a new version directory.
+  it does **not** create a new version directory. **Human-route exception:** when `spec_mode` is
+  `human`, `IMPLEMENTATION-SPEC.md` also lives at the project root (with the `spec/` page tree beside
+  it) and is overwritten in place on re-run — it is a living Desktop guide, not a versioned machine
+  handoff under `mock-version/v_N/`.
 > **`mock.html` and views.** When `DASHBOARD-PLAN.md` declares more than one `view`, `mock.html` may hold several canvases (one per view) behind a tab strip in a single file; `tableau-mock` coverage is checked per view. A plan with no `view` column still produces one canvas.
 
 - **Deliverables = standalone versioned copies.** `mock.html`, `IMPLEMENTATION-SPEC.md`, and
