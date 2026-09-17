@@ -20,11 +20,12 @@ primitive guard live in :mod:`reconcile`. This module owns the parts that touch
    staleness to ``build`` (§4.2), so the workbook can never silently disagree with a
    re-specced mock.
 
-The module is pure and stdlib-only (it does **not** import the router) so the contract
-test can call its functions directly, exactly like ``mock.py`` / ``tableau-data``'s
-``state.py``. The CLI exposes ``precheck`` (before authoring - reports the version dir + the
-elements to map), ``validate`` (the reconciliation checklist + guard on a draft), and
-``commit`` (after approval). Program output goes to stdout; diagnostics through ``logging``.
+The module is stdlib-only aside from :mod:`reconcile` and :mod:`plan` (for the
+declared-view set from #97). It does **not** import the router, so the contract test can
+call its functions directly, exactly like ``mock.py`` / ``tableau-data``'s ``state.py``.
+The CLI exposes ``precheck`` (before authoring - reports the version dir + the elements to
+map), ``validate`` (the reconciliation checklist + guard on a draft), and ``commit`` (after
+approval). Program output goes to stdout; diagnostics through ``logging``.
 
 Keep ``STEP_ORDER`` in lock-step with CONTRACT.md §1.
 """
@@ -40,6 +41,13 @@ from pathlib import Path
 from typing import Optional
 
 from reconcile import SpecValidation, mock_element_ids, reconcile
+
+# plan.py lives under skills/tableau-plan/scripts; reuse its declared-view helpers (#97)
+# rather than re-parsing the view column here.
+_PLAN_SCRIPTS = Path(__file__).resolve().parents[2] / "tableau-plan" / "scripts"
+if str(_PLAN_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_PLAN_SCRIPTS))
+import plan as _plan  # noqa: E402  (path bootstrap above)
 
 logger = logging.getLogger(__name__)
 
@@ -361,6 +369,55 @@ def entry_gate_blocker(project_root: Path) -> Optional[str]:
     return None
 
 
+# --- Agent-route multi-view gate (issue #100) ---------------------------------
+
+def declared_plan_views(project_root: Path) -> list[str]:
+    """Return the views declared in ``DASHBOARD-PLAN.md`` via :func:`plan.validate_plan`.
+
+    Prefers the plan module's #97 helpers over re-parsing the optional ``view`` column.
+    A plan with no ``view`` column is a single-view plan (``[default]``).
+
+    Args:
+        project_root: The analyst's project directory (must already contain the plan).
+
+    Returns:
+        Declared workbook-tab names, ``default`` first when used.
+    """
+    plan_text = (project_root / PLAN_FILENAME).read_text(encoding="utf-8-sig")
+    return list(_plan.validate_plan(plan_text).views)
+
+
+def agent_multiview_blocker(
+    project_root: Path, effective_mode: str
+) -> Optional[str]:
+    """Block the agent route when the plan declares more than one view.
+
+    ``tableau-build`` still emits a single dashboard. On the agent route a multi-view
+    plan must not be approved into a partial ``.twbx``. The human route is not gated
+    by view count (multi-dashboard generation remains a separate change).
+
+    Args:
+        project_root: The analyst's project directory.
+        effective_mode: Route in effect (``agent`` or ``human``).
+
+    Returns:
+        A plain-ASCII blocker message naming the reason and both ways forward, or
+        ``None`` when the agent route may proceed (single-view plan, or human route).
+    """
+    if effective_mode != SPEC_MODE_AGENT:
+        return None
+    views = declared_plan_views(project_root)
+    if len(views) <= 1:
+        return None
+    named = ", ".join(views)
+    return (
+        f"The plan declares {len(views)} views ({named}), but tableau-build emits a "
+        f"single dashboard. The agent route cannot approve a multi-view plan (no "
+        f"partial .twbx). Choose the human route (record spec_mode: human), or wait "
+        f"for multi-dashboard support."
+    )
+
+
 # --- precheck ----------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -368,7 +425,7 @@ class PrecheckResult:
     """The state spec needs before authoring an IMPLEMENTATION-SPEC.md.
 
     Attributes:
-        can_run: True when the entry gate is open (plan + mock resolved, artifacts present).
+        can_run: True when the entry gate is open (plan + mock resolved, artifacts present) and the agent-route multi-view gate allows it.
         blocker: Why spec cannot run, when ``can_run`` is False; else ``None``.
         version: The ``current_version`` dir holding the mock, and where the spec is written.
         mock_path: ``mock-version/<version>/mock.html`` (the elements to map).
@@ -417,6 +474,20 @@ def precheck(project_dir: Path | str) -> PrecheckResult:
         (project_root / mock_rel).read_text(encoding="utf-8-sig")
     )
     recorded_mode = read_spec_mode(text)
+    effective_mode = recorded_mode or SPEC_MODE_AGENT
+    multiview_blocker = agent_multiview_blocker(project_root, effective_mode)
+    if multiview_blocker is not None:
+        return PrecheckResult(
+            can_run=False,
+            blocker=multiview_blocker,
+            version=version,
+            mock_path=mock_rel,
+            target_path=target_rel,
+            spec_exists=(project_root / target_rel).exists(),
+            element_ids=element_ids,
+            spec_mode=recorded_mode,
+            effective_spec_mode=effective_mode,
+        )
     return PrecheckResult(
         can_run=True,
         blocker=None,
@@ -426,7 +497,7 @@ def precheck(project_dir: Path | str) -> PrecheckResult:
         spec_exists=(project_root / target_rel).exists(),
         element_ids=element_ids,
         spec_mode=recorded_mode,
-        effective_spec_mode=recorded_mode or SPEC_MODE_AGENT,
+        effective_spec_mode=effective_mode,
     )
 
 
@@ -442,6 +513,8 @@ class CommitResult:
         version: The version directory the (attempted) spec lives in.
         staled_steps: Downstream steps flipped to ``stale`` by this commit.
         validation: The reconciliation/guard result that gated the commit, when one ran.
+        blocked: True when the refusal is a hard ``[BLOCKED]`` gate (e.g. agent-route
+            multi-view), as opposed to a ``[REFUSED]`` reconcile failure.
     """
 
     ok: bool
@@ -449,6 +522,7 @@ class CommitResult:
     version: str = "v_1"
     staled_steps: list[str] = field(default_factory=list)
     validation: Optional[SpecValidation] = None
+    blocked: bool = False
 
 
 def commit(project_dir: Path | str) -> CommitResult:
@@ -479,6 +553,13 @@ def commit(project_dir: Path | str) -> CommitResult:
     text = (project_root / STATE_FILENAME).read_text(encoding="utf-8-sig")
     statuses = parse_statuses(text)
     version = read_current_version(text)
+    effective_mode = effective_spec_mode(text)
+
+    multiview_blocker = agent_multiview_blocker(project_root, effective_mode)
+    if multiview_blocker is not None:
+        return CommitResult(
+            False, multiview_blocker, version=version, blocked=True,
+        )
 
     mock_path = project_root / VERSION_DIR / version / MOCK_FILENAME
     spec_path = project_root / VERSION_DIR / version / SPEC_FILENAME
@@ -617,6 +698,8 @@ def format_commit(result: CommitResult) -> str:
     """Render a :class:`CommitResult` as a human-readable, plain-ASCII block."""
     # Plain ASCII only (see format_precheck).
     if not result.ok:
+        if result.blocked:
+            return f"[BLOCKED] tableau-spec cannot run.\n{result.message}"
         text = f"[REFUSED] {result.message}"
         if result.validation is not None:
             text += "\n" + format_validation(result.validation)

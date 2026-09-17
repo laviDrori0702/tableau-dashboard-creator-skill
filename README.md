@@ -171,6 +171,7 @@ Every file there was produced by its owning skill's real flow, so it doubles as 
 - **Container hierarchy** must follow Tableau's zone model (layout-basic → layout-flow → sheets).
 - **Images and standalone legends are added by hand** — `tableau-build` reserves the box at the approved size and position but leaves it empty, and the build warns by name. Drop the picture in, or place the legend, in Tableau Desktop. A chart's own colour legend is generated normally.
 - **Fallback-driven choices are disclosed** — when a skill uses a Tableau default for missing input, it says so.
+- **One dashboard per build** — `tableau-build` emits a single dashboard. A plan may declare multiple `view` tabs (and the mock may preview them), but multi-dashboard generation is a separate change. On the agent `spec` route, a multi-view plan is `[BLOCKED]` up front; use the human route, or wait for multi-dashboard support.
 - **`tableau-build` is experimental** — the workbook passes three validators before it is packaged, but validators are not Tableau: always open the generated workbook in Tableau Desktop and review it against the mock before publishing, and please report anything Desktop rejects or redraws (see the status note above).
 
 ## Contributing
