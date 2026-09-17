@@ -1,4 +1,4 @@
-﻿---
+---
 name: tableau-spec
 description: Translates the approved HTML mock (mock.html) into an IMPLEMENTATION-SPEC.md for the tableau-dashboard-plugin workflow, mapping every mock element to a concrete Tableau construct so the build step never has to guess. Reconciles coverage the mirror of the mock's checklist so nothing is left unmapped, and applies a simplest-primitive guard defaulting each element to the simplest sufficient Tableau primitive and forcing an explicit justification for any escalation to an advanced feature (Dynamic Zone Visibility, LOD, table calculation, parameter action), so the workbook is not over-engineered. Emits a required Layout section (a fenced JSON container tree with canvas dimensions, nested vert/horz containers, and percentage sizes) so the build reproduces the mock's geometry instead of guessing it. Reads the approved mock.html and DASHBOARD-PLAN.md. Use when the user wants to write the implementation spec, map the mock to Tableau, or when tableau-route reports spec is next. Step 7 of 8 in the workflow.
 disable-model-invocation: true
@@ -18,7 +18,7 @@ simplest construct that does the job.
 |---|---|
 | **Reads** | **Required:** `mock-version/<v_N>/mock.html` (from `mock`) â€” the elements to map, tagged with `data-plan-id`; and `DASHBOARD-PLAN.md` (from `plan`) â€” the shared element/filter/interaction ids and the interaction intents (CONTRACT.md Â§6). |
 | **Writes** | `mock-version/<v_N>/IMPLEMENTATION-SPEC.md` â€” a standalone deliverable copy (CONTRACT.md Â§4.3). |
-| **STATE.md update** | Records `spec_mode` (`agent` \| `human`) on first run via `set-mode`; sets `spec` = `approved`; flips a downstream `approved` `build` step to `stale` on a re-run (CONTRACT.md Â§4.2). Does **not** touch `current_version` â€” only `tableau-mock` bumps it (Â§4.3). |
+| **STATE.md update** | Records `spec_mode` (`agent` | `human`) on first run via `set-mode`; sets `spec` = `approved`; flips a downstream `approved` `build` step to `stale` on a re-run (CONTRACT.md Â§4.2). Does **not** touch `current_version` â€” only `tableau-mock` bumps it (Â§4.3). |
 | **Entry gate** | Refuses to run until `plan` is resolved **and** `DASHBOARD-PLAN.md` exists, **and** `mock` is resolved **and** `mock.html` exists at `current_version` (CONTRACT.md Â§4.1). |
 | **Next step** | `tableau-build` (or `tableau-route` to confirm). |
 
@@ -36,10 +36,10 @@ Before authoring, choose the route **once per project** and record it:
 
 | mode | Meaning |
 |------|---------|
-| `agent` | Today's machine `IMPLEMENTATION-SPEC.md` (Element Mapping + `## Layout`) for `tableau-build`. **Default when unset** — projects that predate `spec_mode` keep this behaviour. |
+| `agent` | Today's machine `IMPLEMENTATION-SPEC.md` (Element Mapping + `## Layout`) for `tableau-build`. **Default when unset** ? projects that predate `spec_mode` keep this behaviour. |
 | `human` | A Desktop build guide for analysts who will build in Tableau Desktop (human-route authoring is a later ticket; this skill still records the choice). |
 
-1. Run precheck — it reports the recorded `spec_mode`, or that it is unset and must be chosen.
+1. Run precheck ? it reports the recorded `spec_mode`, or that it is unset and must be chosen.
 2. If unset, ask the analyst once (`agent` or `human`), then record it:
 
    ```bash
