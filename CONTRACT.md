@@ -1,7 +1,7 @@
-﻿# CONTRACT.md â€” the inter-skill API of `tableau-dashboard-plugin`
+# CONTRACT.md — the inter-skill API of `tableau-dashboard-plugin`
 
 > **Audience: maintainers.** This is the single canonical source of truth for the file-based handoff
-> API that the 8 skills use to talk to each other. It is **never loaded at runtime** â€” each
+> API that the 8 skills use to talk to each other. It is **never loaded at runtime** — each
 > `SKILL.md` restates only its own slice (its preconditions, reads, writes, `STATE.md` updates, and
 > next step). When a skill's behavior and this document disagree, **this document wins** and the
 > skill must be corrected.
@@ -20,10 +20,10 @@ a known set of artifacts, and writes exactly one primary artifact.
 
 | # | step     | skill            | required reads (producer step)                                                   | primary write                                  | skippable |
 |---|----------|------------------|----------------------------------------------------------------------------------|------------------------------------------------|-----------|
-| 1 | `init`   | `tableau-init`   | â€”                                                                                | `STATE.md` + `scaffold/` demo examples (see Â§3.1)              | no  |
-| 2 | `intake` | `tableau-intake` | â€” *(prefers root `DASHBOARD-REQUEST.md` or pasted text; demo fallback `scaffold/` â€” Â§3.1)* | `PRD.md`                    | yes |
-| 3 | `data`   | `tableau-data`   | â€” *(csv route: `data/*.csv`; published-ds route: `datasources.json` + `.env` via VDS; demo fallback `scaffold/sample-data/` â€” Â§3.1/Â§3.2)* | `DATA-MODEL.md` + `data/*.csv` | no  |
-| 4 | `brand`  | `tableau-brand`  | â€” *(prefers `branding/`; demo fallback `scaffold/branding/` â€” Â§3.1)*             | `DESIGN-TOKENS.md`                             | yes |
+| 1 | `init`   | `tableau-init`   | —                                                                                | `STATE.md` + `scaffold/` demo examples (see §3.1)              | no  |
+| 2 | `intake` | `tableau-intake` | — *(prefers root `DASHBOARD-REQUEST.md` or pasted text; demo fallback `scaffold/` — §3.1)* | `PRD.md`                    | yes |
+| 3 | `data`   | `tableau-data`   | — *(csv route: `data/*.csv`; published-ds route: `datasources.json` + `.env` via VDS; demo fallback `scaffold/sample-data/` — §3.1/§3.2)* | `DATA-MODEL.md` + `data/*.csv` | no  |
+| 4 | `brand`  | `tableau-brand`  | — *(prefers `branding/`; demo fallback `scaffold/branding/` — §3.1)*             | `DESIGN-TOKENS.md`                             | yes |
 | 5 | `plan`   | `tableau-plan`   | `DATA-MODEL.md` (`data`)                                                          | `DASHBOARD-PLAN.md`                            | no  |
 | 6 | `mock`   | `tableau-mock`   | `DASHBOARD-PLAN.md` (`plan`), `data/*.csv` (`data`)                               | `mock-version/v_N/mock.html`                   | no  |
 | 7 | `spec`   | `tableau-spec`   | `DASHBOARD-PLAN.md` (`plan`), `mock-version/v_N/mock.html` (`mock`)               | `mock-version/v_N/IMPLEMENTATION-SPEC.md`      | no  |
@@ -31,23 +31,23 @@ a known set of artifacts, and writes exactly one primary artifact.
 
 ### Required vs. optional reads
 
-The **required reads** column lists only *producer-gated* artifacts â€” files written by an earlier
-step. It is the only thing that gates ordering (Â§4.1). Steps whose input is an analyst-supplied
+The **required reads** column lists only *producer-gated* artifacts — files written by an earlier
+step. It is the only thing that gates ordering (§4.1). Steps whose input is an analyst-supplied
 **input** (not produced by a step) have no required read and are never blocked on it:
 
 - `intake` reads the `DASHBOARD-REQUEST.md` input file **or** free text the analyst pastes directly
-  into the terminal â€” whichever is present (and, failing both, the `scaffold/` demo example, Â§3.1).
+  into the terminal — whichever is present (and, failing both, the `scaffold/` demo example, §3.1).
   Because the request can be pasted, `intake` has **no** required read and never refuses to run for a
   "missing" request file. (`data` and `brand` are likewise input-driven: `data/`/`datasources.json` and
-  `branding/` respectively, each with a `scaffold/` demo fallback â€” Â§3.1.)
+  `branding/` respectively, each with a `scaffold/` demo fallback — §3.1.)
 
 A step may also have *optional reads* that enrich its output but never block it:
 
 - `plan` optionally reads `PRD.md` (from `intake`) and `DESIGN-TOKENS.md` (from `brand`). Because
   `intake` and `brand` are skippable, those artifacts may be absent; `plan` falls back to
   `DASHBOARD-REQUEST.md` and neutral styling respectively rather than refusing to run.
-- `mock` optionally reads `DESIGN-TOKENS.md`; absent â‡’ neutral styling.
-- `build` optionally reads `DESIGN-TOKENS.md` and the target version (always present, see Â§2).
+- `mock` optionally reads `DESIGN-TOKENS.md`; absent ⇒ neutral styling.
+- `build` optionally reads `DESIGN-TOKENS.md` and the target version (always present, see §2).
 
 > **Maintainer rule:** when you add or change a skill's dependencies, update **both** the table above
 > and the `STEPS` definition in `skills/tableau-route/scripts/route.py`. They are the prose and the
@@ -61,15 +61,15 @@ silently un-styles every workbook while both skills still pass their own checks:
 | heading | what `build` does with it |
 |---|---|
 | `## Typography` | The `- **Font family**:` and `- **Chart title**:` bullets become the worksheet font and title run. |
-| `### Chart series colors` | The ordered hex list becomes a worksheet's colour palette, defined once as a `<color-palette>` under `<workbook><preferences>` and referenced by the mark's colour encoding as `palette='Brandâ€¦'`, plus the default mark colour for charts with nothing on Colour. One table per coloured field (each introduced by its field name in backticks) binds each colour encoding to **its own** table, in row order; a field no table names takes the whole list. |
+| `### Chart series colors` | The ordered hex list becomes a worksheet's colour palette, defined once as a `<color-palette>` under `<workbook><preferences>` and referenced by the mark's colour encoding as `palette='Brand…'`, plus the default mark colour for charts with nothing on Colour. One table per coloured field (each introduced by its field name in backticks) binds each colour encoding to **its own** table, in row order; a field no table names takes the whole list. |
 
-The palette needs **no data member values** â€” that was the open question that kept it unbuilt.
-A member-bound palette (`<map to='#â€¦'><bucket>"West"</bucket>`) is impossible from a manifest,
+The palette needs **no data member values** — that was the open question that kept it unbuilt.
+A member-bound palette (`<map to='#…'><bucket>"West"</bucket>`) is impossible from a manifest,
 but a `<color-palette>` only lists colours *in order* and lets Tableau walk the field's domain
 against them. So profiling never has to pass distinct members to the manifest.
 
 Where that palette *lives* is issue #52's answer: Desktop defines a custom palette once under
-`<workbook><preferences>` and has every encoding reference it by name â€” it writes no inline
+`<workbook><preferences>` and has every encoding reference it by name — it writes no inline
 categorical palette in any attested workbook. `twb._lift_palettes` does that lift, and
 `validate_twb`'s "Palette references resolve" check fails a build whose `palette=` name no
 `<preferences>` entry defines. See
@@ -77,31 +77,31 @@ categorical palette in any attested workbook. `twb._lift_palettes` does that lif
 attested and the one step that is still inferred.
 
 Both headings are in `brand.DESIGN_TOKENS_REQUIRED_SECTIONS`; keep them there. Absent
-`DESIGN-TOKENS.md` â‡’ Tableau's own defaults, never an invented font or colour.
+`DESIGN-TOKENS.md` ⇒ Tableau's own defaults, never an invented font or colour.
 
-### 1.1 The `IMPLEMENTATION-SPEC.md` handoff (step 7 â†’ step 8)
+### 1.1 The `IMPLEMENTATION-SPEC.md` handoff (step 7 → step 8)
 
 `IMPLEMENTATION-SPEC.md` carries two machine-checked sections that `tableau-build` consumes; spec
 approval is blocked until both are present and consistent (enforced by `tableau-spec`'s
 `reconcile.py`):
 
-1. **The Element Mapping table** â€” one row per mock element (`data-plan-id`), mapping each to a
+1. **The Element Mapping table** — one row per mock element (`data-plan-id`), mapping each to a
    Tableau construct, with a justification for any advanced-feature escalation.
-2. **The Layout section** â€” a short human-readable summary followed by a **fenced JSON container
+2. **The Layout section** — a short human-readable summary followed by a **fenced JSON container
    tree** derived from the approved `mock.html`, so layout truth reaches the build instead of being
    guessed. The JSON carries:
-   - `canvas` â€” the mock's design dimensions in px (`{"width": ..., "height": ...}`);
-   - `root` â€” a container node (`type`: `vert` | `horz`, non-empty `children`), nesting further
+   - `canvas` — the mock's design dimensions in px (`{"width": ..., "height": ...}`);
+   - `root` — a container node (`type`: `vert` | `horz`, non-empty `children`), nesting further
      containers and leaves (`{"id": ..., "size": ...}`);
-   - every non-root node has a numeric `size` â€” its **percentage of the parent** along the parent's
-     flow axis â€” and siblings sum to ~100.
-   - a node may carry both `id` **and** `children` â€” a **mapped container** (e.g. a DZV panel that
+   - every non-root node has a numeric `size` — its **percentage of the parent** along the parent's
+     flow axis — and siblings sum to ~100.
+   - a node may carry both `id` **and** `children` — a **mapped container** (e.g. a DZV panel that
      is itself a mapped element and also holds further zones). Its `id` occupies a zone, but that
      zone is filled by the container's children, not by a worksheet or `objects` entry of its own.
 
    Every Element Mapping **zone** id appears in the tree **exactly once**; ids in the tree must have
    a mapping row. Interaction ids (`int-*`, per the plan's id convention) are dashboard *actions*,
-   not zones â€” they are never placed in the tree.
+   not zones — they are never placed in the tree.
 
 ---
 
@@ -119,7 +119,6 @@ analyst is in the workflow.
 ## Metadata
 - target_tableau_version: 2024.2-2025.x   # 2024.2-2025.x | 2026.1+
 - data_mode: csv                          # csv | published-ds
-- spec_mode: agent                        # agent | human
 - current_version: v_1                    # v_1, v_2, ...
 
 ## Steps
@@ -140,29 +139,28 @@ analyst is in the workflow.
 | field                   | location           | allowed values                                  | meaning |
 |-------------------------|--------------------|-------------------------------------------------|---------|
 | `target_tableau_version`| Metadata           | `2024.2-2025.x` \| `2026.1+`                     | Captured at `init`; drives `tableau-build`'s workbook `version` attribute and version-specific XML (e.g. `<explain-data>`). Never re-asked downstream. |
-| `data_mode`             | Metadata           | `csv` \| `published-ds`                          | How `tableau-data` acquires rows (Â§3.2). `csv` is the default, zero-credential path (analyst-provided CSVs); `published-ds` queries a published source via the VizQL Data Service. There is **no** direct-database mode. |
-| `spec_mode`             | Metadata           | `agent` \| `human`                               | How `tableau-spec` authors its deliverable. `agent` (default when unset) is today's machine `IMPLEMENTATION-SPEC.md` for `tableau-build`. `human` is a Desktop build guide (human-route authoring is a later ticket). Recorded by `tableau-spec` on first run; `tableau-init` does not set it. |
-| `current_version`       | Metadata           | `v_1`, `v_2`, â€¦                                 | The active deliverable version directory under `mock-version/`. Bumped when a deliverable skill re-runs after approval (Â§4.3). |
+| `data_mode`             | Metadata           | `csv` \| `published-ds`                          | How `tableau-data` acquires rows (§3.2). `csv` is the default, zero-credential path (analyst-provided CSVs); `published-ds` queries a published source via the VizQL Data Service. There is **no** direct-database mode. |
+| `current_version`       | Metadata           | `v_1`, `v_2`, …                                 | The active deliverable version directory under `mock-version/`. Bumped when a deliverable skill re-runs after approval (§4.3). |
 | `status` (per step)     | Steps table, 1/row | `pending` \| `approved` \| `skipped` \| `stale` | Lifecycle of each step. |
 
 ### Per-step status vocabulary
 
 | status     | set by                                  | meaning |
 |------------|-----------------------------------------|---------|
-| `pending`  | `init` (initial state of steps 2â€“8)     | Not yet run, or run but not approved. |
+| `pending`  | `init` (initial state of steps 2–8)     | Not yet run, or run but not approved. |
 | `approved` | the owning skill, on explicit user OK   | The step's artifact exists and the analyst signed off on it. Satisfies the ordering gate for downstream steps. |
 | `skipped`  | the owning skill (only steps 2 & 4)     | The analyst chose to skip an optional step. Satisfies the ordering gate **without** producing the artifact (downstream uses fallbacks). |
-| `stale`    | an **upstream** skill, via Â§4.2         | The step was `approved`, but an upstream artifact changed afterward; its output may now disagree with the new upstream truth and must be re-run. |
+| `stale`    | an **upstream** skill, via §4.2         | The step was `approved`, but an upstream artifact changed afterward; its output may now disagree with the new upstream truth and must be re-run. |
 
 > A step is **resolved** when its status is `approved` or `skipped`. Resolved is the condition the
-> ordering gate (Â§4.1) checks for and the condition the router (Â§5) treats as "done."
+> ordering gate (§4.1) checks for and the condition the router (§5) treats as "done."
 
 > **Skip preconditions are skill-specific.** A skill may gate its own `skipped` transition behind a
 > minimal precondition when skipping blank would degrade the whole pipeline. `tableau-brand` (step 4)
 > only accepts `skipped` once `branding/branding.md` exists: branding drives how good the mock and the
 > Tableau spec can be, so the analyst must capture at least some brand intent (a spec, a scraped org
 > `.twb`, or the brand interview) before opting into neutral styling. `tableau-intake` (step 2) has no
-> such precondition â€” its request can be skipped outright. This narrows *when* a step may be skipped;
+> such precondition — its request can be skipped outright. This narrows *when* a step may be skipped;
 > it never changes what `skipped` then means (a resolved step that produced no artifact).
 
 ---
@@ -171,13 +169,13 @@ analyst is in the workflow.
 
 The case of a filename encodes its role, so a skill can tell handoff artifacts from inputs at a glance.
 
-- **`UPPER-KEBAB.md` â‡’ handoff artifact** produced by a step and consumed by later steps:
+- **`UPPER-KEBAB.md` ⇒ handoff artifact** produced by a step and consumed by later steps:
   `PRD.md`, `DATA-MODEL.md`, `DESIGN-TOKENS.md`, `DASHBOARD-PLAN.md`, `IMPLEMENTATION-SPEC.md`.
   (`STATE.md` is the manifest and also uses this casing.)
-- **lowercase â‡’ input or config, owned by the analyst, never produced as a handoff** â€” with
+- **lowercase ⇒ input or config, owned by the analyst, never produced as a handoff** — with
   one narrow exception, the build-internal file described below:
   `.env`, `branding/`, `data/`, `datasources.json`, `DASHBOARD-REQUEST.md`. Their demo counterparts live
-  under `scaffold/` (see Â§3.1).
+  under `scaffold/` (see §3.1).
 
 **Build-internal files** are the third, narrow category: lowercase files a skill writes for
 its *own* next stage, never read by another skill. Today there are two, both `tableau-build`'s:
@@ -186,7 +184,7 @@ its *own* next stage, never read by another skill. Today there are two, both `ta
 `mock-version/v_N/dashboard.twb`, the unpackaged workbook the validation gate's three validators
 read before it is zipped into the deliverable `.twbx` (it stays on disk after a failed gate so
 the XML can be inspected). Because nothing downstream reads them, they are not handoffs and take the lowercase
-casing; they are versioned with the deliverable they produce (Â§4.3). A skill may add one only
+casing; they are versioned with the deliverable they produce (§4.3). A skill may add one only
 for a stage boundary inside itself.
 
 New artifacts MUST follow this rule. Do not introduce a lowercase handoff, an UPPER-KEBAB
@@ -206,15 +204,15 @@ folder of **demo examples** so the workflow can be trialed end-to-end before any
 
 **Preference rule.** Every skill that consumes one of these inputs MUST prefer the production
 file/folder at the project root and fall back to the matching `scaffold/` example **only** when the
-production input is absent. A skill that falls back to a `scaffold/` example MUST say so â€” it is
+production input is absent. A skill that falls back to a `scaffold/` example MUST say so — it is
 demoing the workflow, not using real input.
 
 This keeps "real vs. demo" unambiguous and makes the *absence* of a production file the signal of
 what the analyst still owes. `init` creates only `scaffold/` (and `STATE.md`); the production files
-are created by the analyst or written by the step that owns them â€” notably `tableau-data` writes the
-real samples to `data/` (CONTRACT.md Â§1 step 3), never to `scaffold/`.
+are created by the analyst or written by the step that owns them — notably `tableau-data` writes the
+real samples to `data/` (CONTRACT.md §1 step 3), never to `scaffold/`.
 
-> **Ordering-gate note (Â§4.1):** for the `data`-produced sample that gates `mock` and `build`, the
+> **Ordering-gate note (§4.1):** for the `data`-produced sample that gates `mock` and `build`, the
 > artifact-existence check is satisfied by **either** `data/*.csv` **or** `scaffold/sample-data/*.csv`,
 > so a demo run is never wrongly blocked. The producer-status check still applies as normal.
 
@@ -225,49 +223,49 @@ There is deliberately **no** direct-database route: connecting to arbitrary data
 credentials, run uncapped queries that cost money, and force a per-database connector to be built and
 maintained. Both routes below avoid all three.
 
-Whatever the route, the output is identical â€” `DATA-MODEL.md` plus mimicking CSVs in `data/` whose
+Whatever the route, the output is identical — `DATA-MODEL.md` plus mimicking CSVs in `data/` whose
 headers and types match the real source exactly, so **Replace Data Source** swaps in live data later.
 **A `data/` CSV stands in for its data source** ("csv = datasource").
 
-**Route 1 â€” `data_mode: csv` (default, zero-credential).** The analyst drops CSV file(s) in `data/`.
+**Route 1 — `data_mode: csv` (default, zero-credential).** The analyst drops CSV file(s) in `data/`.
 **Each CSV file is one data source.** (Joining several into a single composed source relies on
-Tableau's *composable data sources*, which is newer â€” Tableau 2026.2+ â€” and untested; it is opt-in and
+Tableau's *composable data sources*, which is newer — Tableau 2026.2+ — and untested; it is opt-in and
 out of scope until proven. Until then, multiple CSVs stay as multiple data sources.)
 
-**Route 2 â€” `data_mode: published-ds` (VizQL Data Service).** The analyst lists published data
+**Route 2 — `data_mode: published-ds` (VizQL Data Service).** The analyst lists published data
 source(s) in `datasources.json` (one entry each, keyed by id, with `ds_name` + `project_name`) and
 supplies a Tableau connection in `.env`. This route is a **pure pull** that *fills* an empty `data/`:
-it fires only when `data/` holds no production CSVs (per Â§3.1, real CSVs always win â€” the analyst
-already has the data). `tableau-data` samples each source through the **VizQL Data Service (VDS)** â€”
-Tableau's official, governed query API â€” and **nothing else** (no synthesized rows, no `.tdsx`/`.hyper`
+it fires only when `data/` holds no production CSVs (per §3.1, real CSVs always win — the analyst
+already has the data). `tableau-data` samples each source through the **VizQL Data Service (VDS)** —
+Tableau's official, governed query API — and **nothing else** (no synthesized rows, no `.tdsx`/`.hyper`
 extract download, no embedded-source reading, no GraphQL). Two operations, in order:
 
-1. **read-metadata** â€” the **queryable** fields (names, types, descriptions). These are
+1. **read-metadata** — the **queryable** fields (names, types, descriptions). These are
    **authoritative**: the pulled CSV schema and `DATA-MODEL.md` take their types and descriptions from
    here rather than inferring them; where a field has no description, the model fills it in (as for the
    csv route).
-2. **query-datasource** â€” a capped sample of **all queryable** fields (hidden / non-queryable fields
-   are skipped). **`rowLimit` caps the rows returned to us â€” default `100`, silent up to `1000`; above
+2. **query-datasource** — a capped sample of **all queryable** fields (hidden / non-queryable fields
+   are skipped). **`rowLimit` caps the rows returned to us — default `100`, silent up to `1000`; above
    `1000` requires explicit analyst confirmation** before the pull. The cap bounds the response, not
    what VDS reads from the underlying source.
 
 **Each listed source becomes one `data/<slug>.csv`** ("csv = datasource"), where `<slug>` is the
-lowercased `ds_name` with non-alphanumeric runs collapsed to `_` (e.g. `Regional Sales` â†’
+lowercased `ds_name` with non-alphanumeric runs collapsed to `_` (e.g. `Regional Sales` →
 `regional_sales.csv`). The acquisition tier recorded in `DATA-MODEL.md` is **`published-ds (VDS query)`**.
 
-The pull is **all-or-nothing**: if it cannot deliver rows for every source â€” sign-in/connection
+The pull is **all-or-nothing**: if it cannot deliver rows for every source — sign-in/connection
 failure, the source's **API Access** capability off, the named source not resolving as a *published*
-source, or zero rows â€” `tableau-data` **fails with an actionable error and writes no artifact**
+source, or zero rows — `tableau-data` **fails with an actionable error and writes no artifact**
 (`STATE.md` untouched). There is **no** silent fallback to demo or synthesized data: the analyst fixes
 the credentials/permission and re-runs, or drops CSV(s) in `data/` to use Route 1.
 
 Auth is a Tableau REST **Personal Access Token** sign-in (`.env`, discovered by walking up from the
-project directory â€” nearest wins); the credentials token is reused for VDS, and the source must have
+project directory — nearest wins); the credentials token is reused for VDS, and the source must have
 the **API Access** capability enabled. VDS requires **Tableau Cloud, or Tableau Server 2025.1+**.
 
-> **Published only â€” not embedded.** VDS queries *published* data sources only; it cannot see
+> **Published only — not embedded.** VDS queries *published* data sources only; it cannot see
 > **embedded** sources (bundled inside a workbook). A named source that is in fact embedded simply
-> fails to resolve â€” so `tableau-data`'s not-found error MUST name this possibility and steer the
+> fails to resolve — so `tableau-data`'s not-found error MUST name this possibility and steer the
 > analyst to **export the data to CSV from Tableau** and use Route 1 instead.
 
 > **Executable spec.** The exact VDS endpoints, request/response JSON, `.env` variable names, and the
@@ -283,18 +281,18 @@ Every skill MUST honor all three. They are what make the file-based handoff trus
 
 ### 4.1 Ordering
 
-A skill **refuses to run** unless, for every artifact in its **required reads** (Â§1):
+A skill **refuses to run** unless, for every artifact in its **required reads** (§1):
 
 1. the producer step's status is **resolved** (`approved` or `skipped`), **and**
 2. the artifact file actually exists on disk.
 
 A skill that cannot run reports which upstream step is the blocker and stops. It does not partially
-run or fabricate missing inputs. (Optional reads never block â€” see Â§1.)
+run or fabricate missing inputs. (Optional reads never block — see §1.)
 
 ### 4.2 Staleness propagation
 
 When a skill **re-runs and changes its output**, it flips **every downstream step** (every step with
-a higher order number) from `approved` â†’ `stale`. Steps already `pending`/`skipped`/`stale` are left
+a higher order number) from `approved` → `stale`. Steps already `pending`/`skipped`/`stale` are left
 as-is; the skill's own step becomes `approved` again on re-approval.
 
 This guarantees the demo and the workbook can never silently disagree with an updated plan: a changed
@@ -307,15 +305,15 @@ Two kinds of outputs, two storage strategies:
 
 - **Root files = latest approved truth.** `PRD.md`, `DATA-MODEL.md`, `DESIGN-TOKENS.md`,
   `DASHBOARD-PLAN.md` live at the project root and are overwritten in place. There is exactly one
-  current copy. Re-running one of these skills updates the root file and triggers staleness (Â§4.2);
+  current copy. Re-running one of these skills updates the root file and triggers staleness (§4.2);
   it does **not** create a new version directory.
 - **Deliverables = standalone versioned copies.** `mock.html`, `IMPLEMENTATION-SPEC.md`, and
-  `dashboard.twbx` (plus build's internal `build-manifest.json` and `dashboard.twb`, Â§3) are written under
+  `dashboard.twbx` (plus build's internal `build-manifest.json` and `dashboard.twb`, §3) are written under
   `mock-version/v_N/`, all three deliverables sharing the **same** `v_N`
   directory. A version is anchored by its **mock**: `mock.html` is the leading deliverable, and
   **only `tableau-mock` bumps `current_version`**. Re-running `tableau-mock` after its step was
   approved bumps to a new `v_N`, writes the fresh `mock.html` there, and stales `spec`/`build`
-  (Â§4.2) so they re-run into that new version â€” producing a full standalone copy, prior versions
+  (§4.2) so they re-run into that new version — producing a full standalone copy, prior versions
   preserved. (Re-running mock before approval overwrites the current `v_N`.)
 - **`spec` and `build` never bump `current_version`.** They are downstream deliverables that write
   into the mock's current `v_N`, always beside the `mock.html` they were derived from, and
@@ -330,23 +328,23 @@ Two kinds of outputs, two storage strategies:
 
 `tableau-route` is a **skill** (not a slash command), explicit-invocation only. It is a thin wrapper
 over `skills/tableau-route/scripts/route.py`, which reads `STATE.md` and reports the single next skill the
-analyst should run, honoring Â§4.1.
+analyst should run, honoring §4.1.
 
-**It is a router only â€” it never invokes a skill inline.** Inline execution would share context and
+**It is a router only — it never invokes a skill inline.** Inline execution would share context and
 defeat the whole point of the split (each skill must run in its own fresh conversation). The router's
 job ends at telling the analyst what to run next.
 
 ### Next-step algorithm (`compute_next_step`)
 
-1. If `STATE.md` is **absent** â‡’ next is `tableau-init` (fresh project).
+1. If `STATE.md` is **absent** ⇒ next is `tableau-init` (fresh project).
 2. Parse the Steps table in canonical order.
 3. The first step whose status is **not resolved** (i.e. `pending` or `stale`) is the candidate.
-4. **Gate check** the candidate against Â§4.1: for each required read, the producer must be resolved
+4. **Gate check** the candidate against §4.1: for each required read, the producer must be resolved
    and its artifact must exist. If a required upstream is unresolved, the **upstream** step is
    returned as next (it is the real blocker), not the candidate.
-5. If no step is unresolved â‡’ the pipeline is **done**; point the analyst at the deliverable.
+5. If no step is unresolved ⇒ the pipeline is **done**; point the analyst at the deliverable.
 
-Because staleness only ever flips `approved` â†’ `stale` (Â§4.2), scanning in order and taking the first
+Because staleness only ever flips `approved` → `stale` (§4.2), scanning in order and taking the first
 unresolved step naturally respects the dependency graph; the explicit gate check in step 4 is a
 defensive guard against a hand-edited or inconsistent `STATE.md`.
 
@@ -354,28 +352,28 @@ defensive guard against a hand-edited or inconsistent `STATE.md`.
 
 ## 6. Shared interactions vocabulary
 
-To stop "interaction" meaning three different things across `plan` â†’ `mock` â†’ `spec`, the three
+To stop "interaction" meaning three different things across `plan` → `mock` → `spec`, the three
 skills use this fixed vocabulary. Each term means the same thing in the plan's interactions table,
 the mock's behavior, and the spec's Tableau mapping.
 
 | term            | meaning (intent level)                                                              | typical Tableau construct (decided in `spec`) |
 |-----------------|-------------------------------------------------------------------------------------|-----------------------------------------------|
 | `toggle panel`  | Show/hide a region of the dashboard on demand.                                      | Dynamic Zone Visibility, or a show/hide button container. |
-| `swap view`     | Replace one chart with an alternative in the same slot (e.g. bar â‡„ line).           | Parameter + Dynamic Zone Visibility, or sheet swap. |
-| `drill`         | Move between levels of a hierarchy (e.g. year â†’ quarter â†’ month) in place.          | Hierarchy expand/collapse, or a **parameter** action. `tableau-build` emits no set/URL actions, so a drill that a set action would express has to be specced as a parameter action. |
+| `swap view`     | Replace one chart with an alternative in the same slot (e.g. bar ⇄ line).           | Parameter + Dynamic Zone Visibility, or sheet swap. |
+| `drill`         | Move between levels of a hierarchy (e.g. year → quarter → month) in place.          | Hierarchy expand/collapse, or a **parameter** action. `tableau-build` emits no set/URL actions, so a drill that a set action would express has to be specced as a parameter action. |
 | `cross-filter`  | Selecting marks in one chart filters the others.                                    | Filter action (`Use as Filter`). |
 | `highlight`     | Selecting marks in one chart highlights related marks elsewhere without filtering.  | Highlight action. |
 | `parameter swap`| A control changes a measure/dimension/threshold used across the dashboard.          | Parameter + parameter action / calculated field. |
 
 When a requested interaction does not fit one of these terms, add the term **here first** (with its
-intent and Tableau construct) before using it in any skill â€” that keeps plan, mock, and spec aligned.
+intent and Tableau construct) before using it in any skill — that keeps plan, mock, and spec aligned.
 
 ### 6.1 Views in `DASHBOARD-PLAN.md`
 
 A workbook may have several dashboards (tabs), called **views**. The plan declares them through an
 **optional `view` column** on its Layout Grid, Elements, and Filters tables:
 
-- **A blank `view` cell â€” or no `view` column at all â€” means the single default view.** Every
+- **A blank `view` cell — or no `view` column at all — means the single default view.** Every
   plan written before this column existed is therefore a valid one-view plan, unchanged.
 - An Elements row must be on the same view as the slot it is placed in; `tableau-plan`'s
   `validate` reports a mismatch as a problem and always lists the set of declared views. View
@@ -390,6 +388,6 @@ A workbook may have several dashboards (tabs), called **views**. The plan declar
 
 Each skill owns only the resources it uses; there is no shared resource pool. For example
 `tableau-build` owns its snippet library, `xsd/`, validators, and `examples/`; `tableau-data` owns its
-VizQL Data Service client (the published-ds route, Â§3.2); `tableau-init` owns the `skeleton/`
+VizQL Data Service client (the published-ds route, §3.2); `tableau-init` owns the `skeleton/`
 templates. A skill can be edited and reasoned about independently as long as it continues to honor
 this contract.
