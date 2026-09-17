@@ -4,160 +4,92 @@ description: Translates the approved HTML mock (mock.html) into an IMPLEMENTATIO
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, AskUserQuestion, Bash(python *), Bash(python3 *)
 ---
-
 # tableau-spec
 
-Step 7 of 8, and **non-skippable**. It turns the approved `mock.html` into an
-`IMPLEMENTATION-SPEC.md` that maps **every** mock element to a concrete Tableau construct,
-so `tableau-build` builds from an explicit spec instead of guessing. It ends with a
-**coverage reconciliation** â€” the mirror of the mock's checklist â€” proving every mock
-element is mapped, and applies a **simplest-primitive guard** so the workbook uses the
-simplest construct that does the job.
+Step 7 of 8, and **non-skippable**. It turns the approved `mock.html` into either a
+machine-readable `IMPLEMENTATION-SPEC.md` for `tableau-build`, or a Desktop build guide
+for an analyst who will author in Tableau Desktop. Choose the route once via `spec_mode`.
 
 | | |
 |---|---|
-| **Reads** | **Required:** `mock-version/<v_N>/mock.html` (from `mock`) â€” the elements to map, tagged with `data-plan-id`; and `DASHBOARD-PLAN.md` (from `plan`) â€” the shared element/filter/interaction ids and the interaction intents (CONTRACT.md Â§6). |
-| **Writes** | `mock-version/<v_N>/IMPLEMENTATION-SPEC.md` â€” a standalone deliverable copy (CONTRACT.md Â§4.3). |
-| **STATE.md update** | Records `spec_mode` (`agent` | `human`) on first run via `set-mode`; sets `spec` = `approved`; flips a downstream `approved` `build` step to `stale` on a re-run (CONTRACT.md Â§4.2). Does **not** touch `current_version` â€” only `tableau-mock` bumps it (Â§4.3). |
-| **Entry gate** | Refuses to run until `plan` is resolved **and** `DASHBOARD-PLAN.md` exists, **and** `mock` is resolved **and** `mock.html` exists at `current_version` (CONTRACT.md Â§4.1). |
-| **Next step** | `tableau-build` (or `tableau-route` to confirm). |
+| **Reads** | **Required:** `mock-version/<v_N>/mock.html` (from `mock`); `DASHBOARD-PLAN.md` (from `plan`). |
+| **Writes** | **Agent:** `mock-version/<v_N>/IMPLEMENTATION-SPEC.md`. **Human:** root `IMPLEMENTATION-SPEC.md` + `spec/` tree. |
+| **STATE.md update** | Records `spec_mode` (`agent` \| `human`) on first run via `set-mode`; sets `spec` = `approved`; on human also sets `build` = `skipped`. On agent re-run, flips an `approved` `build` to `stale`. Does **not** bump `current_version`. |
+| **Entry gate** | `plan` + `DASHBOARD-PLAN.md` resolved; `mock` + `mock.html` at `current_version`. Agent route also blocks multi-view plans (one-dashboard builder limit). |
+| **Next step** | Agent → `tableau-build`. Human → pipeline complete (`build` skipped). |
 
-The mechanical guarantees â€” the entry gate, the **coverage reconciliation** (every mock
-element mapped, nothing unmapped), the **simplest-primitive guard** (any advanced feature
-carries a justification), the version bump, and the STATE.md transition â€” live in
-`spec.py` (CLI) and `reconcile.py` (the reconciliation + guard core). Your job is the
-judgment part: choosing the right, simplest Tableau construct for each element and
-justifying any escalation. Run the script at the points below; do not hand-edit `STATE.md`.
-
-
-## Spec mode gate (`spec_mode`)
-
-Before authoring, choose the route **once per project** and record it:
+## Spec mode gate (`spec_mode`) — do this first
 
 | mode | Meaning |
 |------|---------|
-| `agent` | Today's machine `IMPLEMENTATION-SPEC.md` (Element Mapping + `## Layout`) for `tableau-build`. **Default when unset** ? projects that predate `spec_mode` keep this behaviour. |
-| `human` | A Desktop build guide for analysts who will build in Tableau Desktop (human-route authoring is a later ticket; this skill still records the choice). |
+| `agent` | Machine spec (Element Mapping + `## Layout`) for `tableau-build`. **Default when unset.** |
+| `human` | Desktop build guide (root guide + `spec/` tree). `tableau-build` is skipped. |
 
-1. Run precheck ? it reports the recorded `spec_mode`, or that it is unset and must be chosen.
+1. Run precheck — it reports the recorded `spec_mode`, or that it is unset:
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" precheck "<project-dir>"
+   ```
+
 2. If unset, ask the analyst once (`agent` or `human`), then record it:
 
    ```bash
    python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" set-mode "<project-dir>" --mode agent
    ```
 
-   (or `--mode human`). Do **not** hand-edit `STATE.md`. Later runs read the recorded value and do not ask again.
+   (or `--mode human`). Do **not** hand-edit `STATE.md`. Later runs do not ask again.
 
-## The two conventions the reconciliation depends on
+Detail for each route is below; templates hold the full shape.
 
-`reconcile.py` decides "mapped" and "laid out" mechanically, so the spec **must** carry a
-single **Element Mapping table** and a **Layout section** (see
-`references/IMPLEMENTATION-SPEC-TEMPLATE.md`):
+## Agent route
 
-- The table's first column header is **`id`** and it has a column whose header contains
-  **`construct`** and one whose header contains **`justif`**.
-- **One row per mock element**, with the `id` matching a `data-plan-id` from `mock.html`
-  **exactly**. A mock id with no row is an **unmapped element** that blocks approval â€” this
-  is what makes "nothing unmapped" a guarantee.
-- The **construct** cell names the Tableau construct; the **justification** cell explains
-  any escalation (leave it blank / `-` for a simple primitive).
-- The **`## Layout` section** holds a short summary and a fenced JSON **container tree**
-  derived from the approved mock: the mock's `canvas` dimensions, nested `vert`/`horz`
-  containers, and element-id leaves with percentage `size`s (siblings sum to ~100). Every
-  mapped **zone** id appears **exactly once**; interaction ids (`int-*`) are actions, not
-  zones, and never appear. This is how the mock's geometry reaches `tableau-build` â€” a
-  missing or inconsistent Layout blocks approval exactly like an unmapped element.
-- **Siblings meant to stay equal must be a container's only children.** Tableau holds a row
-  of equal cards equal by distributing the *container* evenly, so an equal group stranded
-  beside a smaller sibling (three chart cards above a 3% legend strip) cannot be held â€” the
-  build pins every child but the biggest, and the group drifts apart on any dashboard taller
-  than its minimum. Wrap the group in its own container; the validator flags this.
+Author `mock-version/<v_N>/IMPLEMENTATION-SPEC.md` from
+`references/IMPLEMENTATION-SPEC-TEMPLATE.md`.
 
-## The simplest-primitive guard
+- One **Element Mapping** row per mock `data-plan-id` (exact id match).
+- **`## Layout`** fenced JSON container tree (canvas, vert/horz, percentage sizes).
+- Default to the **simplest** Tableau primitive; justify Dynamic Zone Visibility, LOD, table
+  calc, or parameter action in the justification cell.
+- Equal siblings must be a container's only children.
 
-Default every element to the **simplest sufficient** Tableau primitive. Only escalate to an
-advanced feature when the simpler option genuinely cannot do the job â€” and when you do,
-**write why in the justification cell** (what simpler alternative you rejected and the
-concrete reason). The guard flags these advanced features when their justification is blank:
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" validate "<project-dir>"
+python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" commit "<project-dir>"
+```
 
-| advanced feature | simpler default to justify against |
-|------------------|-------------------------------------|
-| **Dynamic Zone Visibility (DZV)** | a show/hide button container |
-| **LOD expression** (`{FIXED ...}`) | a plain aggregate (`SUM`, `AVG`) or the view's default grain |
-| **table calculation** (`WINDOW_*`, `RUNNING_*`, `INDEX()`, `RANK`) | a native aggregate or quick table calc on the view |
-| **parameter action** | a filter action / highlight action, or a static parameter |
+Show the reconciliation checklist to the analyst before asking for approval. Commit only
+after they approve.
 
-The concrete "what's simplest for this interaction" knowledge lives in the validated
-snippet library. Map the shared interaction terms to their **simplest** construct first
-(CONTRACT.md Â§6): `cross-filter` â†’ a **Filter action** (`Use as Filter`); `highlight` â†’ a
-**Highlight action**; `drill` â†’ a **hierarchy** expand/collapse; `swap view` / `toggle
-panel` / `parameter swap` â†’ these legitimately need DZV / parameter â€” justify them.
+## Human route
 
-## How to run
+Author a Desktop guide from `references/HUMAN-IMPLEMENTATION-SPEC-TEMPLATE.md`:
 
-1. **Precheck.** From the project directory, run:
+1. **Sheet names (one pass).** Derive the full Tableau sheet-name list from the plan (and
+   mock titles). Confirm the **entire list in one interaction** — never one sheet at a time.
+2. **Root `IMPLEMENTATION-SPEC.md`:** decision register with rationale, seams, numbered
+   **build order** (parameters before calculated fields that read them; patterns before the
+   sheets that instantiate them), verification checklist, open-items register.
+3. **`spec/<view>.md` per declared view:** prose tile table, sidebar blocks, sizing rules
+   (range sizing with a minimum; tiled percentage containers; **never floating**), and
+   per-sheet slot tables (Text / Colour / Rows / Columns / Filter / Tooltip).
+4. **Coverage carrier:** every plan id (Elements, Filters, Interactions) must appear on an
+   `Element: <id>` line somewhere in the tree. Show the coverage checklist to the analyst
+   **before** asking for approval.
+5. **Simplest-primitive:** any DZV / LOD / table calc / parameter action needs a written
+   justification nearby.
+6. **`spec/patterns.md`** only when two or more sheets share a `Pattern: <name>`; omit
+   empty support pages rather than stubbing them.
+7. Supporting pages as needed: `calculations.md`, `parameters.md`, `fields.md`.
 
-   ```bash
-   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" precheck "<project-dir>"
-   ```
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" commit "<project-dir>"
+```
 
-   (Use `python3` if `python` is unavailable.) If it prints `[BLOCKED]`, relay the reason
-   and **stop** â€” the analyst must resolve the named upstream step (`tableau-mock` for the
-   approved mock, `tableau-plan` for the blueprint) first. Otherwise note its signals: the
-   **mock path** to map from, the **list of element ids** every one of which needs a
-   mapping row, and the **target path** to write `IMPLEMENTATION-SPEC.md` into (the mock's
-   `current_version` â€” spec writes beside the `mock.html` it maps and never bumps the version).
-
-2. **Read the inputs.** Read `mock.html` at the reported mock path â€” its `data-plan-id`
-   attributes are your exact mapping list. Read `DASHBOARD-PLAN.md` for what each id *is*
-   (KPI / chart kind / filter / interaction) and the interaction intents, so you map to the
-   right construct.
-
-3. **Author `IMPLEMENTATION-SPEC.md`** at the precheck's **target path**. Fill the Element
-   Mapping table with one row per mock element, defaulting to the simplest primitive and
-   justifying every escalation. Write the **`## Layout` section** by reading the mock's
-   actual geometry (its rows, columns, and nesting) into the JSON container tree â€” sizes
-   as percentages of the parent, canvas from the plan's Screen Size. Add the supporting
-   detail the build needs (calculated fields, data source / joins, actions, parameters)
-   following the template. When **refining** an existing spec at this version, `Edit` it
-   in place.
-
-4. **Self-check, then present.** Validate the draft before showing it:
-
-   ```bash
-   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" validate "<project-dir>"
-   ```
-
-   It prints the **reconciliation checklist** (one line per mock element, each `[x]` mapped
-   or `[ ]` unmapped / unjustified-escalation), the guard result, and the **layout check**
-   (the container tree present and consistent with the mapping). If it prints `[INVALID]`,
-   map the missing element(s) / add the missing justification(s) / fix the named layout
-   problem(s) and re-run.
-   When it prints `[OK]`, **show the checklist to the analyst** (it's the proof nothing was
-   dropped and nothing is over-engineered) and present the spec for approval.
-
-5. **Commit** â€” only after the analyst approves:
-
-   ```bash
-   python "${CLAUDE_PLUGIN_ROOT}/skills/tableau-spec/scripts/spec.py" commit "<project-dir>"
-   ```
-
-   Commit re-runs the full reconciliation + guard (spec is non-skippable, so it only ever
-   sets `approved`). If it prints `[REFUSED]`, fix what the checklist names and re-run. On
-   success it records `spec` = `approved`, sets `current_version` to the target `v_N`, and
-   reports any downstream step it marked `stale`. Relay the summary and tell the analyst to
-   open a fresh conversation and run the next step (`tableau-build`, or `tableau-route` to
-   confirm).
+On success: `spec` = `approved`, `build` = `skipped`. Re-running mock still stales `spec`;
+re-running spec overwrites the root guide in place.
 
 ## Notes
 
-- **Non-skippable.** The build needs an explicit spec; `commit` only ever sets `approved`.
-- **Versioned deliverable.** `IMPLEMENTATION-SPEC.md` lives under `mock-version/<v_N>/`
-  beside its `mock.html` (CONTRACT.md Â§4.3). Spec writes into the mock's `current_version`
-  and **overwrites in place** on a re-run; it never bumps `current_version`. A new spec
-  version is created by re-running `tableau-mock` (which bumps and stales spec). The target
-  path is reported by `precheck`.
-
-> The full `STATE.md` schema and the ordering / staleness / versioning rules live in
-> `CONTRACT.md` at the repo root. This skill restates only its own slice; `spec.py` /
-> `reconcile.py` are the executable mirror of the contract it enforces.
+- Scripts are the executable contract. Do not hand-edit `STATE.md`.
+- A worked human-route example lives under `demo/human-route/` (Sales Performance).
+- Full schema: `CONTRACT.md` at the repo root.
