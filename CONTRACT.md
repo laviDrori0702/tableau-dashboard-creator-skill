@@ -309,6 +309,8 @@ Two kinds of outputs, two storage strategies:
   `DASHBOARD-PLAN.md` live at the project root and are overwritten in place. There is exactly one
   current copy. Re-running one of these skills updates the root file and triggers staleness (§4.2);
   it does **not** create a new version directory.
+> **`mock.html` and views.** When `DASHBOARD-PLAN.md` declares more than one `view`, `mock.html` may hold several canvases (one per view) behind a tab strip in a single file; `tableau-mock` coverage is checked per view. A plan with no `view` column still produces one canvas.
+
 - **Deliverables = standalone versioned copies.** `mock.html`, `IMPLEMENTATION-SPEC.md`, and
   `dashboard.twbx` (plus build's internal `build-manifest.json` and `dashboard.twb`, §3) are written under
   `mock-version/v_N/`, all three deliverables sharing the **same** `v_N`

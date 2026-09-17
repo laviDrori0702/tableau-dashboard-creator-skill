@@ -476,3 +476,101 @@ def test_skeleton_multi_select_has_apply_and_no_native_listbox() -> None:
     assert 'type="checkbox"' in skeleton
     assert ">Apply<" in skeleton
     assert 'data-plan-id="int-filter-toggle"' in skeleton
+
+# --- Multi-view tabs (issue #99) ---------------------------------------------
+
+_MULTI_VIEW_PLAN = (
+    "# Dashboard Plan: Multi\n\n"
+    "## Screen Size\n- **mode**: fixed\n- **dimensions**: 1366 x 768 px\n\n"
+    "## Layout Grid\n"
+    "| slot    | position | size | view     |\n"
+    "|---------|----------|------|----------|\n"
+    "| main-a  | left     | 100% | Overview |\n"
+    "| main-b  | left     | 100% | Detail   |\n\n"
+    "## Elements\n"
+    "| id       | type  | columns | slot   | size | view     |\n"
+    "|----------|-------|---------|--------|------|----------|\n"
+    "| chart-a  | chart | revenue | main-a | 100% | Overview |\n"
+    "| chart-b  | chart | profit  | main-b | 100% | Detail   |\n\n"
+    "## Filters\n"
+    "| id  | field | control type | scope | default |\n"
+    "|-----|-------|--------------|-------|---------|\n"
+    "| none | —    | —            | —     | —       |\n\n"
+    "## Interactions\n"
+    "| id  | from | to | interaction |\n"
+    "|-----|------|----|-------------|\n"
+    "| none | —   | —  | —           |\n"
+)
+
+
+def _multi_view_html(*, missing_detail: bool = False) -> str:
+    """Two view canvases; optionally omit chart-b from the Detail canvas."""
+    detail_body = "" if missing_detail else '<div class="chart" data-plan-id="chart-b"></div>'
+    return f"""<!doctype html><html><body>
+<nav class="view-tabs" role="tablist">
+  <button role="tab" aria-selected="true">Overview</button>
+  <button role="tab">Detail</button>
+</nav>
+<div class="canvas view-canvas is-active" data-view="Overview">
+  <div class="chart" data-plan-id="chart-a"></div>
+</div>
+<div class="canvas view-canvas" data-view="Detail">
+  {detail_body}
+</div>
+<script type="application/json" id="mock-layout">
+{{
+  "views": [
+    {{"name": "Overview", "canvas": {{"width": 1366, "height": 768}},
+      "elements": [{{"id": "chart-a", "x": 0, "y": 0, "width": 1366, "height": 768}}]}},
+    {{"name": "Detail", "canvas": {{"width": 1366, "height": 768}},
+      "elements": [{{"id": "chart-b", "x": 0, "y": 0, "width": 1366, "height": 768}}]}}
+  ]
+}}
+</script>
+</body></html>"""
+
+
+def test_parse_plan_coverage_reads_views():
+    """A plan with a view column reports both views and id->view assignments."""
+    cov = coverage.parse_plan_coverage(_MULTI_VIEW_PLAN)
+    assert cov.is_multi_view is True
+    assert cov.views == ["Detail", "Overview"] or set(cov.views) == {"Detail", "Overview"}
+    assert cov.id_views["chart-a"] == "Overview"
+    assert cov.id_views["chart-b"] == "Detail"
+
+
+def test_validate_multi_view_mock_passes():
+    """Each view's ids present on that view's canvas — checklist OK."""
+    validation = coverage.validate_mock(_MULTI_VIEW_PLAN, _multi_view_html())
+    assert validation.ok is True
+    assert validation.gaps == []
+
+
+def test_validate_multi_view_gap_names_the_view():
+    """An id missing from its view canvas is a gap that carries the view name."""
+    validation = coverage.validate_mock(
+        _MULTI_VIEW_PLAN, _multi_view_html(missing_detail=True)
+    )
+    assert validation.ok is False
+    gap_labels = [(g.label, g.view) for g in validation.gaps]
+    assert ("chart-b", "Detail") in gap_labels
+
+
+def test_single_view_plan_unchanged_without_tab_strip():
+    """No view column => whole-document coverage (existing single-canvas mocks)."""
+    validation = coverage.validate_mock(FULL_PLAN, _mock_html())
+    assert validation.ok is True
+    assert all(item.view is None for item in validation.coverage if item.kind != "screen size" or True)
+    # screen size and others should not set view on single-view
+    assert all(item.view is None for item in validation.coverage)
+
+
+def test_skeleton_documents_view_tabs() -> None:
+    """The reference skeleton documents the tab strip + data-view convention."""
+    skeleton = (
+        Path(__file__).resolve().parent.parent
+        / "skills" / "tableau-mock" / "references" / "MOCK-SKELETON.html"
+    ).read_text(encoding="utf-8")
+    assert "view-tabs" in skeleton
+    assert "data-view=" in skeleton
+    assert "showView" in skeleton

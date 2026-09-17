@@ -453,7 +453,7 @@ def commit(project_dir: Path | str) -> CommitResult:
         if validation.gaps:
             reasons.append(
                 "coverage gaps: "
-                + ", ".join(f"{item.kind} '{item.label}'" for item in validation.gaps)
+                + ", ".join((f"{item.kind} '{item.label}'" + (f" (view {item.view})" if getattr(item, "view", None) else "")) for item in validation.gaps)
             )
         if validation.missing_boxes:
             reasons.append("no layout box for: " + ", ".join(validation.missing_boxes))
@@ -543,8 +543,14 @@ def format_validation(validation: MockValidation) -> str:
     lines = ["Coverage checklist (plan -> mock):"]
     for item in validation.coverage:
         mark = "x" if item.rendered else " "
-        gap = "" if item.rendered else "   <- MISSING from mock"
-        lines.append(f"  [{mark}] {item.kind}: {item.label}{gap}")
+        view_bit = f" (view {item.view})" if getattr(item, "view", None) else ""
+        if item.rendered:
+            gap = ""
+        elif item.view:
+            gap = f"   <- MISSING from view '{item.view}' canvas"
+        else:
+            gap = "   <- MISSING from mock"
+        lines.append(f"  [{mark}] {item.kind}: {item.label}{view_bit}{gap}")
     for missing in validation.missing_boxes:
         lines.append(
             f"  [ ] element '{missing}': no geometry box in layout manifest   <- MISSING"
